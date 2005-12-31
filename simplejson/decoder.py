@@ -3,7 +3,7 @@ Implementation of JSONDecoder
 """
 import re
 
-from simple_json.scanner import Scanner, pattern
+from simplejson.scanner import Scanner, pattern
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 

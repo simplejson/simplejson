@@ -1,10 +1,10 @@
-import simple_json
+import simplejson
 
 def test_listrecursion():
     x = []
     x.append(x)
     try:
-        simple_json.dumps(x)
+        simplejson.dumps(x)
     except ValueError:
         pass
     else:
@@ -13,7 +13,7 @@ def test_listrecursion():
     y = [x]
     x.append(y)
     try:
-        simple_json.dumps(x)
+        simplejson.dumps(x)
     except ValueError:
         pass
     else:
@@ -21,13 +21,13 @@ def test_listrecursion():
     y = []
     x = [y, y]
     # ensure that the marker is cleared
-    simple_json.dumps(x)
+    simplejson.dumps(x)
 
 def test_dictrecursion():
     x = {}
     x["test"] = x
     try:
-        simple_json.dumps(x)
+        simplejson.dumps(x)
     except ValueError:
         pass
     else:
@@ -35,12 +35,12 @@ def test_dictrecursion():
     x = {}
     y = {"a": x, "b": x}
     # ensure that the marker is cleared
-    simple_json.dumps(x)
+    simplejson.dumps(x)
 
 class TestObject:
     pass
 
-class RecursiveJSONEncoder(simple_json.JSONEncoder):
+class RecursiveJSONEncoder(simplejson.JSONEncoder):
     recurse = False
     def default(self, o):
         if o is TestObject:
@@ -48,7 +48,7 @@ class RecursiveJSONEncoder(simple_json.JSONEncoder):
                 return [TestObject]
             else:
                 return 'TestObject'
-        simple_json.JSONEncoder.default(o)
+        simplejson.JSONEncoder.default(o)
 
 def test_defaultrecursion():
     enc = RecursiveJSONEncoder()

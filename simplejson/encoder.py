@@ -2,7 +2,6 @@
 Implementation of JSONEncoder
 """
 import re
-import math
 
 # this should match any kind of infinity
 INFCHARS = re.compile(r'[infINF]')

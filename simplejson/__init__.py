@@ -5,46 +5,46 @@ JSON (JavaScript Object Notation) <http://json.org> is a subset of
 JavaScript syntax (ECMA-262 3rd edition) used as a lightweight data
 interchange format.
 
-simple_json exposes an API familiar to uses of the standard library
+simplejson exposes an API familiar to uses of the standard library
 marshal and pickle modules.
 
 Encoding basic Python object hierarchies::
     
-    >>> import simple_json
-    >>> simple_json.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
+    >>> import simplejson
+    >>> simplejson.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
     '["foo", {"bar":["baz", null, 1.0, 2]}]'
-    >>> print simple_json.dumps("\"foo\bar")
+    >>> print simplejson.dumps("\"foo\bar")
     "\"foo\bar"
-    >>> print simple_json.dumps(u'\u1234')
+    >>> print simplejson.dumps(u'\u1234')
     "\u1234"
-    >>> print simple_json.dumps('\\')
+    >>> print simplejson.dumps('\\')
     "\\"
     >>> from StringIO import StringIO
     >>> io = StringIO()
-    >>> simple_json.dump(['streaming API'], io)
+    >>> simplejson.dump(['streaming API'], io)
     >>> io.getvalue()
     '["streaming API"]'
 
 Decoding JSON::
     
-    >>> import simple_json
-    >>> simple_json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]')
+    >>> import simplejson
+    >>> simplejson.loads('["foo", {"bar":["baz", null, 1.0, 2]}]')
     [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
-    >>> simple_json.loads('"\\"foo\\bar"')
+    >>> simplejson.loads('"\\"foo\\bar"')
     u'"foo\x08ar'
     >>> from StringIO import StringIO
     >>> io = StringIO('["streaming API"]')
-    >>> simple_json.load(io)
+    >>> simplejson.load(io)
     [u'streaming API']
 
 Extending JSONEncoder::
     
-    >>> import simple_json
-    >>> class ComplexEncoder(simple_json.JSONEncoder):
+    >>> import simplejson
+    >>> class ComplexEncoder(simplejson.JSONEncoder):
     ...     def default(self, obj):
     ...         if isinstance(obj, complex):
     ...             return [obj.real, obj.imag]
-    ...         return simple_json.JSONEncoder.default(self, obj)
+    ...         return simplejson.JSONEncoder.default(self, obj)
     ... 
     >>> dumps(2 + 1j, cls=ComplexEncoder)
     '[2.0, 1.0]'
@@ -177,7 +177,7 @@ def read(s):
     json-py API compatibility hook.  Use loads(s) instead.
     """
     import warnings
-    warnings.warn("simple_json.loads(s) should be used instead of read(s)",
+    warnings.warn("simplejson.loads(s) should be used instead of read(s)",
         DeprecationWarning)
     return loads(s)
 
@@ -186,7 +186,7 @@ def write(obj):
     json-py API compatibility hook.  Use dumps(s) instead.
     """
     import warnings
-    warnings.warn("simple_json.dumps(s) should be used instead of write(s)",
+    warnings.warn("simplejson.dumps(s) should be used instead of write(s)",
         DeprecationWarning)
     return dumps(obj)
 

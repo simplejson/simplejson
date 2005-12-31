@@ -10,7 +10,7 @@ JSON = r'''
 
 def test_parse():
     # test in/out equivalence and parsing
-    import simple_json
-    res = simple_json.loads(JSON)
-    out = simple_json.dumps(res)
-    assert res == simple_json.loads(out)
+    import simplejson
+    res = simplejson.loads(JSON)
+    out = simplejson.dumps(res)
+    assert res == simplejson.loads(out)

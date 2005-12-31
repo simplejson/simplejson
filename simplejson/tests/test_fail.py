@@ -56,14 +56,14 @@ SKIPS = {
 }
 
 def test_failures():
-    import simple_json
+    import simplejson
     for idx, doc in enumerate(JSONDOCS):
         idx = idx + 1
         if idx in SKIPS:
-            simple_json.loads(doc)
+            simplejson.loads(doc)
             continue
         try:
-            simple_json.loads(doc)
+            simplejson.loads(doc)
         except ValueError:
             pass
         else:
