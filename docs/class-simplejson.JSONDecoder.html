@@ -1,0 +1,205 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+  
+  <HEAD><META CONTENT="text/html; charset=utf-8" HTTP-EQUIV="Content-Type">
+    <TITLE>simplejson.JSONDecoder -- Simple JSON &amp;lt;&lt;a class="reference" href="http://json.org">http://json.org&lt;/a>&amp;gt; decoder</TITLE>
+    <LINK HREF="layout.css" TYPE="text/css" REL="stylesheet">
+    
+  </HEAD>
+  <BODY>
+    <DIV ID="page">
+      
+    <DIV ID="top-nav">
+        <H1 ID="doc-title">
+        <A HREF="index.html" REL="index">simplejson 1.1</A></H1>
+        <DIV CLASS="online-navigation">
+          <A HREF="index.html" REL="index">index</A>
+          <SPAN ID="nav-docs">
+            
+          </SPAN>
+          
+          
+          <BR>
+          
+          
+          
+          <A HREF="module-simplejson.html" TITLE="simplejson reference">
+            simplejson
+          </A>
+          
+            
+            <A HREF="class-simplejson.JSONDecoder.html">details</A>
+            
+            <A HREF="class-simplejson.JSONDecoder-index.html">
+              tree
+            </A>
+            
+          
+        </DIV>
+    </DIV>
+    
+    <DIV ID="main-content">
+  
+  <H1 CLASS="pudge-member-page-heading">
+    <TT>JSONDecoder</TT>
+  </H1>
+  <H4 CLASS="pudge-member-page-subheading">
+    Simple JSON &lt;<A HREF="http://json.org" CLASS="reference">http://json.org</A>> decoder
+  </H4>
+  <P CLASS="pudge-member-parent-link">
+    <SMALL>
+    The JSONDecoder class is accessible via the
+    <A HREF="module-simplejson.html">
+      <TT>simplejson</TT>
+    </A> module.
+    </SMALL>
+  </P>
+  <DIV ID="pudge-section-nav">
+  <UL>
+    <LI>
+      <A HREF="#attributes" CLASS="pudge-section-link">
+        Attributes (1)
+      </A>
+      
+    </LI>
+      
+    <LI>
+      <A HREF="#methods" CLASS="pudge-section-link">
+        Methods (1)
+      </A>
+      
+    </LI>
+    
+    <LI>
+      <A HREF="simplejson/decoder.py.html?f=196&amp;l=257#196" CLASS="pudge-section-link">
+        Source
+      </A>
+    </LI>
+  </UL>
+  </DIV>
+  <DIV STYLE="clear: left">
+  </DIV>
+  <DIV CLASS="rst pudge-module-doc">
+    <P>Performs the following translations in decoding:</P>
+<TABLE BORDER="1" CLASS="docutils">
+<COLGROUP>
+<COL WIDTH="44%">
+
+<COL WIDTH="56%">
+
+</COLGROUP>
+<THEAD VALIGN="bottom">
+<TR>
+<TH CLASS="head">JSON</TH>
+<TH CLASS="head">Python</TH>
+</TR>
+</THEAD>
+<TBODY VALIGN="top">
+<TR>
+<TD>object</TD>
+<TD>dict</TD>
+</TR>
+<TR>
+<TD>array</TD>
+<TD>list</TD>
+</TR>
+<TR>
+<TD>string</TD>
+<TD>unicode</TD>
+</TR>
+<TR>
+<TD>number (int)</TD>
+<TD>int, long</TD>
+</TR>
+<TR>
+<TD>number (real)</TD>
+<TD>float</TD>
+</TR>
+<TR>
+<TD>true</TD>
+<TD>True</TD>
+</TR>
+<TR>
+<TD>false</TD>
+<TD>False</TD>
+</TR>
+<TR>
+<TD>null</TD>
+<TD>None</TD>
+</TR>
+</TBODY>
+</TABLE>
+<P>It also understands <TT CLASS="docutils literal"><SPAN CLASS="pre">NaN</SPAN></TT>, <TT CLASS="docutils literal"><SPAN CLASS="pre">Infinity</SPAN></TT>, and <TT CLASS="docutils literal"><SPAN CLASS="pre">-Infinity</SPAN></TT> as
+their corresponding <TT CLASS="docutils literal"><SPAN CLASS="pre">float</SPAN></TT> values, which is outside the JSON spec.</P>
+  </DIV>
+  
+  <HR>
+  
+  
+  
+  
+    <A NAME="attributes">
+  
+  
+    </A>
+    <H2>Attributes</H2>
+    <DIV CLASS="pudge-member name">
+    <A NAME="scanner">
+    </A>
+    <H4 CLASS="pudge-member-name">
+    <SPAN CLASS="prefix">a</SPAN>
+      <TT>
+      <A HREF="class-simplejson.JSONDecoder.html#scanner" CLASS="pudge-obj-link">scanner</A></TT></H4>
+    <DIV CLASS="pudge-section rst">
+      <PRE>&lt;simplejson.scanner.Scanner object at 0x67ec70></PRE>
+    </DIV>
+  </DIV>
+    
+  
+    <A NAME="methods">
+    
+  
+    </A>
+    <H2>Methods</H2>
+    <DIV CLASS="pudge-member routine alias">
+    <A NAME="__init__">
+    </A>
+    <H4 CLASS="pudge-member-name">
+    <SPAN CLASS="prefix">f</SPAN>
+      <TT>
+      <A HREF="class-simplejson.JSONDecoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, encoding=None)</TT>
+      <A HREF="simplejson/decoder.py.html?f=228&amp;l=230#228" TITLE="View Source">...</A>
+    </H4>
+    <DIV CLASS="pudge-section rst">
+      
+    
+    
+  
+    </DIV>
+  </DIV>
+    
+  
+  
+  <P>
+    <SMALL>
+    
+    
+    See 
+    <A HREF="simplejson/decoder.py.html?f=196&amp;l=257#196" TITLE="simplejson/decoder.py:196">the source</A>
+    for more information.
+    </SMALL>
+  </P>
+</DIV>
+    
+    <DIV ID="footer">
+      
+      <P ID="pudge">
+        Built with
+        <A HREF="http://lesscode.org/projects/pudge/">
+          Pudge/0.1</A>
+      </P>
+      
+    </DIV>
+    </DIV>
+  </BODY>
+</HTML>
