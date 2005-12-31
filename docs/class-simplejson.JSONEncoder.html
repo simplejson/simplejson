@@ -5,6 +5,8 @@
     <TITLE>simplejson.JSONEncoder -- Extensible JSON &amp;lt;&lt;a class="reference" href="http://json.org">http://json.org&lt;/a>&amp;gt; encoder for Python data structures.</TITLE>
     <LINK HREF="layout.css" TYPE="text/css" REL="stylesheet">
     
+    <SCRIPT SRC="class_to_source.js" TYPE="text/javascript">
+    </SCRIPT>
   </HEAD>
   <BODY>
     <DIV ID="page">
@@ -64,13 +66,13 @@
     </LI>
     <LI>
       <A HREF="#methods" CLASS="pudge-section-link">
-        Methods (1)
+        Methods (4)
       </A>
       
     </LI>
     
     <LI>
-      <A HREF="simplejson/encoder.py.html?f=63&amp;l=273#63" CLASS="pudge-section-link">
+      <A HREF="simplejson/encoder.py.html#63" CLASS="pudge-section-link lines-63-277">
         Source
       </A>
     </LI>
@@ -125,7 +127,7 @@
 </TBODY>
 </TABLE>
 <P>To extend this to recognize other objects, subclass and implement a
-<TT CLASS="docutils literal"><SPAN CLASS="pre">.default(o)</SPAN></TT> method with another method that returns a serializable
+<TT CLASS="docutils literal"><SPAN CLASS="pre">.default()</SPAN></TT> method with another method that returns a serializable
 object for <TT CLASS="docutils literal"><SPAN CLASS="pre">o</SPAN></TT> if possible, otherwise it should call the superclass
 implementation (to raise <TT CLASS="docutils literal"><SPAN CLASS="pre">TypeError</SPAN></TT>).</P>
   </DIV>
@@ -147,7 +149,7 @@ implementation (to raise <TT CLASS="docutils literal"><SPAN CLASS="pre">TypeErro
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
       <A HREF="class-simplejson.JSONEncoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True)</TT>
-      <A HREF="simplejson/encoder.py.html?f=92&amp;l=120#92" TITLE="View Source">...</A>
+      <A HREF="simplejson/encoder.py.html#93" CLASS="lines-93-121" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -171,6 +173,81 @@ Otherwise, it will be a ValueError to encode such floats.</P>
   
     </DIV>
   </DIV>
+  <DIV CLASS="pudge-member routine alias">
+    <A NAME="default">
+    </A>
+    <H4 CLASS="pudge-member-name">
+    <SPAN CLASS="prefix">f</SPAN>
+      <TT>
+      <A HREF="class-simplejson.JSONEncoder.html#default" CLASS="pudge-obj-link">default</A>(self, o)</TT>
+      <A HREF="simplejson/encoder.py.html#229" CLASS="lines-229-248" TITLE="View Source">...</A>
+    </H4>
+    <DIV CLASS="pudge-section rst">
+      
+    <P CLASS="pudge-member-blurb">
+      Implement this method in a subclass such that it returns
+a serializable object for <TT CLASS="docutils literal"><SPAN CLASS="pre">o</SPAN></TT>, or calls the base implementation
+(to raise a <TT CLASS="docutils literal"><SPAN CLASS="pre">TypeError</SPAN></TT>).
+    </P>
+    <P>For example, to support arbitrary iterators, you could
+implement default like this:</P>
+<PRE CLASS="literal-block">
+def default(self, o):
+    try:
+        iterable = iter(o)
+    except TypeError:
+        pass
+    else:
+        return list(iterable)
+    return JSONEncoder.default(self, o)
+</PRE>
+  
+    </DIV>
+  </DIV>
+  <DIV CLASS="pudge-member routine alias">
+    <A NAME="encode">
+    </A>
+    <H4 CLASS="pudge-member-name">
+    <SPAN CLASS="prefix">f</SPAN>
+      <TT>
+      <A HREF="class-simplejson.JSONEncoder.html#encode" CLASS="pudge-obj-link">encode</A>(self, o)</TT>
+      <A HREF="simplejson/encoder.py.html#249" CLASS="lines-249-261" TITLE="View Source">...</A>
+    </H4>
+    <DIV CLASS="pudge-section rst">
+      
+    <P CLASS="pudge-member-blurb">
+      Return a JSON string representation of a Python data structure.
+    </P>
+    <PRE CLASS="doctest-block">
+>>> JSONEncoder().encode({"foo": ["bar", "baz"]})
+'{"foo":["bar", "baz"]}'
+</PRE>
+  
+    </DIV>
+  </DIV>
+  <DIV CLASS="pudge-member routine alias">
+    <A NAME="iterencode">
+    </A>
+    <H4 CLASS="pudge-member-name">
+    <SPAN CLASS="prefix">f</SPAN>
+      <TT>
+      <A HREF="class-simplejson.JSONEncoder.html#iterencode" CLASS="pudge-obj-link">iterencode</A>(self, o)</TT>
+      <A HREF="simplejson/encoder.py.html#262" CLASS="lines-262-277" TITLE="View Source">...</A>
+    </H4>
+    <DIV CLASS="pudge-section rst">
+      
+    <P CLASS="pudge-member-blurb">
+      Encode the given object and yield each string
+representation as available.
+    </P>
+    <P>For example:</P>
+<PRE CLASS="literal-block">
+for chunk in JSONEncoder().iterencode(bigobject):
+    mysocket.write(chunk)
+</PRE>
+  
+    </DIV>
+  </DIV>
     
   
   
@@ -179,7 +256,7 @@ Otherwise, it will be a ValueError to encode such floats.</P>
     
     
     See 
-    <A HREF="simplejson/encoder.py.html?f=63&amp;l=273#63" TITLE="simplejson/encoder.py:63">the source</A>
+    <A HREF="simplejson/encoder.py.html?f=63&amp;l=277#63" TITLE="simplejson/encoder.py:63">the source</A>
     for more information.
     </SMALL>
   </P>

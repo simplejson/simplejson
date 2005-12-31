@@ -5,6 +5,8 @@
     <TITLE>simplejson.JSONDecoder -- Simple JSON &amp;lt;&lt;a class="reference" href="http://json.org">http://json.org&lt;/a>&amp;gt; decoder</TITLE>
     <LINK HREF="layout.css" TYPE="text/css" REL="stylesheet">
     
+    <SCRIPT SRC="class_to_source.js" TYPE="text/javascript">
+    </SCRIPT>
   </HEAD>
   <BODY>
     <DIV ID="page">
@@ -57,21 +59,20 @@
   <DIV ID="pudge-section-nav">
   <UL>
     <LI>
-      <A HREF="#attributes" CLASS="pudge-section-link">
-        Attributes (1)
-      </A>
       
+      <SPAN CLASS="pudge-missing-section-link">
+        Attributes
+      </SPAN>
     </LI>
-      
     <LI>
       <A HREF="#methods" CLASS="pudge-section-link">
-        Methods (1)
+        Methods (3)
       </A>
       
     </LI>
     
     <LI>
-      <A HREF="simplejson/decoder.py.html?f=196&amp;l=257#196" CLASS="pudge-section-link">
+      <A HREF="simplejson/decoder.py.html#196" CLASS="pudge-section-link lines-196-266">
         Source
       </A>
     </LI>
@@ -138,26 +139,8 @@ their corresponding <TT CLASS="docutils literal"><SPAN CLASS="pre">float</SPAN><
   
   
   
-    <A NAME="attributes">
-  
-  
-    </A>
-    <H2>Attributes</H2>
-    <DIV CLASS="pudge-member name">
-    <A NAME="scanner">
-    </A>
-    <H4 CLASS="pudge-member-name">
-    <SPAN CLASS="prefix">a</SPAN>
-      <TT>
-      <A HREF="class-simplejson.JSONDecoder.html#scanner" CLASS="pudge-obj-link">scanner</A></TT></H4>
-    <DIV CLASS="pudge-section rst">
-      <PRE>&lt;simplejson.scanner.Scanner object at 0x67ec70></PRE>
-    </DIV>
-  </DIV>
-    
-  
     <A NAME="methods">
-    
+  
   
     </A>
     <H2>Methods</H2>
@@ -168,12 +151,58 @@ their corresponding <TT CLASS="docutils literal"><SPAN CLASS="pre">float</SPAN><
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
       <A HREF="class-simplejson.JSONDecoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, encoding=None)</TT>
-      <A HREF="simplejson/decoder.py.html?f=228&amp;l=230#228" TITLE="View Source">...</A>
+      <A HREF="simplejson/decoder.py.html#229" CLASS="lines-229-239" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
+    <P CLASS="pudge-member-blurb">
+      <TT CLASS="docutils literal">
+      <SPAN CLASS="pre">encoding</SPAN></TT> determines the encoding used to interpret any <TT CLASS="docutils literal"><SPAN CLASS="pre">str</SPAN></TT>
+objects decoded by this instance (utf-8 by default).  It has no
+effect when decoding <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPAN></TT> objects.
+    </P>
+    <P>Note that currently only encodings that are a superset of ASCII work,
+strings of other encodings should be passed in as <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPAN></TT>.</P>
+  
+    </DIV>
+  </DIV>
+  <DIV CLASS="pudge-member routine alias">
+    <A NAME="decode">
+    </A>
+    <H4 CLASS="pudge-member-name">
+    <SPAN CLASS="prefix">f</SPAN>
+      <TT>
+      <A HREF="class-simplejson.JSONDecoder.html#decode" CLASS="pudge-obj-link">decode</A>(self, s)</TT>
+      <A HREF="simplejson/decoder.py.html#240" CLASS="lines-240-250" TITLE="View Source">...</A>
+    </H4>
+    <DIV CLASS="pudge-section rst">
+      
+    <P CLASS="pudge-member-blurb">
+      Return the Python representation of <TT CLASS="docutils literal"><SPAN CLASS="pre">s</SPAN></TT> (a <TT CLASS="docutils literal"><SPAN CLASS="pre">str</SPAN></TT> or <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPAN></TT>
+instance containing a JSON document)
+    </P>
     
-    
+  
+    </DIV>
+  </DIV>
+  <DIV CLASS="pudge-member routine alias">
+    <A NAME="raw_decode">
+    </A>
+    <H4 CLASS="pudge-member-name">
+    <SPAN CLASS="prefix">f</SPAN>
+      <TT>
+      <A HREF="class-simplejson.JSONDecoder.html#raw_decode" CLASS="pudge-obj-link">raw_decode</A>(self, s)</TT>
+      <A HREF="simplejson/decoder.py.html#251" CLASS="lines-251-266" TITLE="View Source">...</A>
+    </H4>
+    <DIV CLASS="pudge-section rst">
+      
+    <P CLASS="pudge-member-blurb">
+      Decode a JSON document from <TT CLASS="docutils literal"><SPAN CLASS="pre">s</SPAN></TT> (a <TT CLASS="docutils literal"><SPAN CLASS="pre">str</SPAN></TT> or <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPAN></TT> beginning
+with a JSON document) and return a 2-tuple of the Python
+representation and the index in <TT CLASS="docutils literal"><SPAN CLASS="pre">s</SPAN></TT> where the document ended.
+    </P>
+    <P>This can be used to decode a JSON document from a string that may
+have extraneous data at the end.</P>
   
     </DIV>
   </DIV>
@@ -185,7 +214,7 @@ their corresponding <TT CLASS="docutils literal"><SPAN CLASS="pre">float</SPAN><
     
     
     See 
-    <A HREF="simplejson/decoder.py.html?f=196&amp;l=257#196" TITLE="simplejson/decoder.py:196">the source</A>
+    <A HREF="simplejson/decoder.py.html?f=196&amp;l=266#196" TITLE="simplejson/decoder.py:196">the source</A>
     for more information.
     </SMALL>
   </P>

@@ -17,7 +17,7 @@ VERSION = _get_version()
 
 
 res = subprocess.call([
-    'pudge', '-d', 'docs', '-m', PROJECT,
+    'pudge', '-v', '-d', 'docs', '-m', PROJECT,
     '-l', '%s %s' % (PROJECT, VERSION),
     '--theme=green'
 ])

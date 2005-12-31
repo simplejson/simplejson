@@ -85,10 +85,11 @@ class JSONEncoder(object):
     +-------------------+---------------+
 
     To extend this to recognize other objects, subclass and implement a
-    ``.default(o)`` method with another method that returns a serializable
+    ``.default()`` method with another method that returns a serializable
     object for ``o`` if possible, otherwise it should call the superclass
     implementation (to raise ``TypeError``).
     """
+    __all__ = ['__init__', 'default', 'encode', 'iterencode']
     def __init__(self, skipkeys=False, ensure_ascii=True, check_circular=True,
             allow_nan=True):
         """
@@ -187,22 +188,6 @@ class JSONEncoder(object):
         if markers is not None:
             del markers[markerid]
 
-    def iterencode(self, o):
-        """
-        Encode the given object and yield each string
-        representation as available.
-        
-        For example::
-            
-            for chunk in JSONEncoder().iterencode(bigobject):
-                mysocket.write(chunk)
-        """
-        if self.check_circular:
-            markers = {}
-        else:
-            markers = None
-        return self._iterencode(o, markers)
-
     def _iterencode(self, o, markers=None):
         if isinstance(o, basestring):
             if self.ensure_ascii:
@@ -264,11 +249,30 @@ class JSONEncoder(object):
     def encode(self, o):
         """
         Return a JSON string representation of a Python data structure.
+
+        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
+        '{"foo":["bar", "baz"]}'
         """
         # This doesn't pass the iterator directly to ''.join() because it
         # sucks at reporting exceptions.  It's going to do this internally
         # anyway because it uses PySequence_Fast or similar.
         chunks = list(self.iterencode(o))
         return ''.join(chunks)
+
+    def iterencode(self, o):
+        """
+        Encode the given object and yield each string
+        representation as available.
+        
+        For example::
+            
+            for chunk in JSONEncoder().iterencode(bigobject):
+                mysocket.write(chunk)
+        """
+        if self.check_circular:
+            markers = {}
+        else:
+            markers = None
+        return self._iterencode(o, markers)
 
 __all__ = ['JSONEncoder']

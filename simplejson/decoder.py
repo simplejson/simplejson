@@ -223,10 +223,30 @@ class JSONDecoder(object):
     their corresponding ``float`` values, which is outside the JSON spec.
     """
 
-    scanner = Scanner(ANYTHING)
+    _scanner = Scanner(ANYTHING)
+    __all__ = ['__init__', 'decode', 'raw_decode']
 
     def __init__(self, encoding=None):
+        """
+        ``encoding`` determines the encoding used to interpret any ``str``
+        objects decoded by this instance (utf-8 by default).  It has no
+        effect when decoding ``unicode`` objects.
+        
+        Note that currently only encodings that are a superset of ASCII work,
+        strings of other encodings should be passed in as ``unicode``.
+        """
         self.encoding = encoding
+
+    def decode(self, s):
+        """
+        Return the Python representation of ``s`` (a ``str`` or ``unicode``
+        instance containing a JSON document)
+        """
+        obj, end = self.raw_decode(s, idx=skipwhitespace(s, 0))
+        end = skipwhitespace(s, end)
+        if end != len(s):
+            raise ValueError(errmsg("Extra data", s, end, len(s)))
+        return obj
 
     def raw_decode(self, s, **kw):
         """
@@ -239,20 +259,9 @@ class JSONDecoder(object):
         """
         kw.setdefault('context', self)
         try:
-            obj, end = self.scanner.iterscan(s, **kw).next()
+            obj, end = self._scanner.iterscan(s, **kw).next()
         except StopIteration:
             raise ValueError("No JSON object could be decoded")
         return obj, end
-
-    def decode(self, s):
-        """
-        Return the Python representation of ``s`` (a ``str`` or ``unicode``
-        instance containing a JSON document)
-        """
-        obj, end = self.raw_decode(s, idx=skipwhitespace(s, 0))
-        end = skipwhitespace(s, end)
-        if end != len(s):
-            raise ValueError(errmsg("Extra data", s, end, len(s)))
-        return obj
 
 __all__ = ['JSONDecoder']
