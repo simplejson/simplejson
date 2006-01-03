@@ -61,7 +61,3 @@ def pattern(pattern, flags=FLAGS):
         fn.regex = re.compile(pattern, flags)
         return fn
     return decorator
-
-def InsignificantWhitespace(match, context):
-    return None, None
-pattern(r'\s+')(InsignificantWhitespace)
