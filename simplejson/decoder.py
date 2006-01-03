@@ -34,29 +34,18 @@ def errmsg(msg, doc, pos, end=None):
     return '%s: line %d column %d - line %d column %d (char %d - %d)' % (
         msg, lineno, colno, endlineno, endcolno, pos, end)
 
-def JSONInfinity(match, context):
-    return PosInf, None
-pattern('Infinity')(JSONInfinity)
+_CONSTANTS = {
+    '-Infinity': NegInf,
+    'Infinity': PosInf,
+    'NaN': NaN,
+    'true': True,
+    'false': False,
+    'null': None,
+}
 
-def JSONNegInfinity(match, context):
-    return NegInf, None
-pattern('-Infinity')(JSONNegInfinity)
-
-def JSONNaN(match, context):
-    return NaN, None
-pattern('NaN')(JSONNaN)
-
-def JSONTrue(match, context):
-    return True, None
-pattern('true')(JSONTrue)
-
-def JSONFalse(match, context):
-    return False, None
-pattern('false')(JSONFalse)
-
-def JSONNull(match, context):
-    return None, None
-pattern('null')(JSONNull)
+def JSONConstant(match, context, c=_CONSTANTS):
+    return c[match.group(0)], None
+pattern('(-?Infinity|NaN|true|false|null)')(JSONConstant)
 
 def JSONNumber(match, context):
     match = JSONNumber.regex.match(match.string, *match.span())
@@ -68,8 +57,7 @@ def JSONNumber(match, context):
     return res, None
 pattern(r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?')(JSONNumber)
 
-STRINGCHUNK = re.compile(r'("|\\|[^"\\]+)', FLAGS)
-STRINGBACKSLASH = re.compile(r'([\\/bfnrt"]|u[A-Fa-f0-9]{4})', FLAGS)
+STRINGCHUNK = re.compile(r'(.*?)(["\\])', FLAGS)
 BACKSLASH = {
     '"': u'"', '\\': u'\\', '/': u'/',
     'b': u'\b', 'f': u'\f', 'n': u'\n', 'r': u'\r', 't': u'\t',
@@ -77,29 +65,47 @@ BACKSLASH = {
 
 DEFAULT_ENCODING = "utf-8"
 
-def scanstring(s, end, encoding=None):
+def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
     if encoding is None:
         encoding = DEFAULT_ENCODING
     chunks = []
+    _append = chunks.append
+    begin = end - 1
     while 1:
-        chunk = STRINGCHUNK.match(s, end)
+        chunk = _m(s, end)
+        if chunk is None:
+            raise ValueError(
+                errmsg("Unterminated string starting at", s, begin))
         end = chunk.end()
-        m = chunk.group(1)
-        if m == '"':
+        content, terminator = chunk.groups()
+        if content:
+            if not isinstance(content, unicode):
+                content = unicode(content, encoding)
+            _append(content)
+        if terminator == '"':
             break
-        if m == '\\':
-            chunk = STRINGBACKSLASH.match(s, end)
-            if chunk is None:
-                raise ValueError(errmsg("Invalid \\escape", s, end))
-            end = chunk.end()
-            esc = chunk.group(1)
+        try:
+            esc = s[end]
+        except IndexError:
+            raise ValueError(
+                errmsg("Unterminated string starting at", s, begin))
+        if esc != 'u':
             try:
-                m = BACKSLASH[esc]
+                m = _b[esc]
             except KeyError:
-                m = unichr(int(esc[1:], 16))
-        if not isinstance(m, unicode):
-            m = unicode(m, encoding)
-        chunks.append(m)
+                raise ValueError(
+                    errmsg("Invalid \\escape: %r" % (esc,), s, end))
+            end += 1
+        else:
+            esc = s[end + 1:end + 5]
+            try:
+                m = unichr(int(esc, 16))
+                if len(esc) != 4 or not esc.isalnum():
+                    raise ValueError
+            except ValueError:
+                raise ValueError(errmsg("Invalid \\uXXXX escape", s, end))
+            end += 5
+        _append(m)
     return u''.join(chunks), end
 
 def JSONString(match, context):
@@ -107,18 +113,12 @@ def JSONString(match, context):
     return scanstring(match.string, match.end(), encoding)
 pattern(r'"')(JSONString)
 
-WHITESPACE = re.compile(r'\s+', FLAGS)
+WHITESPACE = re.compile(r'\s*', FLAGS)
 
-def skipwhitespace(s, end):
-    m = WHITESPACE.match(s, end)
-    if m is not None:
-        return m.end()
-    return end
-
-def JSONObject(match, context):
+def JSONObject(match, context, _w=WHITESPACE.match):
     pairs = {}
     s = match.string
-    end = skipwhitespace(s, match.end())
+    end = _w(s, match.end()).end()
     nextchar = s[end:end + 1]
     # trivial empty object
     if nextchar == '}':
@@ -129,23 +129,23 @@ def JSONObject(match, context):
     encoding = getattr(context, 'encoding', None)
     while True:
         key, end = scanstring(s, end, encoding)
-        end = skipwhitespace(s, end)
+        end = _w(s, end).end()
         if s[end:end + 1] != ':':
             raise ValueError(errmsg("Expecting : delimiter", s, end))
-        end = skipwhitespace(s, end + 1)
+        end = _w(s, end + 1).end()
         try:
             value, end = JSONScanner.iterscan(s, idx=end).next()
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
         pairs[key] = value
-        end = skipwhitespace(s, end)
+        end = _w(s, end).end()
         nextchar = s[end:end + 1]
         end += 1
         if nextchar == '}':
             break
         if nextchar != ',':
             raise ValueError(errmsg("Expecting , delimiter", s, end - 1))
-        end = skipwhitespace(s, end)
+        end = _w(s, end).end()
         nextchar = s[end:end + 1]
         end += 1
         if nextchar != '"':
@@ -153,10 +153,10 @@ def JSONObject(match, context):
     return pairs, end
 pattern(r'{')(JSONObject)
             
-def JSONArray(match, context):
+def JSONArray(match, context, _w=WHITESPACE.match):
     values = []
     s = match.string
-    end = skipwhitespace(s, match.end())
+    end = _w(s, match.end()).end()
     # look-ahead for trivial empty array
     nextchar = s[end:end + 1]
     if nextchar == ']':
@@ -167,28 +167,23 @@ def JSONArray(match, context):
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
         values.append(value)
-        end = skipwhitespace(s, end)
+        end = _w(s, end).end()
         nextchar = s[end:end + 1]
         end += 1
         if nextchar == ']':
             break
         if nextchar != ',':
             raise ValueError(errmsg("Expecting , delimiter", s, end))
-        end = skipwhitespace(s, end)
+        end = _w(s, end).end()
     return values, end
 pattern(r'\[')(JSONArray)
  
 ANYTHING = [
-    JSONTrue,
-    JSONFalse,
-    JSONNull,
-    JSONNaN,
-    JSONInfinity,
-    JSONNegInfinity,
-    JSONNumber,
-    JSONString,
-    JSONArray,
     JSONObject,
+    JSONArray,
+    JSONString,
+    JSONConstant,
+    JSONNumber,
 ]
 
 JSONScanner = Scanner(ANYTHING)
@@ -237,13 +232,13 @@ class JSONDecoder(object):
         """
         self.encoding = encoding
 
-    def decode(self, s):
+    def decode(self, s, _w=WHITESPACE.match):
         """
         Return the Python representation of ``s`` (a ``str`` or ``unicode``
         instance containing a JSON document)
         """
-        obj, end = self.raw_decode(s, idx=skipwhitespace(s, 0))
-        end = skipwhitespace(s, end)
+        obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+        end = _w(s, end).end()
         if end != len(s):
             raise ValueError(errmsg("Extra data", s, end, len(s)))
         return obj
