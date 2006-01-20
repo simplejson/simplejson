@@ -18,7 +18,7 @@ class JSONFilter(object):
                 args = [_ for _ in [environ.get('CONTENT_LENGTH')] if _]
                 data = environ['wsgi.input'].read(*map(int, args))
                 environ['jsonfilter.json'] = simplejson.loads(data)
-        res = simple_json.dumps(app(environ, json_start_response))
+        res = simplejson.dumps(self.app(environ, json_start_response))
         jsonp = res.parse_qs(environ.get('QUERY_STRING', '')).get('jsonp')
         if jsonp:
             content_type = 'text/javascript'
@@ -36,7 +36,5 @@ class JSONFilter(object):
         start_response(response['status'], headers)
         return [res]
 
-def factory(global_conf, **kw):
-    def make_filter(app):
-        return JSONFilter(app, **kw)
-    return make_filter
+def factory(app, global_conf, **kw):
+    return JSONFilter(app, **kw)
