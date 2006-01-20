@@ -46,6 +46,6 @@ setup(
     test_suite="nose.collector",
     zip_safe=True,
     entry_points={
-        'paste.filter_app_factory': ['json = simplejson.jsonfilter:filter'],
+        'paste.filter_app_factory': ['json = simplejson.jsonfilter:factory'],
     },
 )

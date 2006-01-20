@@ -36,7 +36,7 @@ class JSONFilter(object):
         start_response(response['status'], headers)
         return [res]
 
-def jsonfilter_factory(global_conf, **kw):
+def factory(global_conf, **kw):
     def make_filter(app):
         return JSONFilter(app, **kw)
     return make_filter
