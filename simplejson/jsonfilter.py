@@ -19,7 +19,7 @@ class JSONFilter(object):
                 data = environ['wsgi.input'].read(*map(int, args))
                 environ['jsonfilter.json'] = simplejson.loads(data)
         res = simplejson.dumps(self.app(environ, json_start_response))
-        jsonp = res.parse_qs(environ.get('QUERY_STRING', '')).get('jsonp')
+        jsonp = cgi.parse_qs(environ.get('QUERY_STRING', '')).get('jsonp')
         if jsonp:
             content_type = 'text/javascript'
             res = ''.join(jsonp + ['(', res, ')'])
