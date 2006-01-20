@@ -5,7 +5,7 @@ ez_setup.use_setuptools()
 
 from setuptools import setup, find_packages
 
-VERSION = '1.2'
+VERSION = '1.3'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = """
 simplejson is a simple, fast, complete, correct and extensible
@@ -45,4 +45,7 @@ setup(
     platforms=['any'],
     test_suite="nose.collector",
     zip_safe=True,
+    entry_points={
+        'paste.filter_app_factory': ['json = simplejson.jsonfilter:filter'],
+    },
 )
