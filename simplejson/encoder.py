@@ -181,7 +181,7 @@ class JSONEncoder(object):
             else:
                 yield ', '
             yield encoder(key)
-            yield ':'
+            yield ': '
             for chunk in self._iterencode(value, markers):
                 yield chunk
         yield '}'
