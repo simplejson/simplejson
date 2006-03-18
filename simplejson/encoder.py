@@ -90,18 +90,18 @@ class JSONEncoder(object):
     implementation (to raise ``TypeError``).
     """
     __all__ = ['__init__', 'default', 'encode', 'iterencode']
-    def __init__(self, skipkeys=False, ensure_ascii=True, check_circular=True,
-            allow_nan=True):
+    def __init__(self, skipkeys=False, ensure_ascii=True,
+            check_circular=True, allow_nan=True, sort_keys=False):
         """
         Constructor for JSONEncoder, with sensible defaults.
-        
+
         If skipkeys is False, then it is a TypeError to attempt
         encoding of keys that are not str, int, long, float or None.  If
         skipkeys is True, such items are simply skipped.
 
         If ensure_ascii is True, the output is guaranteed to be str
-        objects with all incoming unicode characters escaped.  If ensure_ascii
-        is false, the output will be unicode object.
+        objects with all incoming unicode characters escaped.  If
+        ensure_ascii is false, the output will be unicode object.
 
         If check_circular is True, then lists, dicts, and custom encoded
         objects will be checked for circular references during encoding to
@@ -112,12 +112,17 @@ class JSONEncoder(object):
         encoded as such.  This behavior is not JSON specification compliant,
         but is consistent with most JavaScript based encoders and decoders.
         Otherwise, it will be a ValueError to encode such floats.
+
+        If sort_keys is True, then the output of dictionaries will be
+        sorted by key; this is useful for regression tests to ensure
+        that JSON serializations can be compared on a day-to-day basis.
         """
-        
+
         self.skipkeys = skipkeys
         self.ensure_ascii = ensure_ascii
         self.check_circular = check_circular
         self.allow_nan = allow_nan
+        self.sort_keys = sort_keys
 
     def _iterencode_list(self, lst, markers=None):
         if not lst:
@@ -157,7 +162,13 @@ class JSONEncoder(object):
         else:
             encoder = encode_basestring
         allow_nan = self.allow_nan
-        for key, value in dct.iteritems():
+        if self.sort_keys:
+            keys = dct.keys()
+            keys.sort()
+            items = [(k,dct[k]) for k in keys]
+        else:
+            items = dct.iteritems()
+        for key, value in items:
             if isinstance(key, basestring):
                 pass
             # JavaScript is weakly typed for these, so it makes sense to
