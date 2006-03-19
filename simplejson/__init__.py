@@ -39,6 +39,18 @@ Decoding JSON::
     >>> simplejson.load(io)
     [u'streaming API']
 
+Specializing JSON object decoding::
+
+    >>> import simplejson
+    >>> def as_complex(dct):
+    ...     if '__complex__' in dct:
+    ...         return complex(dct['real'], dct['imag'])
+    ...     return dct
+    ... 
+    >>> simplejson.loads('{"__complex__": true, "real": 1, "imag": 2}',
+    ...     object_hook=as_complex)
+    (1+2j)
+
 Extending JSONEncoder::
     
     >>> import simplejson

@@ -150,6 +150,9 @@ def JSONObject(match, context, _w=WHITESPACE.match):
         end += 1
         if nextchar != '"':
             raise ValueError(errmsg("Expecting property name", s, end - 1))
+    object_hook = getattr(context, 'object_hook', None)
+    if object_hook is not None:
+        pairs = object_hook(pairs)
     return pairs, end
 pattern(r'{')(JSONObject)
             
@@ -221,7 +224,7 @@ class JSONDecoder(object):
     _scanner = Scanner(ANYTHING)
     __all__ = ['__init__', 'decode', 'raw_decode']
 
-    def __init__(self, encoding=None):
+    def __init__(self, encoding=None, object_hook=None):
         """
         ``encoding`` determines the encoding used to interpret any ``str``
         objects decoded by this instance (utf-8 by default).  It has no
@@ -229,8 +232,14 @@ class JSONDecoder(object):
         
         Note that currently only encodings that are a superset of ASCII work,
         strings of other encodings should be passed in as ``unicode``.
+
+        ``object_hook``, if specified, will be called with the result
+        of every JSON object decoded and its return value will be used in
+        place of the given ``dict``.  This can be used to provide custom
+        deserializations (e.g. to support JSON-RPC class hinting).
         """
         self.encoding = encoding
+        self.object_hook = object_hook
 
     def decode(self, s, _w=WHITESPACE.match):
         """
