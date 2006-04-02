@@ -150,7 +150,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     return cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
         check_circular=check_circular, allow_nan=allow_nan, **kw).encode(obj)
 
-def load(fp, encoding=None, cls=None, **kw):
+def load(fp, encoding=None, cls=None, object_hook=None, **kw):
     """
     Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
     a JSON document) to a Python object.
@@ -161,15 +161,22 @@ def load(fp, encoding=None, cls=None, **kw):
     not allowed, and should be wrapped with
     ``codecs.getreader(fp)(encoding)``, or simply decoded to a ``unicode``
     object and passed to ``loads()``
+
+    ``object_hook`` is an optional function that will be called with the
+    result of any object literal decode (a ``dict``).  The return value of
+    ``object_hook`` will be used instead of the ``dict``.  This feature
+    can be used to implement custom decoders (e.g. JSON-RPC class hinting).
     
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
     """
     if cls is None:
         cls = JSONDecoder
+    if object_hook is not None:
+        kw['object_hook'] = object_hook
     return cls(encoding=encoding, **kw).decode(fp.read())
 
-def loads(s, encoding=None, cls=None, **kw):
+def loads(s, encoding=None, cls=None, object_hook=None, **kw):
     """
     Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
     document) to a Python object.
@@ -179,11 +186,18 @@ def loads(s, encoding=None, cls=None, **kw):
     must be specified.  Encodings that are not ASCII based (such as UCS-2)
     are not allowed and should be decoded to ``unicode`` first.
 
+    ``object_hook`` is an optional function that will be called with the
+    result of any object literal decode (a ``dict``).  The return value of
+    ``object_hook`` will be used instead of the ``dict``.  This feature
+    can be used to implement custom decoders (e.g. JSON-RPC class hinting).
+
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
     """
     if cls is None:
         cls = JSONDecoder
+    if object_hook is not None:
+        kw['object_hook'] = object_hook
     return cls(encoding=encoding, **kw).decode(s)
 
 def read(s):

@@ -5,15 +5,13 @@
     <TITLE>simplejson -- A simple, fast, extensible JSON encoder and decoder</TITLE>
     <LINK HREF="layout.css" TYPE="text/css" REL="stylesheet">
     
-    <SCRIPT SRC="class_to_source.js" TYPE="text/javascript">
-    </SCRIPT>
   </HEAD>
   <BODY>
     <DIV ID="page">
       
     <DIV ID="top-nav">
         <H1 ID="doc-title">
-        <A HREF="index.html" REL="index">simplejson 1.1</A></H1>
+        <A HREF="index.html" REL="index">simplejson 1.3</A></H1>
         <DIV CLASS="online-navigation">
           <A HREF="index.html" REL="index">index</A>
           <SPAN ID="nav-docs">
@@ -83,7 +81,7 @@
       </A>
     </LI>
     <LI>
-      <A HREF="simplejson/__init__.py.html" CLASS="pudge-section-link ">
+      <A HREF="simplejson/__init__.py.html" CLASS="pudge-section-link">
         Source
       </A>
     </LI>
@@ -101,13 +99,15 @@ marshal and pickle modules.</P>
 <PRE CLASS="literal-block">
 >>> import simplejson
 >>> simplejson.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
-'["foo", {"bar":["baz", null, 1.0, 2]}]'
+'["foo", {"bar": ["baz", null, 1.0, 2]}]'
 >>> print simplejson.dumps("\"foo\bar")
 "\"foo\bar"
 >>> print simplejson.dumps(u'\u1234')
 "\u1234"
 >>> print simplejson.dumps('\\')
 "\\"
+>>> print simplejson.dumps({"c": 0, "b": 0, "a": 0}, sort_keys=True)
+{"a": 0, "b": 0, "c": 0}
 >>> from StringIO import StringIO
 >>> io = StringIO()
 >>> simplejson.dump(['streaming API'], io)
@@ -125,6 +125,18 @@ u'"foo\x08ar'
 >>> io = StringIO('["streaming API"]')
 >>> simplejson.load(io)
 [u'streaming API']
+</PRE>
+<P>Specializing JSON object decoding:</P>
+<PRE CLASS="literal-block">
+>>> import simplejson
+>>> def as_complex(dct):
+...     if '__complex__' in dct:
+...         return complex(dct['real'], dct['imag'])
+...     return dct
+...
+>>> simplejson.loads('{"__complex__": true, "real": 1, "imag": 2}',
+...     object_hook=as_complex)
+(1+2j)
 </PRE>
 <P>Extending JSONEncoder:</P>
 <PRE CLASS="literal-block">
@@ -163,7 +175,7 @@ so it may be used as a serializer for that as well.</P>
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
       <A HREF="module-simplejson.html#dump" CLASS="pudge-obj-link">dump</A>(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None)</TT>
-      <A HREF="simplejson/__init__.py.html#69" CLASS="lines-69-107" TITLE="View Source">...</A>
+      <A HREF="simplejson/__init__.py.html?f=83&amp;l=121#83" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -199,7 +211,7 @@ the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
       <A HREF="module-simplejson.html#dumps" CLASS="pudge-obj-link">dumps</A>(obj, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None)</TT>
-      <A HREF="simplejson/__init__.py.html#108" CLASS="lines-108-138" TITLE="View Source">...</A>
+      <A HREF="simplejson/__init__.py.html?f=122&amp;l=152#122" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -231,8 +243,8 @@ the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
     <H4 CLASS="pudge-member-name">
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
-      <A HREF="module-simplejson.html#load" CLASS="pudge-obj-link">load</A>(fp, encoding=None, cls=None)</TT>
-      <A HREF="simplejson/__init__.py.html#139" CLASS="lines-139-157" TITLE="View Source">...</A>
+      <A HREF="module-simplejson.html#load" CLASS="pudge-obj-link">load</A>(fp, encoding=None, cls=None, object_hook=None)</TT>
+      <A HREF="simplejson/__init__.py.html?f=153&amp;l=178#153" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -246,6 +258,12 @@ be specified.  Encodings that are not ASCII based (such as UCS-2) are
 not allowed, and should be wrapped with
 <TT CLASS="docutils literal"><SPAN CLASS="pre">codecs.getreader(fp)(encoding)</SPAN></TT>, or simply decoded to a <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPAN></TT>
 object and passed to <TT CLASS="docutils literal"><SPAN CLASS="pre">loads()</SPAN></TT></P>
+<P>
+<TT CLASS="docutils literal">
+<SPAN CLASS="pre">object_hook</SPAN></TT> is an optional function that will be called with the
+result of any object literal decode (a <TT CLASS="docutils literal"><SPAN CLASS="pre">dict</SPAN></TT>).  The return value of
+<TT CLASS="docutils literal"><SPAN CLASS="pre">object_hook</SPAN></TT> will be used instead of the <TT CLASS="docutils literal"><SPAN CLASS="pre">dict</SPAN></TT>.  This feature
+can be used to implement custom decoders (e.g. JSON-RPC class hinting).</P>
 <P>To use a custom <TT CLASS="docutils literal"><SPAN CLASS="pre">JSONDecoder</SPAN></TT> subclass, specify it with the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT>
 kwarg.</P>
   
@@ -257,8 +275,8 @@ kwarg.</P>
     <H4 CLASS="pudge-member-name">
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
-      <A HREF="module-simplejson.html#loads" CLASS="pudge-obj-link">loads</A>(s, encoding=None, cls=None)</TT>
-      <A HREF="simplejson/__init__.py.html#158" CLASS="lines-158-174" TITLE="View Source">...</A>
+      <A HREF="module-simplejson.html#loads" CLASS="pudge-obj-link">loads</A>(s, encoding=None, cls=None, object_hook=None)</TT>
+      <A HREF="simplejson/__init__.py.html?f=179&amp;l=202#179" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -270,6 +288,12 @@ document) to a Python object.
 other than utf-8 (e.g. latin-1) then an appropriate <TT CLASS="docutils literal"><SPAN CLASS="pre">encoding</SPAN></TT> name
 must be specified.  Encodings that are not ASCII based (such as UCS-2)
 are not allowed and should be decoded to <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPAN></TT> first.</P>
+<P>
+<TT CLASS="docutils literal">
+<SPAN CLASS="pre">object_hook</SPAN></TT> is an optional function that will be called with the
+result of any object literal decode (a <TT CLASS="docutils literal"><SPAN CLASS="pre">dict</SPAN></TT>).  The return value of
+<TT CLASS="docutils literal"><SPAN CLASS="pre">object_hook</SPAN></TT> will be used instead of the <TT CLASS="docutils literal"><SPAN CLASS="pre">dict</SPAN></TT>.  This feature
+can be used to implement custom decoders (e.g. JSON-RPC class hinting).</P>
 <P>To use a custom <TT CLASS="docutils literal"><SPAN CLASS="pre">JSONDecoder</SPAN></TT> subclass, specify it with the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT>
 kwarg.</P>
   
@@ -287,7 +311,7 @@ kwarg.</P>
     <SPAN CLASS="prefix">C</SPAN>
       <TT>
         <A HREF="class-simplejson.JSONEncoder.html" CLASS="pudge-obj-link">JSONEncoder</A>(...)</TT>
-      <A HREF="simplejson/encoder.py.html#63" CLASS="pudge-member-view-source lines-63-277" TITLE="View Source">...</A>
+      <A HREF="simplejson/encoder.py.html?f=63&amp;l=288#63" CLASS="pudge-member-view-source" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -356,7 +380,7 @@ implementation (to raise <TT CLASS="docutils literal"><SPAN CLASS="pre">TypeErro
     <SPAN CLASS="prefix">C</SPAN>
       <TT>
         <A HREF="class-simplejson.JSONDecoder.html" CLASS="pudge-obj-link">JSONDecoder</A>(...)</TT>
-      <A HREF="simplejson/decoder.py.html#196" CLASS="pudge-member-view-source lines-196-266" TITLE="View Source">...</A>
+      <A HREF="simplejson/decoder.py.html?f=194&amp;l=270#194" CLASS="pudge-member-view-source" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -441,7 +465,7 @@ their corresponding <TT CLASS="docutils literal"><SPAN CLASS="pre">float</SPAN><
       <P ID="pudge">
         Built with
         <A HREF="http://lesscode.org/projects/pudge/">
-          Pudge/0.1</A>
+          Pudge/0.1.1</A>
       </P>
       
     </DIV>

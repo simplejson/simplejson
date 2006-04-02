@@ -5,15 +5,13 @@
     <TITLE>simplejson.JSONDecoder -- Simple JSON &amp;lt;&lt;a class="reference" href="http://json.org">http://json.org&lt;/a>&amp;gt; decoder</TITLE>
     <LINK HREF="layout.css" TYPE="text/css" REL="stylesheet">
     
-    <SCRIPT SRC="class_to_source.js" TYPE="text/javascript">
-    </SCRIPT>
   </HEAD>
   <BODY>
     <DIV ID="page">
       
     <DIV ID="top-nav">
         <H1 ID="doc-title">
-        <A HREF="index.html" REL="index">simplejson 1.1</A></H1>
+        <A HREF="index.html" REL="index">simplejson 1.3</A></H1>
         <DIV CLASS="online-navigation">
           <A HREF="index.html" REL="index">index</A>
           <SPAN ID="nav-docs">
@@ -72,7 +70,7 @@
     </LI>
     
     <LI>
-      <A HREF="simplejson/decoder.py.html#196" CLASS="pudge-section-link lines-196-266">
+      <A HREF="simplejson/decoder.py.html?f=194&amp;l=270#194" CLASS="pudge-section-link">
         Source
       </A>
     </LI>
@@ -150,8 +148,8 @@ their corresponding <TT CLASS="docutils literal"><SPAN CLASS="pre">float</SPAN><
     <H4 CLASS="pudge-member-name">
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
-      <A HREF="class-simplejson.JSONDecoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, encoding=None)</TT>
-      <A HREF="simplejson/decoder.py.html#229" CLASS="lines-229-239" TITLE="View Source">...</A>
+      <A HREF="class-simplejson.JSONDecoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, encoding=None, object_hook=None)</TT>
+      <A HREF="simplejson/decoder.py.html?f=227&amp;l=243#227" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -163,6 +161,12 @@ effect when decoding <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPA
     </P>
     <P>Note that currently only encodings that are a superset of ASCII work,
 strings of other encodings should be passed in as <TT CLASS="docutils literal"><SPAN CLASS="pre">unicode</SPAN></TT>.</P>
+<P>
+<TT CLASS="docutils literal">
+<SPAN CLASS="pre">object_hook</SPAN></TT>, if specified, will be called with the result
+of every JSON object decoded and its return value will be used in
+place of the given <TT CLASS="docutils literal"><SPAN CLASS="pre">dict</SPAN></TT>.  This can be used to provide custom
+deserializations (e.g. to support JSON-RPC class hinting).</P>
   
     </DIV>
   </DIV>
@@ -172,8 +176,8 @@ strings of other encodings should be passed in as <TT CLASS="docutils literal"><
     <H4 CLASS="pudge-member-name">
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
-      <A HREF="class-simplejson.JSONDecoder.html#decode" CLASS="pudge-obj-link">decode</A>(self, s)</TT>
-      <A HREF="simplejson/decoder.py.html#240" CLASS="lines-240-250" TITLE="View Source">...</A>
+      <A HREF="class-simplejson.JSONDecoder.html#decode" CLASS="pudge-obj-link">decode</A>(self, s, _w=&lt;built-in method match of _sre.SRE_Pattern object at 0x11813c8>)</TT>
+      <A HREF="simplejson/decoder.py.html?f=244&amp;l=254#244" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -192,7 +196,7 @@ instance containing a JSON document)
     <SPAN CLASS="prefix">f</SPAN>
       <TT>
       <A HREF="class-simplejson.JSONDecoder.html#raw_decode" CLASS="pudge-obj-link">raw_decode</A>(self, s)</TT>
-      <A HREF="simplejson/decoder.py.html#251" CLASS="lines-251-266" TITLE="View Source">...</A>
+      <A HREF="simplejson/decoder.py.html?f=255&amp;l=270#255" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -214,7 +218,7 @@ have extraneous data at the end.</P>
     
     
     See 
-    <A HREF="simplejson/decoder.py.html?f=196&amp;l=266#196" TITLE="simplejson/decoder.py:196">the source</A>
+    <A HREF="simplejson/decoder.py.html?f=194&amp;l=270#194" TITLE="simplejson/decoder.py:194">the source</A>
     for more information.
     </SMALL>
   </P>
@@ -225,7 +229,7 @@ have extraneous data at the end.</P>
       <P ID="pudge">
         Built with
         <A HREF="http://lesscode.org/projects/pudge/">
-          Pudge/0.1</A>
+          Pudge/0.1.1</A>
       </P>
       
     </DIV>
