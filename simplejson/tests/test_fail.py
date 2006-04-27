@@ -48,6 +48,8 @@ JSONDOCS = [
     '["Bad value", truth]',
     # http://json.org/JSON_checker/test/fail24.json
     "['single quote']",
+    # Not part of the JSON spec
+    '{"a": 1, "a": 1}',
 ]
 
 SKIPS = {

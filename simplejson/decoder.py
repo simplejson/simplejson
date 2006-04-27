@@ -138,6 +138,8 @@ def JSONObject(match, context, _w=WHITESPACE.match):
             value, end = iterscan(s, idx=end, context=context).next()
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
+        if key in pairs:
+            raise ValueError(errmsg("Duplicate property name", s, end))
         pairs[key] = value
         end = _w(s, end).end()
         nextchar = s[end:end + 1]
