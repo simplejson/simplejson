@@ -91,7 +91,7 @@ class JSONEncoder(object):
     """
     __all__ = ['__init__', 'default', 'encode', 'iterencode']
     def __init__(self, skipkeys=False, ensure_ascii=True,
-            check_circular=True, allow_nan=True, sort_keys=False):
+            check_circular=True, allow_nan=True, sort_keys=False, indent=None):
         """
         Constructor for JSONEncoder, with sensible defaults.
 
@@ -116,6 +116,11 @@ class JSONEncoder(object):
         If sort_keys is True, then the output of dictionaries will be
         sorted by key; this is useful for regression tests to ensure
         that JSON serializations can be compared on a day-to-day basis.
+
+        If ``indent`` is a non-negative integer, then JSON array
+        elements and object members will be pretty-printed with that
+        indent level.  An indent level of 0 will only insert newlines.
+        ``None`` is the most compact representation.
         """
 
         self.skipkeys = skipkeys
@@ -123,6 +128,13 @@ class JSONEncoder(object):
         self.check_circular = check_circular
         self.allow_nan = allow_nan
         self.sort_keys = sort_keys
+        self.indent = indent
+        self.current_indent_level = 0
+
+    def _newline_indent(self):
+        if self.indent is None:
+            return ''
+        return '\n' + (' ' * (self.indent * self.current_indent_level))
 
     def _iterencode_list(self, lst, markers=None):
         if not lst:
@@ -133,16 +145,19 @@ class JSONEncoder(object):
             if markerid in markers:
                 raise ValueError("Circular reference detected")
             markers[markerid] = lst
-        yield '['
+        self.current_indent_level += 1
+        newline_indent = self._newline_indent()
+        yield '[' + newline_indent
         first = True
         for value in lst:
             if first:
                 first = False
             else:
-                yield ', '
+                yield ', ' + newline_indent
             for chunk in self._iterencode(value, markers):
                 yield chunk
-        yield ']'
+        self.current_indent_level -= 1
+        yield self._newline_indent() + ']'
         if markers is not None:
             del markers[markerid]
 
@@ -155,7 +170,9 @@ class JSONEncoder(object):
             if markerid in markers:
                 raise ValueError("Circular reference detected")
             markers[markerid] = dct
-        yield '{'
+        self.current_indent_level += 1
+        newline_indent = self._newline_indent()
+        yield '{' + newline_indent
         first = True
         if self.ensure_ascii:
             encoder = encode_basestring_ascii
@@ -190,12 +207,13 @@ class JSONEncoder(object):
             if first:
                 first = False
             else:
-                yield ', '
+                yield ', ' + newline_indent
             yield encoder(key)
             yield ': '
             for chunk in self._iterencode(value, markers):
                 yield chunk
-        yield '}'
+        self.current_indent_level -= 1
+        yield self._newline_indent() + '}'
         if markers is not None:
             del markers[markerid]
 
