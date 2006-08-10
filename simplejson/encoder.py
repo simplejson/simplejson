@@ -20,27 +20,27 @@ for i in range(20):
     ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
 
 def floatstr(o, allow_nan=True):
-    s = str(o)
-    # If the first non-sign is a digit then it's not a special value
-    if (o < 0.0 and s[1].isdigit()) or s[0].isdigit():
-        return s
-    elif not allow_nan:
+    # Check for specials.  Note that this type of test is processor- and/or
+    # platform-specific, so do tests which don't depend on the internals.
+
+    # assume this produces an infinity on all machines (probably not guaranteed)
+    INFINITY = 1e66666
+
+    if o != o:
+        text = 'NaN'
+    elif o == INFINITY:
+        text = 'Infinity'
+    elif o == -INFINITY:
+        text = '-Infinity'
+    else:
+        return str(o)
+
+    if not allow_nan:
         raise ValueError("Out of range float values are not JSON compliant: %r"
             % (o,))
-    # These are the string representations on the platforms I've tried
-    if s == 'nan':
-        return 'NaN'
-    if s == 'inf':
-        return 'Infinity'
-    if s == '-inf':
-        return '-Infinity'
-    # NaN should either be inequal to itself, or equal to everything
-    if o != o or o == 0.0:
-        return 'NaN'
-    # Last ditch effort, assume inf
-    if o < 0:
-        return '-Infinity'
-    return 'Infinity'
+
+    return text
+
 
 def encode_basestring(s):
     """
