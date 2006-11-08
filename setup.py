@@ -5,7 +5,7 @@ ez_setup.use_setuptools()
 
 from setuptools import setup, find_packages
 
-VERSION = '1.4'
+VERSION = '1.5'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = """
 simplejson is a simple, fast, complete, correct and extensible
