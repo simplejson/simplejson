@@ -16,7 +16,7 @@ ESCAPE_DCT = {
     '\r': '\\r',
     '\t': '\\t',
 }
-for i in range(20):
+for i in range(0x20):
     ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
 
 def floatstr(o, allow_nan=True):
@@ -28,6 +28,9 @@ def floatstr(o, allow_nan=True):
 
     if o != o:
         text = 'NaN'
+    elif o == 1.0:
+        assert o != INFINITY
+        return '1.0'
     elif o == INFINITY:
         text = 'Infinity'
     elif o == -INFINITY:
