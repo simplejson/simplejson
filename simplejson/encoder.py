@@ -19,18 +19,15 @@ ESCAPE_DCT = {
 for i in range(0x20):
     ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
 
+# assume this produces an infinity on all machines (probably not guaranteed)
+INFINITY = float('1e66666')
+
 def floatstr(o, allow_nan=True):
     # Check for specials.  Note that this type of test is processor- and/or
     # platform-specific, so do tests which don't depend on the internals.
 
-    # assume this produces an infinity on all machines (probably not guaranteed)
-    INFINITY = 1e66666
-
     if o != o:
         text = 'NaN'
-    elif o == 1.0:
-        assert o != INFINITY
-        return '1.0'
     elif o == INFINITY:
         text = 'Infinity'
     elif o == -INFINITY:
