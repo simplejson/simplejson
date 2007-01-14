@@ -1,7 +1,7 @@
 
 
 
-def test_indent():
+def test_separators():
     import simplejson
     import textwrap
     
@@ -12,26 +12,26 @@ def test_indent():
     [
       [
         "blorpie"
-      ],
+      ] ,
       [
         "whoops"
-      ],
-      [],
-      "d-shtaeou",
-      "d-nthiouh",
-      "i-vhbjkhnth",
+      ] ,
+      [] ,
+      "d-shtaeou" ,
+      "d-nthiouh" ,
+      "i-vhbjkhnth" ,
       {
-        "nifty": 87
-      },
+        "nifty" : 87
+      } ,
       {
-        "field": "yes",
-        "morefield": false
+        "field" : "yes" ,
+        "morefield" : false
       }
     ]""")
 
 
     d1 = simplejson.dumps(h)
-    d2 = simplejson.dumps(h, indent=2, sort_keys=True, separators=(',', ': '))
+    d2 = simplejson.dumps(h, indent=2, sort_keys=True, separators=(' ,', ' : '))
 
     h1 = simplejson.loads(d1)
     h2 = simplejson.loads(d2)
