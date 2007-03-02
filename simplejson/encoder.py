@@ -94,7 +94,7 @@ class JSONEncoder(object):
     key_separator = ': '
     def __init__(self, skipkeys=False, ensure_ascii=True,
             check_circular=True, allow_nan=True, sort_keys=False,
-            indent=None, separators=None):
+            indent=None, separators=None, encoding='utf-8'):
         """
         Constructor for JSONEncoder, with sensible defaults.
 
@@ -128,6 +128,10 @@ class JSONEncoder(object):
         If specified, separators should be a (item_separator, key_separator)
         tuple. The default is (', ', ': '). To get the most compact JSON
         representation you should specify (',', ':') to eliminate whitespace.
+
+        If encoding is not None, then all input strings will be
+        transformed into unicode using that encoding prior to JSON-encoding. 
+        The default is UTF-8.
         """
 
         self.skipkeys = skipkeys
@@ -139,6 +143,7 @@ class JSONEncoder(object):
         self.current_indent_level = 0
         if separators is not None:
             self.item_separator, self.key_separator = separators
+        self.encoding = encoding
 
     def _newline_indent(self):
         return '\n' + (' ' * (self.indent * self.current_indent_level))
@@ -208,7 +213,9 @@ class JSONEncoder(object):
         else:
             items = dct.iteritems()
         for key, value in items:
-            if isinstance(key, basestring):
+            if self.encoding is not None and isinstance(key, str):
+                key = key.decode(self.encoding)
+            elif isinstance(key, basestring):
                 pass
             # JavaScript is weakly typed for these, so it makes sense to
             # also allow them.  Many encoders seem to do something like this.
@@ -247,6 +254,8 @@ class JSONEncoder(object):
                 encoder = encode_basestring_ascii
             else:
                 encoder = encode_basestring
+            if self.encoding and isinstance(o, str):
+                o = o.decode(self.encoding)
             yield encoder(o)
         elif o is None:
             yield 'null'
