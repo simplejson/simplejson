@@ -86,7 +86,7 @@ Extending JSONEncoder::
 Note that the JSON produced by this module's default settings
 is a subset of YAML, so it may be used as a serializer for that as well.
 """
-__version__ = '1.6'
+__version__ = '1.7'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONEncoder',
@@ -95,8 +95,20 @@ __all__ = [
 from decoder import JSONDecoder
 from encoder import JSONEncoder
 
+_default_encoder = JSONEncoder(
+    skipkeys=False,
+    ensure_ascii=True,
+    check_circular=True,
+    allow_nan=True,
+    indent=None,
+    separators=None,
+    encoding='utf-8'
+)
+
+
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
-        allow_nan=True, cls=None, indent=None, encoding='utf-8', **kw):
+        allow_nan=True, cls=None, indent=None, encoding='utf-8',
+        _iterencode=_default_encoder.iterencode, **kw):
     """
     Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
@@ -130,19 +142,27 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
     """
-    if cls is None:
-        cls = JSONEncoder
-    iterable = cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
-        check_circular=check_circular, allow_nan=allow_nan, indent=indent,
-        encoding=encoding, **kw).iterencode(obj)
+    # cached encoder
+    if (skipkeys is False and ensure_ascii is True and
+        check_circular is True and allow_nan is True and
+        cls is None and indent is None and separators is None and
+        encoding == 'utf-8' and not kw):
+        iterable = _iterencode(obj)
+    else:
+        if cls is None:
+            cls = JSONEncoder
+        iterable = cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
+            check_circular=check_circular, allow_nan=allow_nan, indent=indent,
+            encoding=encoding, **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
     for chunk in iterable:
         fp.write(chunk)
 
+
 def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
-        encoding='utf-8', **kw):
+        encoding='utf-8', _encode=_default_encoder.encode, **kw):
     """
     Serialize ``obj`` to a JSON formatted ``str``.
 
@@ -178,6 +198,12 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
     """
+    # cached encoder
+    if (skipkeys is False and ensure_ascii is True and
+        check_circular is True and allow_nan is True and
+        cls is None and indent is None and separators is None and
+        encoding == 'utf-8' and not kw):
+        return _encode(obj)
     if cls is None:
         cls = JSONEncoder
     return cls(

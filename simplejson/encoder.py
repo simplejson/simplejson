@@ -2,6 +2,10 @@
 Implementation of JSONEncoder
 """
 import re
+try:
+    from simplejson import _speedups
+except ImportError:
+    _speedups = None
 
 ESCAPE = re.compile(r'[\x00-\x19\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"/]|[^\ -~])')
@@ -56,9 +60,22 @@ def encode_basestring_ascii(s):
         try:
             return ESCAPE_DCT[s]
         except KeyError:
-            return '\\u%04x' % (ord(s),)
+            n = ord(s)
+            if n < 0x10000:
+                return '\\u%04x' % (n,)
+            else:
+                # surrogate pair
+                n -= 0x10000
+                s1 = 0xd800 | ((n >> 10) & 0x3ff)
+                s2 = 0xdc00 | (n & 0x3ff)
+                return '\\u%04x\\u%04x' % (s1, s2)
     return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
         
+try:
+    encode_basestring_ascii = _speedups.encode_basestring_ascii
+    _need_utf8 = True
+except AttributeError:
+    _need_utf8 = False
 
 class JSONEncoder(object):
     """
@@ -212,9 +229,13 @@ class JSONEncoder(object):
             items = [(k, dct[k]) for k in keys]
         else:
             items = dct.iteritems()
+        _encoding = self.encoding
+        _do_decode = (_encoding is not None
+            and not (_need_utf8 and _encoding == 'utf-8'))
         for key, value in items:
-            if self.encoding is not None and isinstance(key, str):
-                key = key.decode(self.encoding)
+            if isinstance(key, str):
+                if _do_decode:
+                    key = key.decode(_encoding)
             elif isinstance(key, basestring):
                 pass
             # JavaScript is weakly typed for these, so it makes sense to
@@ -254,8 +275,10 @@ class JSONEncoder(object):
                 encoder = encode_basestring_ascii
             else:
                 encoder = encode_basestring
-            if self.encoding and isinstance(o, str):
-                o = o.decode(self.encoding)
+            _encoding = self.encoding
+            if (_encoding is not None and isinstance(o, str)
+                    and not (_need_utf8 and _encoding == 'utf-8')):
+                o = o.decode(_encoding)
             yield encoder(o)
         elif o is None:
             yield 'null'
@@ -315,6 +338,14 @@ class JSONEncoder(object):
         >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo":["bar", "baz"]}'
         """
+        # This is for extremely simple cases and benchmarks...
+        if isinstance(o, basestring):
+            if isinstance(o, str):
+                _encoding = self.encoding
+                if (_encoding is not None 
+                        and not (_encoding == 'utf-8' and _need_utf8)):
+                    o = o.decode(_encoding)
+            return encode_basestring_ascii(o)
         # This doesn't pass the iterator directly to ''.join() because it
         # sucks at reporting exceptions.  It's going to do this internally
         # anyway because it uses PySequence_Fast or similar.
