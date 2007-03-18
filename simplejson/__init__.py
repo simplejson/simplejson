@@ -212,7 +212,10 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         separators=separators, encoding=encoding,
         **kw).encode(obj)
 
-def load(fp, encoding=None, cls=None, object_hook=None, **kw):
+_default_decoder = JSONDecoder(encoding=None, object_hook=None)
+
+def load(fp, encoding=None, cls=None, object_hook=None,
+        _decode=_default_decoder.decode, **kw):
     """
     Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
     a JSON document) to a Python object.
@@ -232,13 +235,16 @@ def load(fp, encoding=None, cls=None, object_hook=None, **kw):
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
     """
+    if cls is None and encoding is None and object_hook is None and not kw:
+        return _decode(fp.read())
     if cls is None:
         cls = JSONDecoder
     if object_hook is not None:
         kw['object_hook'] = object_hook
     return cls(encoding=encoding, **kw).decode(fp.read())
 
-def loads(s, encoding=None, cls=None, object_hook=None, **kw):
+def loads(s, encoding=None, cls=None, object_hook=None,
+        _decode=_default_decoder.decode, **kw):
     """
     Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
     document) to a Python object.
@@ -256,6 +262,8 @@ def loads(s, encoding=None, cls=None, object_hook=None, **kw):
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
     """
+    if cls is None and encoding is None and object_hook is None and not kw:
+        return _decode(s)
     if cls is None:
         cls = JSONDecoder
     if object_hook is not None:
