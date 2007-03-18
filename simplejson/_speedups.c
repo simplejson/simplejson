@@ -17,6 +17,13 @@ void init_speedups(void);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '/' && c != '"')
 
+#define MIN_EXPANSION 6
+#ifdef Py_UNICODE_WIDE
+#define MAX_EXPANSION (2 * MIN_EXPANSION)
+#else
+#define MAX_EXPANSION MIN_EXPANSION
+#endif
+
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars) {
     Py_UNICODE x;
@@ -75,7 +82,7 @@ ascii_escape_unicode(PyObject *pystr) {
     input_chars = PyUnicode_GET_SIZE(pystr);
     input_unicode = PyUnicode_AS_UNICODE(pystr);
     /* One char input can be up to 6 chars output, estimate 4 of these */
-    output_size = 32 + input_chars;
+    output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
     rval = PyString_FromStringAndSize(NULL, output_size);
     if (rval == NULL) {
         return NULL;
@@ -90,11 +97,12 @@ ascii_escape_unicode(PyObject *pystr) {
         } else {
             chars = ascii_escape_char(c, output, chars);
         }
-        if (output_size - chars < 7) {
+        if (output_size - chars < (1 + MAX_EXPANSION)) {
             /* There's more than four, so let's resize by a lot */
             output_size *= 2;
-            if (output_size > 2 + (input_chars * 6)) {
-                output_size = 2 + (input_chars * 6);
+            /* This is an upper bound */
+            if (output_size > 2 + (input_chars * MAX_EXPANSION)) {
+                output_size = 2 + (input_chars * MAX_EXPANSION);
             }
             if (_PyString_Resize(&rval, output_size) == -1) {
                 return NULL;
@@ -122,7 +130,7 @@ ascii_escape_str(PyObject *pystr) {
     input_chars = PyString_GET_SIZE(pystr);
     input_str = PyString_AS_STRING(pystr);
     /* One char input can be up to 6 chars output, estimate 4 of these */
-    output_size = 32 + input_chars;
+    output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
     rval = PyString_FromStringAndSize(NULL, output_size);
     if (rval == NULL) {
         return NULL;
@@ -148,11 +156,12 @@ ascii_escape_str(PyObject *pystr) {
         } else {
             chars = ascii_escape_char(c, output, chars);
         }
-        if (output_size - chars < 7) {
+        /* An ASCII char can't possibly expand to a surrogate! */
+        if (output_size - chars < (1 + MIN_EXPANSION)) {
             /* There's more than four, so let's resize by a lot */
             output_size *= 2;
-            if (output_size > 2 + (input_chars * 6)) {
-                output_size = 2 + (input_chars * 6);
+            if (output_size > 2 + (input_chars * MIN_EXPANSION)) {
+                output_size = 2 + (input_chars * MIN_EXPANSION);
             }
             if (_PyString_Resize(&rval, output_size) == -1) {
                 return NULL;
