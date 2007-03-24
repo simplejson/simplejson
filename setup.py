@@ -4,8 +4,10 @@ import ez_setup
 ez_setup.use_setuptools()
 
 from setuptools import setup, find_packages, Extension, Feature
+from distutils.command.build_ext import build_ext
+from distutils.errors import CCompilerError
 
-VERSION = '1.7'
+VERSION = '1.7.1'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = """
 simplejson is a simple, fast, complete, correct and extensible
@@ -31,6 +33,23 @@ License :: OSI Approved :: MIT License
 Programming Language :: Python
 Topic :: Software Development :: Libraries :: Python Modules
 """.splitlines()))
+
+
+BUILD_EXT_WARNING="""
+WARNING: The C extension could not be compiled, speedups are not enabled.
+
+Above is the output showing how the compilation failed.
+"""
+
+class ve_build_ext(build_ext):
+    # This class allows C extension building to fail.
+    def build_extension(self, ext):
+        try:
+            build_ext.build_extension(self, ext)
+        except CCompilerError, x:
+            print ('*'*70+'\n')
+            print BUILD_EXT_WARNING
+            print ('*'*70+'\n')
 
 speedups = Feature(
     "options C speed-enhancement modules",
@@ -58,4 +77,5 @@ setup(
         'paste.filter_app_factory': ['json = simplejson.jsonfilter:factory'],
     },
     features={'speedups': speedups},
+    cmdclass={'build_ext': ve_build_ext},
 )
