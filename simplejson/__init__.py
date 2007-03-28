@@ -106,8 +106,8 @@ _default_encoder = JSONEncoder(
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
-        allow_nan=True, cls=None, indent=None, encoding='utf-8',
-        **kw):
+        allow_nan=True, cls=None, indent=None, separators=None,
+        encoding='utf-8', **kw):
     """
     Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
@@ -135,6 +135,10 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     members will be pretty-printed with that indent level. An indent level
     of 0 will only insert newlines. ``None`` is the most compact representation.
 
+    If ``separators`` is an ``(item_separator, dict_separator)`` tuple
+    then it will be used instead of the default ``(', ', ': ')`` separators.
+    ``(',', ':')`` is the most compact JSON representation.
+
     ``encoding`` is the character encoding for str instances, default is UTF-8.
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
@@ -152,7 +156,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             cls = JSONEncoder
         iterable = cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
             check_circular=check_circular, allow_nan=allow_nan, indent=indent,
-            encoding=encoding, **kw).iterencode(obj)
+            separators=separators, encoding=encoding, **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
     for chunk in iterable:

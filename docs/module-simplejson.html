@@ -9,7 +9,7 @@
     <DIV ID="page">
       
     <DIV ID="top-nav">
-        <H1 ID="doc-title"><A HREF="index.html" REL="index">simplejson 1.7dev-r1000</A></H1>
+        <H1 ID="doc-title"><A HREF="index.html" REL="index">simplejson 1.7.1</A></H1>
         <DIV CLASS="online-navigation">
           <A HREF="index.html" REL="index">index</A>
           <SPAN ID="nav-docs">
@@ -174,8 +174,8 @@ is a subset of YAML, so it may be used as a serializer for that as well.</P>
     <DIV CLASS="pudge-member routine ">
     <A NAME="dump"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
-      <TT><A HREF="module-simplejson.html#dump" CLASS="pudge-obj-link">dump</A>(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, encoding='utf-8', **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=108&amp;l=160#108" TITLE="View Source">...</A>
+      <TT><A HREF="module-simplejson.html#dump" CLASS="pudge-obj-link">dump</A>(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, encoding='utf-8', **kw)</TT>
+      <A HREF="simplejson/__init__.py.html?f=108&amp;l=164#108" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -201,6 +201,9 @@ JavaScript equivalents (<TT CLASS="docutils literal"><SPAN CLASS="pre">NaN</SPAN
 <P>If <TT CLASS="docutils literal"><SPAN CLASS="pre">indent</SPAN></TT> is a non-negative integer, then JSON array elements and object
 members will be pretty-printed with that indent level. An indent level
 of 0 will only insert newlines. <TT CLASS="docutils literal"><SPAN CLASS="pre">None</SPAN></TT> is the most compact representation.</P>
+<P>If <TT CLASS="docutils literal"><SPAN CLASS="pre">separators</SPAN></TT> is an <TT CLASS="docutils literal"><SPAN CLASS="pre">(item_separator,</SPAN> <SPAN CLASS="pre">dict_separator)</SPAN></TT> tuple
+then it will be used instead of the default <TT CLASS="docutils literal"><SPAN CLASS="pre">(',</SPAN> <SPAN CLASS="pre">',</SPAN> <SPAN CLASS="pre">':</SPAN> <SPAN CLASS="pre">')</SPAN></TT> separators.
+<TT CLASS="docutils literal"><SPAN CLASS="pre">(',',</SPAN> <SPAN CLASS="pre">':')</SPAN></TT> is the most compact JSON representation.</P>
 <P><TT CLASS="docutils literal"><SPAN CLASS="pre">encoding</SPAN></TT> is the character encoding for str instances, default is UTF-8.</P>
 <P>To use a custom <TT CLASS="docutils literal"><SPAN CLASS="pre">JSONEncoder</SPAN></TT> subclass (e.g. one that overrides the
 <TT CLASS="docutils literal"><SPAN CLASS="pre">.default()</SPAN></TT> method to serialize additional types), specify it with
@@ -212,7 +215,7 @@ the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
     <A NAME="dumps"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="module-simplejson.html#dumps" CLASS="pudge-obj-link">dumps</A>(obj, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, encoding='utf-8', **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=162&amp;l=213#162" TITLE="View Source">...</A>
+      <A HREF="simplejson/__init__.py.html?f=166&amp;l=217#166" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -250,7 +253,7 @@ the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
     <A NAME="load"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="module-simplejson.html#load" CLASS="pudge-obj-link">load</A>(fp, encoding=None, cls=None, object_hook=None, **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=216&amp;l=238#216" TITLE="View Source">...</A>
+      <A HREF="simplejson/__init__.py.html?f=220&amp;l=242#220" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -277,7 +280,7 @@ kwarg.</P>
     <A NAME="loads"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="module-simplejson.html#loads" CLASS="pudge-obj-link">loads</A>(s, encoding=None, cls=None, object_hook=None, **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=239&amp;l=264#239" TITLE="View Source">...</A>
+      <A HREF="simplejson/__init__.py.html?f=243&amp;l=268#243" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       

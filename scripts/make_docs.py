@@ -15,9 +15,11 @@ def _get_version():
     return dist.version
 VERSION = _get_version()
 
+PUDGE = '/Library/Frameworks/Python.framework/Versions/2.4/bin/pudge'
+#PUDGE = 'pudge'
 
 res = subprocess.call([
-    'pudge', '-v', '-d', 'docs', '-m', PROJECT,
+    PUDGE, '-v', '-d', 'docs', '-m', PROJECT,
     '-l', '%s %s' % (PROJECT, VERSION),
     '--theme=green'
 ])
