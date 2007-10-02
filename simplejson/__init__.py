@@ -86,7 +86,7 @@ Extending JSONEncoder::
 Note that the JSON produced by this module's default settings
 is a subset of YAML, so it may be used as a serializer for that as well.
 """
-__version__ = '1.7.1'
+__version__ = '1.7.2'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONEncoder',
