@@ -37,7 +37,7 @@ def floatstr(o, allow_nan=True):
     elif o == -INFINITY:
         text = '-Infinity'
     else:
-        return str(o)
+        return repr(o)
 
     if not allow_nan:
         raise ValueError("Out of range float values are not JSON compliant: %r"

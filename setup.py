@@ -12,7 +12,7 @@ from setuptools import setup, find_packages, Extension, Feature
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError
 
-VERSION = '1.7.2'
+VERSION = '1.7.3'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = """
 simplejson is a simple, fast, complete, correct and extensible
