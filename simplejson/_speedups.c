@@ -5,6 +5,12 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MIN INT_MIN
 #endif
 
+#ifdef __GNUC__
+#define UNUSED __attribute__((__unused__))
+#else
+#define UNUSED
+#endif
+
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars);
 static PyObject *
@@ -12,7 +18,7 @@ ascii_escape_unicode(PyObject *pystr);
 static PyObject *
 ascii_escape_str(PyObject *pystr);
 static PyObject *
-py_encode_basestring_ascii(PyObject* self __attribute__((__unused__)), PyObject *pystr);
+py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
 void init_speedups(void);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '/' && c != '"')
@@ -183,7 +189,7 @@ PyDoc_STRVAR(pydoc_encode_basestring_ascii,
 );
 
 static PyObject *
-py_encode_basestring_ascii(PyObject* self __attribute__((__unused__)), PyObject *pystr) {
+py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr) {
     /* METH_O */
     if (PyString_Check(pystr)) {
         return ascii_escape_str(pystr);
