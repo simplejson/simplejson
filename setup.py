@@ -15,7 +15,8 @@ except TypeError:
 
 from setuptools import setup, find_packages, Extension, Feature
 from distutils.command.build_ext import build_ext
-from distutils.errors import CCompilerError
+from distutils.errors import CCompilerError, DistutilsExecError, \
+    DistutilsPlatformError
 
 VERSION = '1.7.4'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
@@ -45,21 +46,32 @@ Topic :: Software Development :: Libraries :: Python Modules
 """.splitlines()))
 
 
-BUILD_EXT_WARNING="""
+BUILD_EXT_WARNING="""\
 WARNING: The C extension could not be compiled, speedups are not enabled.
 
-Above is the output showing how the compilation failed.
+Below is the output showing how the compilation failed:
 """
 
 class ve_build_ext(build_ext):
     # This class allows C extension building to fail.
+
+    def run(self):
+        try:
+            build_ext.run(self)
+        except DistutilsPlatformError, x:
+            self._unavailable(x)
+
     def build_extension(self, ext):
         try:
             build_ext.build_extension(self, ext)
-        except CCompilerError, x:
-            print ('*'*70+'\n')
-            print BUILD_EXT_WARNING
-            print ('*'*70+'\n')
+        except (CCompilerError, DistutilsExecError), x:
+           self._unavailable(x)
+
+    def _unavailable(self, exc):
+         print '*'*70
+         print BUILD_EXT_WARNING
+         print exc
+         print '*'*70
 
 speedups = Feature(
     "options C speed-enhancement modules",
