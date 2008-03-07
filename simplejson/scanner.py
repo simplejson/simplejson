@@ -26,6 +26,7 @@ class Scanner(object):
             p.append(subpattern)
             self.actions.append(token)
 
+        s.groups = len(p)+1  # NOTE(guido): Added to make SRE validation work
         p = sre_parse.SubPattern(s, [(BRANCH, (None, p))])
         self.scanner = sre_compile.compile(p)
 
