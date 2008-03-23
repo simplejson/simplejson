@@ -106,13 +106,26 @@ def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
             end += 1
         else:
             esc = s[end + 1:end + 5]
+            next_end = end + 5
+            msg = "Invalid \\uXXXX escape"
             try:
-                m = unichr(int(esc, 16))
                 if len(esc) != 4 or not esc.isalnum():
                     raise ValueError
+                uni = int(esc, 16)
+                if 0xd800 <= uni <= 0xdbff:
+                    msg = "Invalid \\uXXXX\\uXXXX surrogate pair"
+                    if not s[end + 5:end + 7] == '\\u':
+                        raise ValueError
+                    esc2 = s[end + 7:end + 11]
+                    if len(esc2) != 4 or not esc2.isalnum():
+                        raise ValueError
+                    uni2 = int(esc2, 16)
+                    uni = 0x10000 + (((uni - 0xd800) << 10) | (uni2 - 0xdc00))
+                    next_end += 6
+                m = unichr(uni)
             except ValueError:
-                raise ValueError(errmsg("Invalid \\uXXXX escape", s, end))
-            end += 5
+                raise ValueError(errmsg(msg, s, end))
+            end = next_end
         _append(m)
     return u''.join(chunks), end
 

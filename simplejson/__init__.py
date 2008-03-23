@@ -105,8 +105,12 @@ __all__ = [
     'JSONDecoder', 'JSONEncoder',
 ]
 
-from simplejson.decoder import JSONDecoder
-from simplejson.encoder import JSONEncoder
+if __name__ == '__main__':
+    from simplejson.decoder import JSONDecoder
+    from simplejson.encoder import JSONEncoder
+else:
+    from decoder import JSONDecoder
+    from encoder import JSONEncoder
 
 _default_encoder = JSONEncoder(
     skipkeys=False,
