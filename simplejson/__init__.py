@@ -353,7 +353,23 @@ def write(obj):
 
 def main():
     import sys
-    print dumps(loads(sys.stdin.read()), indent=4)
+    if len(sys.argv) == 1:
+        infile = sys.stdin
+        outfile = sys.stdout
+    elif len(sys.argv) == 2:
+        infile = open(sys.argv[1], 'rb')
+        outfile = sys.stdout
+    elif len(sys.argv) == 3:
+        infile = open(sys.argv[1], 'rb')
+        outfile = open(sys.argv[2], 'wb')
+    else:
+        raise SystemExit("%s [infile [outfile]]" % (sys.argv[0],))
+    try:
+        obj = load(infile)
+    except ValueError, e:
+        raise SystemExit(e)
+    dump(obj, outfile, indent=4)
+    outfile.write('\n')
 
 if __name__ == '__main__':
     main()
