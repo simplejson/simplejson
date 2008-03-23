@@ -24,3 +24,13 @@ def test_big_unicode_decode():
     u = u'z\U0001d120x'
     assert S.loads('"' + u + '"') == u
     assert S.loads('"z\\ud834\\udd20x"') == u
+
+def test_unicode_decode():
+    for i in range(0, 0xd7ff):
+        u = unichr(i)
+        json = '"\\u%04x"' % (i,)
+        res = S.loads(json)
+        assert res == u, 'S.loads(%r) != %r got %r' % (json, u, res)
+
+if __name__ == '__main__':
+    test_unicode_decode()

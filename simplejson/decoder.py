@@ -5,6 +5,10 @@ import re
 import sys
 
 from simplejson.scanner import Scanner, pattern
+try:
+    from simplejson import _speedups
+except:
+    _speedups = None
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 
@@ -110,7 +114,7 @@ def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
             next_end = end + 5
             msg = "Invalid \\uXXXX escape"
             try:
-                if len(esc) != 4 or not esc.isalnum():
+                if len(esc) != 4:
                     raise ValueError
                 uni = int(esc, 16)
                 if 0xd800 <= uni <= 0xdbff and sys.maxunicode > 65535:
@@ -118,7 +122,7 @@ def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
                     if not s[end + 5:end + 7] == '\\u':
                         raise ValueError
                     esc2 = s[end + 7:end + 11]
-                    if len(esc2) != 4 or not esc2.isalnum():
+                    if len(esc2) != 4:
                         raise ValueError
                     uni2 = int(esc2, 16)
                     uni = 0x10000 + (((uni - 0xd800) << 10) | (uni2 - 0xdc00))
@@ -129,6 +133,10 @@ def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
             end = next_end
         _append(m)
     return u''.join(chunks), end
+
+# Use speedup
+if _speedups is not None:
+    scanstring = _speedups.scanstring
 
 def JSONString(match, context):
     encoding = getattr(context, 'encoding', None)
