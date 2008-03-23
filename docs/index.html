@@ -164,6 +164,16 @@ decimal.Decimal(1.1)
 >>> list(ComplexEncoder().iterencode(2 + 1j))
 ['[', '2.0', ', ', '1.0', ']']
 </PRE>
+<P>Using simplejson from the shell to validate and
+pretty-print:</P>
+<PRE CLASS="literal-block">
+$ echo '{"json":"obj"}' | python -msimplejson
+{
+    "json": "obj"
+}
+$ echo '{ 1.2:3.4}' | python -msimplejson
+Expecting property name: line 1 column 2 (char 2)
+</PRE>
 <P>Note that the JSON produced by this module's default settings
 is a subset of YAML, so it may be used as a serializer for that as well.</P>
 
@@ -177,8 +187,8 @@ is a subset of YAML, so it may be used as a serializer for that as well.</P>
     <DIV CLASS="pudge-member routine ">
     <A NAME="dump"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
-      <TT><A HREF="module-simplejson.html#dump" CLASS="pudge-obj-link">dump</A>(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, encoding='utf-8', **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=111&amp;l=167#111" TITLE="View Source">...</A>
+      <TT><A HREF="module-simplejson.html#dump" CLASS="pudge-obj-link">dump</A>(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, encoding='utf-8', default=None, **kw)</TT>
+      <A HREF="simplejson/__init__.py.html?f=122&amp;l=182#122" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -208,6 +218,8 @@ of 0 will only insert newlines. <TT CLASS="docutils literal"><SPAN CLASS="pre">N
 then it will be used instead of the default <TT CLASS="docutils literal"><SPAN CLASS="pre">(',</SPAN> <SPAN CLASS="pre">',</SPAN> <SPAN CLASS="pre">':</SPAN> <SPAN CLASS="pre">')</SPAN></TT> separators.
 <TT CLASS="docutils literal"><SPAN CLASS="pre">(',',</SPAN> <SPAN CLASS="pre">':')</SPAN></TT> is the most compact JSON representation.</P>
 <P><TT CLASS="docutils literal"><SPAN CLASS="pre">encoding</SPAN></TT> is the character encoding for str instances, default is UTF-8.</P>
+<P><TT CLASS="docutils literal"><SPAN CLASS="pre">default(obj)</SPAN></TT> is a function that should return a serializable version
+of obj or raise TypeError. The default simply raises TypeError.</P>
 <P>To use a custom <TT CLASS="docutils literal"><SPAN CLASS="pre">JSONEncoder</SPAN></TT> subclass (e.g. one that overrides the
 <TT CLASS="docutils literal"><SPAN CLASS="pre">.default()</SPAN></TT> method to serialize additional types), specify it with
 the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
@@ -217,8 +229,8 @@ the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
   </DIV><DIV CLASS="pudge-member routine ">
     <A NAME="dumps"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
-      <TT><A HREF="module-simplejson.html#dumps" CLASS="pudge-obj-link">dumps</A>(obj, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, encoding='utf-8', **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=169&amp;l=220#169" TITLE="View Source">...</A>
+      <TT><A HREF="module-simplejson.html#dumps" CLASS="pudge-obj-link">dumps</A>(obj, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, cls=None, indent=None, separators=None, encoding='utf-8', default=None, **kw)</TT>
+      <A HREF="simplejson/__init__.py.html?f=184&amp;l=238#184" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -246,6 +258,8 @@ representation.</P>
 then it will be used instead of the default <TT CLASS="docutils literal"><SPAN CLASS="pre">(',</SPAN> <SPAN CLASS="pre">',</SPAN> <SPAN CLASS="pre">':</SPAN> <SPAN CLASS="pre">')</SPAN></TT> separators.
 <TT CLASS="docutils literal"><SPAN CLASS="pre">(',',</SPAN> <SPAN CLASS="pre">':')</SPAN></TT> is the most compact JSON representation.</P>
 <P><TT CLASS="docutils literal"><SPAN CLASS="pre">encoding</SPAN></TT> is the character encoding for str instances, default is UTF-8.</P>
+<P><TT CLASS="docutils literal"><SPAN CLASS="pre">default(obj)</SPAN></TT> is a function that should return a serializable version
+of obj or raise TypeError. The default simply raises TypeError.</P>
 <P>To use a custom <TT CLASS="docutils literal"><SPAN CLASS="pre">JSONEncoder</SPAN></TT> subclass (e.g. one that overrides the
 <TT CLASS="docutils literal"><SPAN CLASS="pre">.default()</SPAN></TT> method to serialize additional types), specify it with
 the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
@@ -256,7 +270,7 @@ the <TT CLASS="docutils literal"><SPAN CLASS="pre">cls</SPAN></TT> kwarg.</P>
     <A NAME="load"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="module-simplejson.html#load" CLASS="pudge-obj-link">load</A>(fp, encoding=None, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=223&amp;l=248#223" TITLE="View Source">...</A>
+      <A HREF="simplejson/__init__.py.html?f=241&amp;l=266#241" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -283,7 +297,7 @@ kwarg.</P>
     <A NAME="loads"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="module-simplejson.html#loads" CLASS="pudge-obj-link">loads</A>(s, encoding=None, cls=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None, **kw)</TT>
-      <A HREF="simplejson/__init__.py.html?f=249&amp;l=298#249" TITLE="View Source">...</A>
+      <A HREF="simplejson/__init__.py.html?f=267&amp;l=316#267" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -325,7 +339,7 @@ kwarg.</P>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">C</SPAN>
       <TT>
         <A HREF="class-simplejson.JSONEncoder.html" CLASS="pudge-obj-link">JSONEncoder</A>(...)</TT>
-      <A HREF="simplejson/encoder.py.html?f=79&amp;l=369#79" CLASS="pudge-member-view-source" TITLE="View Source">...</A>
+      <A HREF="simplejson/encoder.py.html?f=79&amp;l=375#79" CLASS="pudge-member-view-source" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       

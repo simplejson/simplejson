@@ -67,7 +67,7 @@
     </LI>
     
     <LI>
-      <A HREF="simplejson/encoder.py.html?f=79&amp;l=369#79" CLASS="pudge-section-link">
+      <A HREF="simplejson/encoder.py.html?f=79&amp;l=375#79" CLASS="pudge-section-link">
         Source
       </A>
     </LI>
@@ -125,8 +125,8 @@ implementation (to raise <TT CLASS="docutils literal"><SPAN CLASS="pre">TypeErro
     <DIV CLASS="pudge-member routine alias">
     <A NAME="__init__"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
-      <TT><A HREF="class-simplejson.JSONEncoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, sort_keys=False, indent=None, separators=None, encoding='utf-8')</TT>
-      <A HREF="simplejson/encoder.py.html?f=111&amp;l=163#111" TITLE="View Source">...</A>
+      <TT><A HREF="class-simplejson.JSONEncoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, skipkeys=False, ensure_ascii=True, check_circular=True, allow_nan=True, sort_keys=False, indent=None, separators=None, encoding='utf-8', default=None)</TT>
+      <A HREF="simplejson/encoder.py.html?f=111&amp;l=169#111" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -157,6 +157,9 @@ None is the most compact representation.</P>
 <P>If specified, separators should be a (item_separator, key_separator)
 tuple. The default is (', ', ': '). To get the most compact JSON
 representation you should specify (',', ':') to eliminate whitespace.</P>
+<P>If specified, default is a function that gets called for objects
+that can't otherwise be serialized. It should return a JSON encodable
+version of the object or raise a <TT CLASS="docutils literal"><SPAN CLASS="pre">TypeError</SPAN></TT>.</P>
 <P>If encoding is not None, then all input strings will be
 transformed into unicode using that encoding prior to JSON-encoding.
 The default is UTF-8.</P>
@@ -167,7 +170,7 @@ The default is UTF-8.</P>
     <A NAME="default"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="class-simplejson.JSONEncoder.html#default" CLASS="pudge-obj-link">default</A>(self, o)</TT>
-      <A HREF="simplejson/encoder.py.html?f=313&amp;l=332#313" TITLE="View Source">...</A>
+      <A HREF="simplejson/encoder.py.html?f=319&amp;l=338#319" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -195,7 +198,7 @@ def default(self, o):
     <A NAME="encode"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="class-simplejson.JSONEncoder.html#encode" CLASS="pudge-obj-link">encode</A>(self, o)</TT>
-      <A HREF="simplejson/encoder.py.html?f=333&amp;l=353#333" TITLE="View Source">...</A>
+      <A HREF="simplejson/encoder.py.html?f=339&amp;l=359#339" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -213,7 +216,7 @@ def default(self, o):
     <A NAME="iterencode"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="class-simplejson.JSONEncoder.html#iterencode" CLASS="pudge-obj-link">iterencode</A>(self, o)</TT>
-      <A HREF="simplejson/encoder.py.html?f=354&amp;l=369#354" TITLE="View Source">...</A>
+      <A HREF="simplejson/encoder.py.html?f=360&amp;l=375#360" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -238,7 +241,7 @@ for chunk in JSONEncoder().iterencode(bigobject):
     
     
     See 
-    <A HREF="simplejson/encoder.py.html?f=79&amp;l=369#79" TITLE="simplejson/encoder.py:79">the source</A>
+    <A HREF="simplejson/encoder.py.html?f=79&amp;l=375#79" TITLE="simplejson/encoder.py:79">the source</A>
     for more information.
     </SMALL>
   </P>

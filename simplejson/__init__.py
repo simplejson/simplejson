@@ -86,6 +86,16 @@ Extending JSONEncoder::
     ['[', '2.0', ', ', '1.0', ']']
     
 
+Using simplejson from the shell to validate and
+pretty-print::
+    
+    $ echo '{"json":"obj"}' | python -msimplejson
+    {
+        "json": "obj"
+    }
+    $ echo '{ 1.2:3.4}' | python -msimplejson
+    Expecting property name: line 1 column 2 (char 2)
+
 Note that the JSON produced by this module's default settings
 is a subset of YAML, so it may be used as a serializer for that as well.
 """
@@ -368,7 +378,7 @@ def main():
         obj = load(infile)
     except ValueError, e:
         raise SystemExit(e)
-    dump(obj, outfile, indent=4)
+    dump(obj, outfile, sort_keys=True, indent=4)
     outfile.write('\n')
 
 if __name__ == '__main__':
