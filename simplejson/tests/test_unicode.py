@@ -14,3 +14,13 @@ def test_encoding2():
     ju = S.dumps(u, encoding='utf-8')
     js = S.dumps(s, encoding='utf-8')
     assert ju == js
+
+def test_big_unicode_encode():
+    u = u'\U0001d120'
+    assert S.dumps(u) == '"\\ud834\\udd20"'
+    assert S.dumps(u, ensure_ascii=False) == '"\\ud834\\udd20"'
+
+def test_big_unicode_decode():
+    u = u'\U0001d120'
+    assert S.loads('"' + u + '"') == u
+    assert S.loads('"\\ud834\\udd20"') == u
