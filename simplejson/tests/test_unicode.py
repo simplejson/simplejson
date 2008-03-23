@@ -21,6 +21,6 @@ def test_big_unicode_encode():
     assert S.dumps(u, ensure_ascii=False) == '"\\ud834\\udd20"'
 
 def test_big_unicode_decode():
-    u = u'\U0001d120'
+    u = u'z\U0001d120x'
     assert S.loads('"' + u + '"') == u
-    assert S.loads('"\\ud834\\udd20"') == u
+    assert S.loads('"z\\ud834\\udd20x"') == u
