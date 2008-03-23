@@ -9,7 +9,7 @@
     <DIV ID="page">
       
     <DIV ID="top-nav">
-        <H1 ID="doc-title"><A HREF="index.html" REL="index">simplejson 1.7.5</A></H1>
+        <H1 ID="doc-title"><A HREF="index.html" REL="index">simplejson 1.8</A></H1>
         <DIV CLASS="online-navigation">
           <A HREF="index.html" REL="index">index</A>
           <SPAN ID="nav-docs">
@@ -67,7 +67,7 @@
     </LI>
     
     <LI>
-      <A HREF="simplejson/decoder.py.html?f=196&amp;l=272#196" CLASS="pudge-section-link">
+      <A HREF="simplejson/decoder.py.html?f=204&amp;l=299#204" CLASS="pudge-section-link">
         Source
       </A>
     </LI>
@@ -75,7 +75,7 @@
   </DIV>
   <DIV STYLE="clear: left"></DIV>
   <DIV CLASS="rst pudge-module-doc">
-    <P>Performs the following translations in decoding:</P>
+    <P>Performs the following translations in decoding by default:</P>
 <TABLE BORDER="1" CLASS="docutils">
 <COLGROUP>
 <COL WIDTH="44%">
@@ -126,8 +126,8 @@ their corresponding <TT CLASS="docutils literal"><SPAN CLASS="pre">float</SPAN><
     <DIV CLASS="pudge-member routine alias">
     <A NAME="__init__"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
-      <TT><A HREF="class-simplejson.JSONDecoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, encoding=None, object_hook=None)</TT>
-      <A HREF="simplejson/decoder.py.html?f=229&amp;l=245#229" TITLE="View Source">...</A>
+      <TT><A HREF="class-simplejson.JSONDecoder.html#__init__" CLASS="pudge-obj-link">__init__</A>(self, encoding=None, object_hook=None, parse_float=None, parse_int=None, parse_constant=None)</TT>
+      <A HREF="simplejson/decoder.py.html?f=237&amp;l=272#237" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -142,14 +142,26 @@ strings of other encodings should be passed in as <TT CLASS="docutils literal"><
 of every JSON object decoded and its return value will be used in
 place of the given <TT CLASS="docutils literal"><SPAN CLASS="pre">dict</SPAN></TT>.  This can be used to provide custom
 deserializations (e.g. to support JSON-RPC class hinting).</P>
+<P><TT CLASS="docutils literal"><SPAN CLASS="pre">parse_float</SPAN></TT>, if specified, will be called with the string
+of every JSON float to be decoded. By default this is equivalent to
+float(num_str). This can be used to use another datatype or parser
+for JSON floats (e.g. decimal.Decimal).</P>
+<P><TT CLASS="docutils literal"><SPAN CLASS="pre">parse_int</SPAN></TT>, if specified, will be called with the string
+of every JSON int to be decoded. By default this is equivalent to
+int(num_str). This can be used to use another datatype or parser
+for JSON integers (e.g. float).</P>
+<P><TT CLASS="docutils literal"><SPAN CLASS="pre">parse_constant</SPAN></TT>, if specified, will be called with one of the
+following strings: -Infinity, Infinity, NaN, null, true, false.
+This can be used to raise an exception if invalid JSON numbers
+are encountered.</P>
 
   
     </DIV>
   </DIV><DIV CLASS="pudge-member routine alias">
     <A NAME="decode"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
-      <TT><A HREF="class-simplejson.JSONDecoder.html#decode" CLASS="pudge-obj-link">decode</A>(self, s, _w=&lt;built-in method match of _sre.SRE_Pattern object at 0x1539770>)</TT>
-      <A HREF="simplejson/decoder.py.html?f=246&amp;l=256#246" TITLE="View Source">...</A>
+      <TT><A HREF="class-simplejson.JSONDecoder.html#decode" CLASS="pudge-obj-link">decode</A>(self, s, _w=&lt;built-in method match of _sre.SRE_Pattern object at 0x15a3728>)</TT>
+      <A HREF="simplejson/decoder.py.html?f=273&amp;l=283#273" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -164,7 +176,7 @@ instance containing a JSON document)
     <A NAME="raw_decode"></A>
     <H4 CLASS="pudge-member-name"><SPAN CLASS="prefix">f</SPAN>
       <TT><A HREF="class-simplejson.JSONDecoder.html#raw_decode" CLASS="pudge-obj-link">raw_decode</A>(self, s, **kw)</TT>
-      <A HREF="simplejson/decoder.py.html?f=257&amp;l=272#257" TITLE="View Source">...</A>
+      <A HREF="simplejson/decoder.py.html?f=284&amp;l=299#284" TITLE="View Source">...</A>
     </H4>
     <DIV CLASS="pudge-section rst">
       
@@ -187,7 +199,7 @@ have extraneous data at the end.</P>
     
     
     See 
-    <A HREF="simplejson/decoder.py.html?f=196&amp;l=272#196" TITLE="simplejson/decoder.py:196">the source</A>
+    <A HREF="simplejson/decoder.py.html?f=204&amp;l=299#204" TITLE="simplejson/decoder.py:204">the source</A>
     for more information.
     </SMALL>
   </P>

@@ -65,6 +65,9 @@ Specializing JSON object decoding::
     >>> simplejson.loads('{"__complex__": true, "real": 1, "imag": 2}',
     ...     object_hook=as_complex)
     (1+2j)
+    >>> import decimal
+    >>> simplejson.loads('1.1', parse_float=decimal.Decimal)
+    decimal.Decimal(1.1)
 
 Extending JSONEncoder::
     
@@ -217,7 +220,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
 
 _default_decoder = JSONDecoder(encoding=None, object_hook=None)
 
-def load(fp, encoding=None, cls=None, object_hook=None, **kw):
+def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
+        parse_int=None, parse_constant=None, **kw):
     """
     Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
     a JSON document) to a Python object.
@@ -238,9 +242,12 @@ def load(fp, encoding=None, cls=None, object_hook=None, **kw):
     kwarg.
     """
     return loads(fp.read(),
-        encoding=encoding, cls=cls, object_hook=object_hook, **kw)
+        encoding=encoding, cls=cls, object_hook=object_hook,
+        parse_float=parse_float, parse_int=parse_int,
+        parse_constant=parse_constant, **kw)
 
-def loads(s, encoding=None, cls=None, object_hook=None, **kw):
+def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
+        parse_int=None, parse_constant=None, **kw):
     """
     Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
     document) to a Python object.
@@ -255,20 +262,66 @@ def loads(s, encoding=None, cls=None, object_hook=None, **kw):
     ``object_hook`` will be used instead of the ``dict``. This feature
     can be used to implement custom decoders (e.g. JSON-RPC class hinting).
 
+    ``parse_float``, if specified, will be called with the string
+    of every JSON float to be decoded. By default this is equivalent to
+    float(num_str). This can be used to use another datatype or parser
+    for JSON floats (e.g. decimal.Decimal).
+
+    ``parse_int``, if specified, will be called with the string
+    of every JSON int to be decoded. By default this is equivalent to
+    int(num_str). This can be used to use another datatype or parser
+    for JSON integers (e.g. float).
+
+    ``parse_constant``, if specified, will be called with one of the
+    following strings: -Infinity, Infinity, NaN, null, true, false.
+    This can be used to raise an exception if invalid JSON numbers
+    are encountered.
+
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
     """
-    if cls is None and encoding is None and object_hook is None and not kw:
+    if (cls is None and encoding is None and object_hook is None and
+            parse_int is None and parse_float is None and
+            parse_constant is None and not kw):
         return _default_decoder.decode(s)
     if cls is None:
         cls = JSONDecoder
     if object_hook is not None:
         kw['object_hook'] = object_hook
+    if parse_float is not None:
+        kw['parse_float'] = parse_float
+    if parse_int is not None:
+        kw['parse_int'] = parse_int
+    if parse_constant is not None:
+        kw['parse_constant'] = parse_constant
     return cls(encoding=encoding, **kw).decode(s)
+
+#
+# Compatibility cruft from other libraries
+#
+
+def decode(s):
+    """
+    demjson, python-cjson API compatibility hook. Use loads(s) instead.
+    """
+    import warnings
+    warnings.warn("simplejson.loads(s) should be used instead of decode(s)",
+        DeprecationWarning)
+    return loads(s)
+
+def encode(obj):
+    """
+    demjson, python-cjson compatibility hook. Use dumps(s) instead.
+    """
+    import warnings
+    warnings.warn("simplejson.dumps(s) should be used instead of encode(s)",
+        DeprecationWarning)
+    return dumps(obj)
 
 def read(s):
     """
-    json-py API compatibility hook. Use loads(s) instead.
+    jsonlib, JsonUtils, python-json, json-py API compatibility hook.
+    Use loads(s) instead.
     """
     import warnings
     warnings.warn("simplejson.loads(s) should be used instead of read(s)",
@@ -277,11 +330,10 @@ def read(s):
 
 def write(obj):
     """
-    json-py API compatibility hook. Use dumps(s) instead.
+    jsonlib, JsonUtils, python-json, json-py API compatibility hook.
+    Use dumps(s) instead.
     """
     import warnings
     warnings.warn("simplejson.dumps(s) should be used instead of write(s)",
         DeprecationWarning)
     return dumps(obj)
-
-
