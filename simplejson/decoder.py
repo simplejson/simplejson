@@ -2,6 +2,7 @@
 Implementation of JSONDecoder
 """
 import re
+import sys
 
 from simplejson.scanner import Scanner, pattern
 
@@ -112,7 +113,7 @@ def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
                 if len(esc) != 4 or not esc.isalnum():
                     raise ValueError
                 uni = int(esc, 16)
-                if 0xd800 <= uni <= 0xdbff:
+                if 0xd800 <= uni <= 0xdbff and sys.maxunicode > 65535:
                     msg = "Invalid \\uXXXX\\uXXXX surrogate pair"
                     if not s[end + 5:end + 7] == '\\u':
                         raise ValueError
