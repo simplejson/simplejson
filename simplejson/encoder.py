@@ -7,7 +7,7 @@ try:
 except ImportError:
     _speedups = None
 
-ESCAPE = re.compile(r'[\x00-\x19\\"\b\f\n\r\t]')
+ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"/]|[^\ -~])')
 ESCAPE_DCT = {
     # escape all forward slashes to prevent </script> attack
