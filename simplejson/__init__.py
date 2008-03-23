@@ -95,8 +95,8 @@ __all__ = [
     'JSONDecoder', 'JSONEncoder',
 ]
 
-from decoder import JSONDecoder
-from encoder import JSONEncoder
+from simplejson.decoder import JSONDecoder
+from simplejson.encoder import JSONEncoder
 
 _default_encoder = JSONEncoder(
     skipkeys=False,
@@ -105,12 +105,13 @@ _default_encoder = JSONEncoder(
     allow_nan=True,
     indent=None,
     separators=None,
-    encoding='utf-8'
+    encoding='utf-8',
+    default=None,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
-        encoding='utf-8', **kw):
+        encoding='utf-8', default=None, **kw):
     """
     Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
@@ -144,6 +145,9 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
 
     ``encoding`` is the character encoding for str instances, default is UTF-8.
 
+    ``default(obj)`` is a function that should return a serializable version
+    of obj or raise TypeError. The default simply raises TypeError.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -152,14 +156,15 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     if (skipkeys is False and ensure_ascii is True and
         check_circular is True and allow_nan is True and
         cls is None and indent is None and separators is None and
-        encoding == 'utf-8' and not kw):
+        encoding == 'utf-8' and default is None and not kw):
         iterable = _default_encoder.iterencode(obj)
     else:
         if cls is None:
             cls = JSONEncoder
         iterable = cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
             check_circular=check_circular, allow_nan=allow_nan, indent=indent,
-            separators=separators, encoding=encoding, **kw).iterencode(obj)
+            separators=separators, encoding=encoding,
+            default=default, **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
     for chunk in iterable:
@@ -168,7 +173,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
 
 def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
-        encoding='utf-8', **kw):
+        encoding='utf-8', default=None, **kw):
     """
     Serialize ``obj`` to a JSON formatted ``str``.
 
@@ -200,6 +205,9 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
 
     ``encoding`` is the character encoding for str instances, default is UTF-8.
 
+    ``default(obj)`` is a function that should return a serializable version
+    of obj or raise TypeError. The default simply raises TypeError.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -208,14 +216,14 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     if (skipkeys is False and ensure_ascii is True and
         check_circular is True and allow_nan is True and
         cls is None and indent is None and separators is None and
-        encoding == 'utf-8' and not kw):
+        encoding == 'utf-8' and default is None and not kw):
         return _default_encoder.encode(obj)
     if cls is None:
         cls = JSONEncoder
     return cls(
         skipkeys=skipkeys, ensure_ascii=ensure_ascii,
         check_circular=check_circular, allow_nan=allow_nan, indent=indent,
-        separators=separators, encoding=encoding,
+        separators=separators, encoding=encoding, default=default,
         **kw).encode(obj)
 
 _default_decoder = JSONDecoder(encoding=None, object_hook=None)
@@ -337,3 +345,15 @@ def write(obj):
     warnings.warn("simplejson.dumps(s) should be used instead of write(s)",
         DeprecationWarning)
     return dumps(obj)
+
+#
+# Pretty printer:
+#     curl http://mochikit.com/examples/ajax_tables/domains.json | python -msimplejson
+#
+
+def main():
+    import sys
+    print dumps(loads(sys.stdin.read()), indent=4)
+
+if __name__ == '__main__':
+    main()
