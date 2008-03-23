@@ -10,8 +10,6 @@ except ImportError:
 ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"/]|[^\ -~])')
 ESCAPE_DCT = {
-    # escape all forward slashes to prevent </script> attack
-    '/': '\\/',
     '\\': '\\\\',
     '"': '\\"',
     '\b': '\\b',

@@ -21,7 +21,7 @@ static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
 void init_speedups(void);
 
-#define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '/' && c != '"')
+#define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 
 #define MIN_EXPANSION 6
 #ifdef Py_UNICODE_WIDE
@@ -35,7 +35,6 @@ ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars) {
     Py_UNICODE x;
     output[chars++] = '\\';
     switch (c) {
-        case '/': output[chars++] = (char)c; break;
         case '\\': output[chars++] = (char)c; break;
         case '"': output[chars++] = (char)c; break;
         case '\b': output[chars++] = 'b'; break;
