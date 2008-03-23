@@ -25,6 +25,7 @@ for i in range(0x20):
 
 # assume this produces an infinity on all machines (probably not guaranteed)
 INFINITY = float('1e66666')
+FLOAT_REPR = repr
 
 def floatstr(o, allow_nan=True):
     # Check for specials.  Note that this type of test is processor- and/or
@@ -37,7 +38,7 @@ def floatstr(o, allow_nan=True):
     elif o == -INFINITY:
         text = '-Infinity'
     else:
-        return str(o)
+        return FLOAT_REPR(o)
 
     if not allow_nan:
         raise ValueError("Out of range float values are not JSON compliant: %r"
