@@ -70,7 +70,7 @@ def JSONNumber(match, context):
     return res, None
 pattern(r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?')(JSONNumber)
 
-STRINGCHUNK = re.compile(r'(.*?)(["\\])', FLAGS)
+STRINGCHUNK = re.compile(r'(.*?)(["\\\x00-\x1f])', FLAGS)
 BACKSLASH = {
     '"': u'"', '\\': u'\\', '/': u'/',
     'b': u'\b', 'f': u'\f', 'n': u'\n', 'r': u'\r', 't': u'\t',
@@ -78,7 +78,7 @@ BACKSLASH = {
 
 DEFAULT_ENCODING = "utf-8"
 
-def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
+def scanstring(s, end, encoding=None, strict=True, _b=BACKSLASH, _m=STRINGCHUNK.match):
     if encoding is None:
         encoding = DEFAULT_ENCODING
     chunks = []
@@ -97,6 +97,12 @@ def scanstring(s, end, encoding=None, _b=BACKSLASH, _m=STRINGCHUNK.match):
             _append(content)
         if terminator == '"':
             break
+        elif terminator != '\\':
+            if strict:
+                raise ValueError(errmsg("Invalid control character %r at", s, end))
+            else:
+                _append(terminator)
+                continue
         try:
             esc = s[end]
         except IndexError:
@@ -140,7 +146,8 @@ if _speedups is not None:
 
 def JSONString(match, context):
     encoding = getattr(context, 'encoding', None)
-    return scanstring(match.string, match.end(), encoding)
+    strict = getattr(context, 'strict', True)
+    return scanstring(match.string, match.end(), encoding, strict)
 pattern(r'"')(JSONString)
 
 WHITESPACE = re.compile(r'\s*', FLAGS)
@@ -157,9 +164,10 @@ def JSONObject(match, context, _w=WHITESPACE.match):
         raise ValueError(errmsg("Expecting property name", s, end))
     end += 1
     encoding = getattr(context, 'encoding', None)
+    strict = getattr(context, 'strict', True)
     iterscan = JSONScanner.iterscan
     while True:
-        key, end = scanstring(s, end, encoding)
+        key, end = scanstring(s, end, encoding, strict)
         end = _w(s, end).end()
         if s[end:end + 1] != ':':
             raise ValueError(errmsg("Expecting : delimiter", s, end))
@@ -257,7 +265,7 @@ class JSONDecoder(object):
     __all__ = ['__init__', 'decode', 'raw_decode']
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
-            parse_int=None, parse_constant=None):
+            parse_int=None, parse_constant=None, strict=True):
         """
         ``encoding`` determines the encoding used to interpret any ``str``
         objects decoded by this instance (utf-8 by default).  It has no
@@ -291,6 +299,7 @@ class JSONDecoder(object):
         self.parse_float = parse_float
         self.parse_int = parse_int
         self.parse_constant = parse_constant
+        self.strict = strict
 
     def decode(self, s, _w=WHITESPACE.match):
         """

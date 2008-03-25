@@ -99,7 +99,7 @@ pretty-print::
 Note that the JSON produced by this module's default settings
 is a subset of YAML, so it may be used as a serializer for that as well.
 """
-__version__ = '1.8.1'
+__version__ = '1.8.2'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONEncoder',

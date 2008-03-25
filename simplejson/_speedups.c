@@ -239,7 +239,7 @@ join_list_unicode(PyObject *lst) {
 }
 
 static PyObject *
-scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding) {
+scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict) {
     PyObject *rval;
     Py_ssize_t len = PyString_GET_SIZE(pystr);
     Py_ssize_t begin = end - 1;
@@ -257,6 +257,9 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding) {
             c = buf[next];
             if (c == '"' || c == '\\') {
                 break;
+            } else if (strict && c <= 0x1f) {
+                raise_errmsg("Invalid control character at", pystr, begin);
+                goto bail;
             }
         }
         if (!(c == '"' || c == '\\')) {
@@ -397,7 +400,7 @@ bail:
 
 
 static PyObject *
-scanstring_unicode(PyObject *pystr, Py_ssize_t end) {
+scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict) {
     PyObject *rval;
     Py_ssize_t len = PyUnicode_GET_SIZE(pystr);
     Py_ssize_t begin = end - 1;
@@ -415,6 +418,9 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end) {
             c = buf[next];
             if (c == '"' || c == '\\') {
                 break;
+            } else if (strict && c <= 0x1f) {
+                raise_errmsg("Invalid control character at", pystr, begin);
+                goto bail;
             }
         }
         if (!(c == '"' || c == '\\')) {
@@ -559,11 +565,12 @@ static PyObject *
 py_scanstring(PyObject* self UNUSED, PyObject *args) {
     PyObject *pystr;
     Py_ssize_t end;
-    char *encoding;
+    char *encoding = NULL;
+    int strict = 0;
 #if PY_VERSION_HEX < 0x02050000 
-    if (!PyArg_ParseTuple(args, "Oiz:scanstring", &pystr, &end, &encoding)) {
+    if (!PyArg_ParseTuple(args, "Oi|zi:scanstring", &pystr, &end, &encoding, &strict)) {
 #else
-    if (!PyArg_ParseTuple(args, "Onz:scanstring", &pystr, &end, &encoding)) {
+    if (!PyArg_ParseTuple(args, "On|zi:scanstring", &pystr, &end, &encoding, &strict)) {
 #endif
         return NULL;
     }
@@ -571,9 +578,9 @@ py_scanstring(PyObject* self UNUSED, PyObject *args) {
         encoding = DEFAULT_ENCODING;
     }
     if (PyString_Check(pystr)) {
-        return scanstring_str(pystr, end, encoding);
+        return scanstring_str(pystr, end, encoding, strict);
     } else if (PyUnicode_Check(pystr)) {
-        return scanstring_unicode(pystr, end);
+        return scanstring_unicode(pystr, end, strict);
     }
     PyErr_SetString(PyExc_TypeError, "first argument must be a string");
     return NULL;

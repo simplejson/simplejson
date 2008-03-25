@@ -48,6 +48,8 @@ JSONDOCS = [
     '["Bad value", truth]',
     # http://json.org/JSON_checker/test/fail24.json
     "['single quote']",
+    # http://code.google.com/p/simplejson/issues/detail?id=3
+    u'["A\u001FZ control characters in string"]',
 ]
 
 SKIPS = {
