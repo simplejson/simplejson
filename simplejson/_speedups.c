@@ -614,7 +614,7 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr) {
 static PyMethodDef speedups_methods[] = {
     DEFN(encode_basestring_ascii, METH_O),
     DEFN(scanstring, METH_VARARGS),
-    {}
+    {NULL,NULL}
 };
 #undef DEFN
 
