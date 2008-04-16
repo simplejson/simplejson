@@ -341,7 +341,7 @@ class JSONEncoder(object):
         Return a JSON string representation of a Python data structure.
 
         >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
-        '{"foo":["bar", "baz"]}'
+        '{"foo": ["bar", "baz"]}'
         """
         # This is for extremely simple cases and benchmarks...
         if isinstance(o, basestring):
