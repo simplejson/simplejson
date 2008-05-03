@@ -104,7 +104,7 @@ ascii_escape_unicode(PyObject *pystr)
         if (S_CHAR(c)) {
             output[chars++] = (char)c;
         }
-	else {
+        else {
             chars = ascii_escape_char(c, output, chars);
         }
         if (output_size - chars < (1 + MAX_EXPANSION)) {
@@ -154,7 +154,7 @@ ascii_escape_str(PyObject *pystr)
         if (S_CHAR(c)) {
             output[chars++] = (char)c;
         }
-	else if (c > 0x7F) {
+        else if (c > 0x7F) {
             /* We hit a non-ASCII character, bail to unicode mode */
             PyObject *uni;
             Py_DECREF(rval);
@@ -166,7 +166,7 @@ ascii_escape_str(PyObject *pystr)
             Py_DECREF(uni);
             return rval;
         }
-	else {
+        else {
             chars = ascii_escape_char(c, output, chars);
         }
         /* An ASCII char can't possibly expand to a surrogate! */
