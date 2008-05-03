@@ -69,7 +69,7 @@ def encode_basestring_ascii(s):
                 s2 = 0xdc00 | (n & 0x3ff)
                 return '\\u%04x\\u%04x' % (s1, s2)
     return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
-        
+
 try:
     encode_basestring_ascii = _speedups.encode_basestring_ascii
     _need_utf8 = True
@@ -150,7 +150,7 @@ class JSONEncoder(object):
         version of the object or raise a ``TypeError``.
 
         If encoding is not None, then all input strings will be
-        transformed into unicode using that encoding prior to JSON-encoding. 
+        transformed into unicode using that encoding prior to JSON-encoding.
         The default is UTF-8.
         """
 
@@ -350,7 +350,10 @@ class JSONEncoder(object):
                 if (_encoding is not None 
                         and not (_encoding == 'utf-8' and _need_utf8)):
                     o = o.decode(_encoding)
-            return encode_basestring_ascii(o)
+            if self.ensure_ascii:
+                return encode_basestring_ascii(o)
+            else:
+                return encode_basestring(o)
         # This doesn't pass the iterator directly to ''.join() because it
         # sucks at reporting exceptions.  It's going to do this internally
         # anyway because it uses PySequence_Fast or similar.

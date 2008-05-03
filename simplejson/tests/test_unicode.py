@@ -18,10 +18,30 @@ class TestUnicode(TestCase):
         js = S.dumps(s, encoding='utf-8')
         self.assertEquals(ju, js)
 
+    def test_encoding3(self):
+        u = u'\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}'
+        j = S.dumps(u)
+        self.assertEquals(j, '"\\u03b1\\u03a9"')
+
+    def test_encoding4(self):
+        u = u'\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}'
+        j = S.dumps([u])
+        self.assertEquals(j, '["\\u03b1\\u03a9"]')
+
+    def test_encoding5(self):
+        u = u'\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}'
+        j = S.dumps(u, ensure_ascii=False)
+        self.assertEquals(j, u'"%s"' % (u,))
+
+    def test_encoding6(self):
+        u = u'\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}'
+        j = S.dumps([u], ensure_ascii=False)
+        self.assertEquals(j, u'["%s"]' % (u,))
+
     def test_big_unicode_encode(self):
         u = u'\U0001d120'
         self.assertEquals(S.dumps(u), '"\\ud834\\udd20"')
-        self.assertEquals(S.dumps(u, ensure_ascii=False), '"\\ud834\\udd20"')
+        self.assertEquals(S.dumps(u, ensure_ascii=False), u'"\U0001d120"')
 
     def test_big_unicode_decode(self):
         u = u'z\U0001d120x'
