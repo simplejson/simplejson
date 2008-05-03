@@ -2,6 +2,7 @@
 Implementation of JSONEncoder
 """
 import re
+
 try:
     from simplejson import _speedups
 except ImportError:
@@ -21,7 +22,7 @@ ESCAPE_DCT = {
 for i in range(0x20):
     ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
 
-# assume this produces an infinity on all machines (probably not guaranteed)
+# Assume this produces an infinity on all machines (probably not guaranteed)
 INFINITY = float('1e66666')
 FLOAT_REPR = repr
 
@@ -53,6 +54,7 @@ def encode_basestring(s):
         return ESCAPE_DCT[match.group(0)]
     return '"' + ESCAPE.sub(replace, s) + '"'
 
+
 def encode_basestring_ascii(s):
     def replace(match):
         s = match.group(0)
@@ -70,11 +72,13 @@ def encode_basestring_ascii(s):
                 return '\\u%04x\\u%04x' % (s1, s2)
     return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
 
+
 try:
     encode_basestring_ascii = _speedups.encode_basestring_ascii
     _need_utf8 = True
 except AttributeError:
     _need_utf8 = False
+
 
 class JSONEncoder(object):
     """
@@ -142,11 +146,11 @@ class JSONEncoder(object):
         None is the most compact representation.
 
         If specified, separators should be a (item_separator, key_separator)
-        tuple. The default is (', ', ': '). To get the most compact JSON
+        tuple.  The default is (', ', ': ').  To get the most compact JSON
         representation you should specify (',', ':') to eliminate whitespace.
 
         If specified, default is a function that gets called for objects
-        that can't otherwise be serialized. It should return a JSON encodable
+        that can't otherwise be serialized.  It should return a JSON encodable
         version of the object or raise a ``TypeError``.
 
         If encoding is not None, then all input strings will be
@@ -343,7 +347,7 @@ class JSONEncoder(object):
         >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo": ["bar", "baz"]}'
         """
-        # This is for extremely simple cases and benchmarks...
+        # This is for extremely simple cases and benchmarks.
         if isinstance(o, basestring):
             if isinstance(o, str):
                 _encoding = self.encoding
@@ -354,9 +358,9 @@ class JSONEncoder(object):
                 return encode_basestring_ascii(o)
             else:
                 return encode_basestring(o)
-        # This doesn't pass the iterator directly to ''.join() because it
-        # sucks at reporting exceptions.  It's going to do this internally
-        # anyway because it uses PySequence_Fast or similar.
+        # This doesn't pass the iterator directly to ''.join() because the
+        # exceptions aren't as detailed.  The list call should be roughly
+        # equivalent to the PySequence_Fast that ''.join() would do.
         chunks = list(self.iterencode(o))
         return ''.join(chunks)
 

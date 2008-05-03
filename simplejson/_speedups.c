@@ -33,7 +33,8 @@ void init_speedups(void);
 #endif
 
 static Py_ssize_t
-ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars) {
+ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars)
+{
     Py_UNICODE x;
     output[chars++] = '\\';
     switch (c) {
@@ -77,7 +78,8 @@ ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars) {
 }
 
 static PyObject *
-ascii_escape_unicode(PyObject *pystr) {
+ascii_escape_unicode(PyObject *pystr)
+{
     Py_ssize_t i;
     Py_ssize_t input_chars;
     Py_ssize_t output_size;
@@ -101,7 +103,8 @@ ascii_escape_unicode(PyObject *pystr) {
         Py_UNICODE c = input_unicode[i];
         if (S_CHAR(c)) {
             output[chars++] = (char)c;
-        } else {
+        }
+	else {
             chars = ascii_escape_char(c, output, chars);
         }
         if (output_size - chars < (1 + MAX_EXPANSION)) {
@@ -125,7 +128,8 @@ ascii_escape_unicode(PyObject *pystr) {
 }
 
 static PyObject *
-ascii_escape_str(PyObject *pystr) {
+ascii_escape_str(PyObject *pystr)
+{
     Py_ssize_t i;
     Py_ssize_t input_chars;
     Py_ssize_t output_size;
@@ -149,7 +153,8 @@ ascii_escape_str(PyObject *pystr) {
         Py_UNICODE c = (Py_UNICODE)input_str[i];
         if (S_CHAR(c)) {
             output[chars++] = (char)c;
-        } else if (c > 0x7F) {
+        }
+	else if (c > 0x7F) {
             /* We hit a non-ASCII character, bail to unicode mode */
             PyObject *uni;
             Py_DECREF(rval);
@@ -160,7 +165,8 @@ ascii_escape_str(PyObject *pystr) {
             rval = ascii_escape_unicode(uni);
             Py_DECREF(uni);
             return rval;
-        } else {
+        }
+	else {
             chars = ascii_escape_char(c, output, chars);
         }
         /* An ASCII char can't possibly expand to a surrogate! */
@@ -184,7 +190,8 @@ ascii_escape_str(PyObject *pystr) {
 }
 
 void
-raise_errmsg(char *msg, PyObject *s, Py_ssize_t end) {
+raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
+{
     static PyObject *errmsg_fn = NULL;
     PyObject *pymsg;
     if (errmsg_fn == NULL) {
@@ -222,7 +229,8 @@ def errmsg(msg, doc, pos, end=None):
 }
 
 static PyObject *
-join_list_unicode(PyObject *lst) {
+join_list_unicode(PyObject *lst)
+{
     static PyObject *ustr = NULL;
     static PyObject *joinstr = NULL;
     if (ustr == NULL) {
@@ -239,7 +247,8 @@ join_list_unicode(PyObject *lst) {
 }
 
 static PyObject *
-scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict) {
+scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict)
+{
     PyObject *rval;
     Py_ssize_t len = PyString_GET_SIZE(pystr);
     Py_ssize_t begin = end - 1;
@@ -257,7 +266,8 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict) {
             c = buf[next];
             if (c == '"' || c == '\\') {
                 break;
-            } else if (strict && c <= 0x1f) {
+            }
+            else if (strict && c <= 0x1f) {
                 raise_errmsg("Invalid control character at", pystr, begin);
                 goto bail;
             }
@@ -309,7 +319,8 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict) {
                 raise_errmsg("Invalid \\escape", pystr, end - 2);
                 goto bail;
             }
-        } else {
+        }
+        else {
             c = 0;
             next++;
             end = next + 4;
@@ -400,7 +411,8 @@ bail:
 
 
 static PyObject *
-scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict) {
+scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict)
+{
     PyObject *rval;
     Py_ssize_t len = PyUnicode_GET_SIZE(pystr);
     Py_ssize_t begin = end - 1;
@@ -418,7 +430,8 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict) {
             c = buf[next];
             if (c == '"' || c == '\\') {
                 break;
-            } else if (strict && c <= 0x1f) {
+            }
+            else if (strict && c <= 0x1f) {
                 raise_errmsg("Invalid control character at", pystr, begin);
                 goto bail;
             }
@@ -466,7 +479,8 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict) {
                 raise_errmsg("Invalid \\escape", pystr, end - 2);
                 goto bail;
             }
-        } else {
+        }
+        else {
             c = 0;
             next++;
             end = next + 4;
@@ -562,7 +576,8 @@ PyDoc_STRVAR(pydoc_scanstring,
 );
 
 static PyObject *
-py_scanstring(PyObject* self UNUSED, PyObject *args) {
+py_scanstring(PyObject* self UNUSED, PyObject *args)
+{
     PyObject *pystr;
     Py_ssize_t end;
     char *encoding = NULL;
@@ -579,7 +594,8 @@ py_scanstring(PyObject* self UNUSED, PyObject *args) {
     }
     if (PyString_Check(pystr)) {
         return scanstring_str(pystr, end, encoding, strict);
-    } else if (PyUnicode_Check(pystr)) {
+    }
+    else if (PyUnicode_Check(pystr)) {
         return scanstring_unicode(pystr, end, strict);
     }
     PyErr_SetString(PyExc_TypeError, "first argument must be a string");
@@ -593,30 +609,30 @@ PyDoc_STRVAR(pydoc_encode_basestring_ascii,
 );
 
 static PyObject *
-py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr) {
+py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
+{
     /* METH_O */
     if (PyString_Check(pystr)) {
         return ascii_escape_str(pystr);
-    } else if (PyUnicode_Check(pystr)) {
+    }
+    else if (PyUnicode_Check(pystr)) {
         return ascii_escape_unicode(pystr);
     }
     PyErr_SetString(PyExc_TypeError, "first argument must be a string");
     return NULL;
 }
 
-#define DEFN(n, k) \
-    {  \
-        #n, \
-        (PyCFunction)py_ ##n, \
-        k, \
-        pydoc_ ##n \
-    }
 static PyMethodDef speedups_methods[] = {
-    DEFN(encode_basestring_ascii, METH_O),
-    DEFN(scanstring, METH_VARARGS),
-    {NULL,NULL}
+    {"encode_basestring_ascii",
+        (PyCFunction)py_encode_basestring_ascii,
+        METH_O,
+        pydoc_encode_basestring_ascii},
+    {"scanstring",
+        (PyCFunction)py_scanstring,
+        METH_VARARGS,
+        pydoc_scanstring},
+    {NULL, NULL, 0, NULL}
 };
-#undef DEFN
 
 void
 init_speedups(void)

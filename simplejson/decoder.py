@@ -23,6 +23,7 @@ def _floatconstants():
 
 NaN, PosInf, NegInf = _floatconstants()
 
+
 def linecol(doc, pos):
     lineno = doc.count('\n', 0, pos) + 1
     if lineno == 1:
@@ -31,6 +32,7 @@ def linecol(doc, pos):
         colno = pos - doc.rindex('\n', 0, pos)
     return lineno, colno
 
+
 def errmsg(msg, doc, pos, end=None):
     lineno, colno = linecol(doc, pos)
     if end is None:
@@ -38,6 +40,7 @@ def errmsg(msg, doc, pos, end=None):
     endlineno, endcolno = linecol(doc, end)
     return '%s: line %d column %d - line %d column %d (char %d - %d)' % (
         msg, lineno, colno, endlineno, endcolno, pos, end)
+
 
 _CONSTANTS = {
     '-Infinity': NegInf,
@@ -58,6 +61,7 @@ def JSONConstant(match, context, c=_CONSTANTS):
     return rval, None
 pattern('(-?Infinity|NaN|true|false|null)')(JSONConstant)
 
+
 def JSONNumber(match, context):
     match = JSONNumber.regex.match(match.string, *match.span())
     integer, frac, exp = match.groups()
@@ -69,6 +73,7 @@ def JSONNumber(match, context):
         res = fn(integer)
     return res, None
 pattern(r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?')(JSONNumber)
+
 
 STRINGCHUNK = re.compile(r'(.*?)(["\\\x00-\x1f])', FLAGS)
 BACKSLASH = {
@@ -140,6 +145,7 @@ def scanstring(s, end, encoding=None, strict=True, _b=BACKSLASH, _m=STRINGCHUNK.
         _append(m)
     return u''.join(chunks), end
 
+
 # Use speedup
 if _speedups is not None:
     scanstring = _speedups.scanstring
@@ -150,6 +156,7 @@ def JSONString(match, context):
     return scanstring(match.string, match.end(), encoding, strict)
 pattern(r'"')(JSONString)
 
+
 WHITESPACE = re.compile(r'\s*', FLAGS)
 
 def JSONObject(match, context, _w=WHITESPACE.match):
@@ -157,7 +164,7 @@ def JSONObject(match, context, _w=WHITESPACE.match):
     s = match.string
     end = _w(s, match.end()).end()
     nextchar = s[end:end + 1]
-    # trivial empty object
+    # Trivial empty object
     if nextchar == '}':
         return pairs, end + 1
     if nextchar != '"':
@@ -194,12 +201,13 @@ def JSONObject(match, context, _w=WHITESPACE.match):
         pairs = object_hook(pairs)
     return pairs, end
 pattern(r'{')(JSONObject)
-            
+
+
 def JSONArray(match, context, _w=WHITESPACE.match):
     values = []
     s = match.string
     end = _w(s, match.end()).end()
-    # look-ahead for trivial empty array
+    # Look-ahead for trivial empty array
     nextchar = s[end:end + 1]
     if nextchar == ']':
         return values, end + 1
@@ -220,7 +228,8 @@ def JSONArray(match, context, _w=WHITESPACE.match):
         end = _w(s, end).end()
     return values, end
 pattern(r'\[')(JSONArray)
- 
+
+
 ANYTHING = [
     JSONObject,
     JSONArray,
@@ -230,6 +239,7 @@ ANYTHING = [
 ]
 
 JSONScanner = Scanner(ANYTHING)
+
 
 class JSONDecoder(object):
     """
