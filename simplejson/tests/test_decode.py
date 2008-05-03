@@ -1,11 +1,15 @@
-import simplejson as S
 import decimal
-def test_decimal():
-    rval = S.loads('1.1', parse_float=decimal.Decimal)
-    assert isinstance(rval, decimal.Decimal)
-    assert rval == decimal.Decimal('1.1')
+from unittest import TestCase
 
-def test_float():
-    rval = S.loads('1', parse_int=float)
-    assert isinstance(rval, float)
-    assert rval == 1.0
+import simplejson as S
+
+class TestDecode(TestCase):
+    def test_decimal(self):
+        rval = S.loads('1.1', parse_float=decimal.Decimal)
+        self.assert_(isinstance(rval, decimal.Decimal))
+        self.assertEquals(rval, decimal.Decimal('1.1'))
+
+    def test_float(self):
+        rval = S.loads('1', parse_int=float)
+        self.assert_(isinstance(rval, float))
+        self.assertEquals(rval, 1.0)

@@ -1,41 +1,41 @@
+from unittest import TestCase
+
+import simplejson as S
+import textwrap
+
+class TestIndent(TestCase):
+    def test_indent(self):
+        h = [['blorpie'], ['whoops'], [], 'd-shtaeou', 'd-nthiouh', 'i-vhbjkhnth',
+             {'nifty': 87}, {'field': 'yes', 'morefield': False} ]
+
+        expect = textwrap.dedent("""\
+        [
+          [
+            "blorpie"
+          ],
+          [
+            "whoops"
+          ],
+          [],
+          "d-shtaeou",
+          "d-nthiouh",
+          "i-vhbjkhnth",
+          {
+            "nifty": 87
+          },
+          {
+            "field": "yes",
+            "morefield": false
+          }
+        ]""")
 
 
+        d1 = S.dumps(h)
+        d2 = S.dumps(h, indent=2, sort_keys=True, separators=(',', ': '))
 
-def test_indent():
-    import simplejson
-    import textwrap
-    
-    h = [['blorpie'], ['whoops'], [], 'd-shtaeou', 'd-nthiouh', 'i-vhbjkhnth',
-         {'nifty': 87}, {'field': 'yes', 'morefield': False} ]
+        h1 = S.loads(d1)
+        h2 = S.loads(d2)
 
-    expect = textwrap.dedent("""\
-    [
-      [
-        "blorpie"
-      ],
-      [
-        "whoops"
-      ],
-      [],
-      "d-shtaeou",
-      "d-nthiouh",
-      "i-vhbjkhnth",
-      {
-        "nifty": 87
-      },
-      {
-        "field": "yes",
-        "morefield": false
-      }
-    ]""")
-
-
-    d1 = simplejson.dumps(h)
-    d2 = simplejson.dumps(h, indent=2, sort_keys=True, separators=(',', ': '))
-
-    h1 = simplejson.loads(d1)
-    h2 = simplejson.loads(d2)
-
-    assert h1 == h
-    assert h2 == h
-    assert d2 == expect
+        self.assertEquals(h1, h)
+        self.assertEquals(h2, h)
+        self.assertEquals(d2, expect)

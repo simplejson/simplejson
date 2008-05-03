@@ -1,3 +1,7 @@
+from unittest import TestCase
+
+import simplejson as S
+
 # from http://json.org/JSON_checker/test/pass1.json
 JSON = r'''
 [
@@ -58,15 +62,15 @@ JSON = r'''
 ,"rosebud"]
 '''
 
-def test_parse():
-    # test in/out equivalence and parsing
-    import simplejson
-    res = simplejson.loads(JSON)
-    out = simplejson.dumps(res)
-    assert res == simplejson.loads(out)
-    try:
-        simplejson.dumps(res, allow_nan=False)
-    except ValueError:
-        pass
-    else:
-        assert False, "23456789012E666 should be out of range"
+class TestPass1(TestCase):
+    def test_parse(self):
+        # test in/out equivalence and parsing
+        res = S.loads(JSON)
+        out = S.dumps(res)
+        self.assertEquals(res, S.loads(out))
+        try:
+            S.dumps(res, allow_nan=False)
+        except ValueError:
+            pass
+        else:
+            self.fail("23456789012E666 should be out of range")

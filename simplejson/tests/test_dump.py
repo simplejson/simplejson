@@ -1,10 +1,13 @@
+from unittest import TestCase
 from cStringIO import StringIO
+
 import simplejson as S
 
-def test_dump():
-    sio = StringIO()
-    S.dump({}, sio)
-    assert sio.getvalue() == '{}'
+class TestDump(TestCase):
+    def test_dump(self):
+        sio = StringIO()
+        S.dump({}, sio)
+        self.assertEquals(sio.getvalue(), '{}')
     
-def test_dumps():
-    assert S.dumps({}) == '{}'
+    def test_dumps(self):
+        self.assertEquals(S.dumps({}), '{}')

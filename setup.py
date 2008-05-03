@@ -18,7 +18,7 @@ from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
-VERSION = '1.8.2'
+VERSION = '1.9'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = """
 simplejson is a simple, fast, complete, correct and extensible
@@ -93,11 +93,8 @@ setup(
     license="MIT License",
     packages=find_packages(exclude=['ez_setup']),
     platforms=['any'],
-    test_suite="nose.collector",
+    test_suite="simplejson.tests",
     zip_safe=True,
-    entry_points={
-        'paste.filter_app_factory': ['json = simplejson.jsonfilter:factory'],
-    },
     features={'speedups': speedups},
     cmdclass={'build_ext': ve_build_ext},
 )
