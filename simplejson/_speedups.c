@@ -207,6 +207,7 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
     pymsg = PyObject_CallFunction(errmsg_fn, "(zOn)", msg, s, end);
 #endif
     PyErr_SetObject(PyExc_ValueError, pymsg);
+    Py_XDECREF(pymsg);
 /*
 
 def linecol(doc, pos):
@@ -283,6 +284,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict)
                 goto bail;
             }
             chunk = PyUnicode_FromEncodedObject(strchunk, encoding, NULL);
+            Py_XDECREF(strchunk);
             if (chunk == NULL) {
                 goto bail;
             }
