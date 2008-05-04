@@ -4,12 +4,13 @@ Implementation of JSONEncoder
 import re
 
 try:
-    from simplejson import _speedups
+    from simplejson._speedups import encode_basestring_ascii as c_encode_basestring_ascii
 except ImportError:
-    _speedups = None
+    pass
 
 ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
-ESCAPE_ASCII = re.compile(r'([\\"/]|[^\ -~])')
+ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
+HAS_UTF8 = re.compile(r'[\x80-\xff]')
 ESCAPE_DCT = {
     '\\': '\\\\',
     '"': '\\"',
@@ -55,7 +56,9 @@ def encode_basestring(s):
     return '"' + ESCAPE.sub(replace, s) + '"'
 
 
-def encode_basestring_ascii(s):
+def py_encode_basestring_ascii(s):
+    if isinstance(s, str) and HAS_UTF8.search(s) is not None:
+        s = s.decode('utf-8')
     def replace(match):
         s = match.group(0)
         try:
@@ -74,10 +77,9 @@ def encode_basestring_ascii(s):
 
 
 try:
-    encode_basestring_ascii = _speedups.encode_basestring_ascii
-    _need_utf8 = True
-except AttributeError:
-    _need_utf8 = False
+    encode_basestring_ascii = c_encode_basestring_ascii
+except NameError:
+    encode_basestring_ascii = py_encode_basestring_ascii
 
 
 class JSONEncoder(object):
@@ -240,7 +242,7 @@ class JSONEncoder(object):
             items = dct.iteritems()
         _encoding = self.encoding
         _do_decode = (_encoding is not None
-            and not (_need_utf8 and _encoding == 'utf-8'))
+            and not (_encoding == 'utf-8'))
         for key, value in items:
             if isinstance(key, str):
                 if _do_decode:
@@ -286,7 +288,7 @@ class JSONEncoder(object):
                 encoder = encode_basestring
             _encoding = self.encoding
             if (_encoding is not None and isinstance(o, str)
-                    and not (_need_utf8 and _encoding == 'utf-8')):
+                    and not (_encoding == 'utf-8')):
                 o = o.decode(_encoding)
             yield encoder(o)
         elif o is None:
@@ -352,7 +354,7 @@ class JSONEncoder(object):
             if isinstance(o, str):
                 _encoding = self.encoding
                 if (_encoding is not None 
-                        and not (_encoding == 'utf-8' and _need_utf8)):
+                        and not (_encoding == 'utf-8')):
                     o = o.decode(_encoding)
             if self.ensure_ascii:
                 return encode_basestring_ascii(o)
