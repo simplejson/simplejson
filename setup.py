@@ -46,33 +46,6 @@ Topic :: Software Development :: Libraries :: Python Modules
 """.splitlines()))
 
 
-BUILD_EXT_WARNING="""\
-WARNING: The C extension could not be compiled, speedups are not enabled.
-
-Below is the output showing how the compilation failed:
-"""
-
-class ve_build_ext(build_ext):
-    # This class allows C extension building to fail.
-
-    def run(self):
-        try:
-            build_ext.run(self)
-        except DistutilsPlatformError, x:
-            self._unavailable(x)
-
-    def build_extension(self, ext):
-        try:
-            build_ext.build_extension(self, ext)
-        except (CCompilerError, DistutilsExecError), x:
-           self._unavailable(x)
-
-    def _unavailable(self, exc):
-         print '*'*70
-         print BUILD_EXT_WARNING
-         print exc
-         print '*'*70
-
 speedups = Feature(
     "options C speed-enhancement modules",
     standard=True,
@@ -81,20 +54,61 @@ speedups = Feature(
     ],
 )
 
-setup(
-    name="simplejson",
-    version=VERSION,
-    description=DESCRIPTION,
-    long_description=LONG_DESCRIPTION,
-    classifiers=CLASSIFIERS,
-    author="Bob Ippolito",
-    author_email="bob@redivi.com",
-    url="http://undefined.org/python/#simplejson",
-    license="MIT License",
-    packages=find_packages(exclude=['ez_setup']),
-    platforms=['any'],
-    test_suite="simplejson.tests",
-    zip_safe=True,
-    features={'speedups': speedups},
-    cmdclass={'build_ext': ve_build_ext},
-)
+class BuildFailed(Exception):
+    pass
+
+class ve_build_ext(build_ext):
+    # This class allows C extension building to fail.
+
+    def run(self):
+        try:
+            build_ext.run(self)
+        except DistutilsPlatformError, x:
+            raise BuildFailed()
+
+    def build_extension(self, ext):
+        try:
+            build_ext.build_extension(self, ext)
+        except (CCompilerError, DistutilsExecError), x:
+            raise BuildFailed()
+
+def run_setup(with_binary):
+    if with_binary:
+        features = {'speedups': speedups}
+    else:
+        features = {}
+
+    setup(
+        name="simplejson",
+        version=VERSION,
+        description=DESCRIPTION,
+        long_description=LONG_DESCRIPTION,
+        classifiers=CLASSIFIERS,
+        author="Bob Ippolito",
+        author_email="bob@redivi.com",
+        url="http://undefined.org/python/#simplejson",
+        license="MIT License",
+        packages=find_packages(exclude=['ez_setup']),
+        platforms=['any'],
+        test_suite="simplejson.tests",
+        zip_safe=True,
+        features=features,
+        cmdclass={'build_ext': ve_build_ext},
+    )
+
+try:
+    run_setup(True)
+except BuildFailed:
+    BUILD_EXT_WARNING = "WARNING: The C extension could not be compiled, speedups are not enabled."
+    print '*' * 75
+    print BUILD_EXT_WARNING
+    print "Failure information, if any, is above."
+    print "I'm retrying the build without the C extension now."
+    print '*' * 75
+
+    run_setup(False)
+
+    print '*' * 75
+    print BUILD_EXT_WARNING
+    print "Plain-Python installation succeeded."
+    print '*' * 75
