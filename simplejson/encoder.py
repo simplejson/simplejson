@@ -6,7 +6,7 @@ import re
 try:
     from simplejson._speedups import encode_basestring_ascii as c_encode_basestring_ascii
 except ImportError:
-    pass
+    c_encode_basestring_ascii = None
 
 ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
@@ -76,10 +76,7 @@ def py_encode_basestring_ascii(s):
     return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
 
 
-try:
-    encode_basestring_ascii = c_encode_basestring_ascii
-except NameError:
-    encode_basestring_ascii = py_encode_basestring_ascii
+encode_basestring_ascii = c_encode_basestring_ascii or py_encode_basestring_ascii
 
 
 class JSONEncoder(object):

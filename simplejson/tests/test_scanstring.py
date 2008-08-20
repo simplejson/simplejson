@@ -9,6 +9,8 @@ class TestScanString(TestCase):
         self._test_scanstring(simplejson.decoder.py_scanstring)
 
     def test_c_scanstring(self):
+        if not simplejson.decoder.c_scanstring:
+            return
         self._test_scanstring(simplejson.decoder.c_scanstring)
 
     def _test_scanstring(self, scanstring):

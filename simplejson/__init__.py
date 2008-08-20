@@ -30,8 +30,10 @@ Encoding basic Python object hierarchies::
 Compact encoding::
 
     >>> import simplejson
-    >>> simplejson.dumps([1,2,3,{'4': 5, '6': 7}], separators=(',',':'))
-    '[1,2,3,{"4":5,"6":7}]'
+    >>> compact = simplejson.dumps([1,2,3,{'4': 5, '6': 7}], separators=(',',':'))
+    >>> # Can't assume dict ordering
+    >>> compact in ('[1,2,3,{"4":5,"6":7}]', '[1,2,3,{"6":7,"4":5}]')
+    True
 
 Pretty printing::
 

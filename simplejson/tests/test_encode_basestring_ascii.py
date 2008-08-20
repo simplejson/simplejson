@@ -26,6 +26,8 @@ class TestEncodeBaseStringAscii(TestCase):
         self._test_encode_basestring_ascii(simplejson.encoder.py_encode_basestring_ascii)
 
     def test_c_encode_basestring_ascii(self):
+        if not simplejson.encoder.c_encode_basestring_ascii:
+            return
         self._test_encode_basestring_ascii(simplejson.encoder.c_encode_basestring_ascii)
 
     def _test_encode_basestring_ascii(self, encode_basestring_ascii):

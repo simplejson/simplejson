@@ -8,7 +8,7 @@ from simplejson.scanner import Scanner, pattern
 try:
     from simplejson._speedups import scanstring as c_scanstring
 except ImportError:
-    pass
+    c_scanstring = None
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 
@@ -146,11 +146,8 @@ def py_scanstring(s, end, encoding=None, strict=True, _b=BACKSLASH, _m=STRINGCHU
     return u''.join(chunks), end
 
 
-# Use speedup
-try:
-    scanstring = c_scanstring
-except NameError:
-    scanstring = py_scanstring
+# Use speedup if available
+scanstring = c_scanstring or py_scanstring
 
 def JSONString(match, context):
     encoding = getattr(context, 'encoding', None)
