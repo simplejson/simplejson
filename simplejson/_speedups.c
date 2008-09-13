@@ -1,4 +1,7 @@
 #include "Python.h"
+#if PY_VERSION_HEX < 0x02060000 && !defined(Py_TYPE)
+#define Py_TYPE(ob)     (((PyObject*)(ob))->ob_type)
+#endif
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
@@ -207,7 +210,7 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
     pymsg = PyObject_CallFunction(errmsg_fn, "(zOn)", msg, s, end);
 #endif
     PyErr_SetObject(PyExc_ValueError, pymsg);
-    Py_XDECREF(pymsg);
+    Py_DECREF(pymsg);
 /*
 
 def linecol(doc, pos):
@@ -239,7 +242,7 @@ join_list_unicode(PyObject *lst)
         ustr = PyUnicode_FromUnicode(&c, 0);
     }
     if (joinstr == NULL) {
-        joinstr = PyString_FromString("join");
+        joinstr = PyString_InternFromString("join");
     }
     if (joinstr == NULL || ustr == NULL) {
         return NULL;
@@ -259,6 +262,10 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict)
     if (chunks == NULL) {
         goto bail;
     }
+    if (end < 0 || len <= end) {
+        PyErr_SetString(PyExc_ValueError, "end is out of bounds");
+        goto bail;
+    }
     while (1) {
         /* Find the end of the string or the next escape */
         Py_UNICODE c = 0;
@@ -269,7 +276,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict)
                 break;
             }
             else if (strict && c <= 0x1f) {
-                raise_errmsg("Invalid control character at", pystr, begin);
+                raise_errmsg("Invalid control character at", pystr, next);
                 goto bail;
             }
         }
@@ -284,7 +291,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict)
                 goto bail;
             }
             chunk = PyUnicode_FromEncodedObject(strchunk, encoding, NULL);
-            Py_XDECREF(strchunk);
+            Py_DECREF(strchunk);
             if (chunk == NULL) {
                 goto bail;
             }
@@ -424,6 +431,10 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict)
     if (chunks == NULL) {
         goto bail;
     }
+    if (end < 0 || len <= end) {
+        PyErr_SetString(PyExc_ValueError, "end is out of bounds");
+        goto bail;
+    }
     while (1) {
         /* Find the end of the string or the next escape */
         Py_UNICODE c = 0;
@@ -434,7 +445,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict)
                 break;
             }
             else if (strict && c <= 0x1f) {
-                raise_errmsg("Invalid control character at", pystr, begin);
+                raise_errmsg("Invalid control character at", pystr, next);
                 goto bail;
             }
         }
@@ -600,7 +611,9 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
     else if (PyUnicode_Check(pystr)) {
         return scanstring_unicode(pystr, end, strict);
     }
-    PyErr_SetString(PyExc_TypeError, "first argument must be a string");
+    PyErr_Format(PyExc_TypeError,
+                 "first argument must be a string, not %.80s",
+                 Py_TYPE(pystr)->tp_name);
     return NULL;
 }
 
@@ -619,9 +632,12 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
     }
     else if (PyUnicode_Check(pystr)) {
         return ascii_escape_unicode(pystr);
+    } else {
+        PyErr_Format(PyExc_TypeError,
+                     "first argument must be a string, not %.80s",
+                     Py_TYPE(pystr)->tp_name);
+        return NULL;
     }
-    PyErr_SetString(PyExc_TypeError, "first argument must be a string");
-    return NULL;
 }
 
 static PyMethodDef speedups_methods[] = {
@@ -636,9 +652,12 @@ static PyMethodDef speedups_methods[] = {
     {NULL, NULL, 0, NULL}
 };
 
+PyDoc_STRVAR(module_doc,
+"simplejson speedups\n");
+
 void
 init_speedups(void)
 {
     PyObject *m;
-    m = Py_InitModule4("_speedups", speedups_methods, NULL, NULL, PYTHON_API_VERSION);
+    m = Py_InitModule3("_speedups", speedups_methods, module_doc);
 }
