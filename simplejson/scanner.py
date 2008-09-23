@@ -8,56 +8,51 @@ import sre_compile
 import sre_constants
 from sre_constants import BRANCH, SUBPATTERN
 
-__all__ = ['Scanner', 'pattern']
+__all__ = ['make_scanner', 'pattern']
 
 FLAGS = (VERBOSE | MULTILINE | DOTALL)
 
-class Scanner(object):
-    def __init__(self, lexicon, flags=FLAGS):
-        self.actions = [None]
-        # Combine phrases into a compound pattern
-        s = sre_parse.Pattern()
-        s.flags = flags
-        p = []
-        for idx, token in enumerate(lexicon):
-            phrase = token.pattern
-            try:
-                subpattern = sre_parse.SubPattern(s,
-                    [(SUBPATTERN, (idx + 1, sre_parse.parse(phrase, flags)))])
-            except sre_constants.error:
-                raise
-            p.append(subpattern)
-            self.actions.append(token)
+def make_scanner(lexicon, flags=FLAGS):
+    actions = [None]
+    # Combine phrases into a compound pattern
+    s = sre_parse.Pattern()
+    s.flags = flags
+    charpatterns = {}
+    p = []
+    idx = 0
+    for token in lexicon:
+        if token.pattern in (r'\[', r'{', r'"'):
+            charpatterns[token.pattern[-1]] = token
+        idx += 1
+        phrase = token.pattern
+        try:
+            subpattern = sre_parse.SubPattern(s,
+                [(SUBPATTERN, (idx, sre_parse.parse(phrase, flags)))])
+        except sre_constants.error:
+            raise
+        p.append(subpattern)
+        actions.append(token)
 
-        s.groups = len(p) + 1 # NOTE(guido): Added to make SRE validation work
-        p = sre_parse.SubPattern(s, [(BRANCH, (None, p))])
-        self.scanner = sre_compile.compile(p)
+    s.groups = len(p) + 1 # NOTE(guido): Added to make SRE validation work
+    p = sre_parse.SubPattern(s, [(BRANCH, (None, p))])
+    scanner = sre_compile.compile(p).scanner
 
-    def iterscan(self, string, idx=0, context=None):
-        """
-        Yield match, end_idx for each match
-        """
-        match = self.scanner.scanner(string, idx).match
-        actions = self.actions
-        lastend = idx
-        end = len(string)
-        while True:
-            m = match()
-            if m is None:
-                break
-            matchbegin, matchend = m.span()
-            if lastend == matchend:
-                break
-            action = actions[m.lastindex]
-            if action is not None:
-                rval, next_pos = action(m, context)
-                if next_pos is not None and next_pos != matchend:
-                    # "fast forward" the scanner
-                    matchend = next_pos
-                    match = self.scanner.scanner(string, matchend).match
-                yield rval, matchend
-            lastend = matchend
-
+    def _scan_once(string, idx=0, context=None):
+        try:
+            action = charpatterns[string[idx]]
+        except KeyError:
+            pass
+        except IndexError:
+            raise StopIteration
+        else:
+            return action((string, idx + 1), context)
+        
+        m = scanner(string, idx).match()
+        if m is None or m.end() == idx:
+            raise StopIteration
+        return actions[m.lastindex](m, context)
+    
+    return _scan_once
 
 def pattern(pattern, flags=FLAGS):
     def decorator(fn):

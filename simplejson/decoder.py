@@ -4,7 +4,7 @@ Implementation of JSONDecoder
 import re
 import sys
 
-from simplejson.scanner import Scanner, pattern
+from simplejson.scanner import make_scanner, pattern
 try:
     from simplejson._speedups import scanstring as c_scanstring
 except ImportError:
@@ -58,20 +58,21 @@ def JSONConstant(match, context, c=_CONSTANTS):
         rval = c[s]
     else:
         rval = fn(s)
-    return rval, None
-pattern('(-?Infinity|NaN|true|false|null)')(JSONConstant)
+    return rval, match.end()
+pattern(r'(-?Infinity|NaN|true|false|null)')(JSONConstant)
 
 
 def JSONNumber(match, context):
-    match = JSONNumber.regex.match(match.string, *match.span())
-    integer, frac, exp = match.groups()
+    # m1 = JSONNumber.regex.match(match.string, *match.span())
+    # assert m1.groups()[:3] == match.groups()[:3]
+    integer, frac, exp = match.groups()[:3]
     if frac or exp:
         fn = getattr(context, 'parse_float', None) or float
         res = fn(integer + (frac or '') + (exp or ''))
     else:
         fn = getattr(context, 'parse_int', None) or int
         res = fn(integer)
-    return res, None
+    return res, match.end()
 pattern(r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?')(JSONNumber)
 
 
@@ -149,52 +150,82 @@ def py_scanstring(s, end, encoding=None, strict=True, _b=BACKSLASH, _m=STRINGCHU
 # Use speedup if available
 scanstring = c_scanstring or py_scanstring
 
-def JSONString(match, context):
+def JSONString((string, end), context):
     encoding = getattr(context, 'encoding', None)
     strict = getattr(context, 'strict', True)
-    return scanstring(match.string, match.end(), encoding, strict)
+    return scanstring(string, end, encoding, strict)
 pattern(r'"')(JSONString)
 
 
-WHITESPACE = re.compile(r'\s*', FLAGS)
+WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
+WHITESPACE_STR = ' \t\n\r'
 
-def JSONObject(match, context, _w=WHITESPACE.match):
+def JSONObject((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     pairs = {}
-    s = match.string
-    end = _w(s, match.end()).end()
     nextchar = s[end:end + 1]
-    # Trivial empty object
-    if nextchar == '}':
-        return pairs, end + 1
+    # Normally we expect nextchar == '"'
     if nextchar != '"':
-        raise ValueError(errmsg("Expecting property name", s, end))
+        if nextchar in _ws:
+            end = _w(s, end).end()
+            nextchar = s[end:end + 1]
+        # Trivial empty object
+        if nextchar == '}':
+            return pairs, end + 1
+        elif nextchar != '"':
+            raise ValueError(errmsg("Expecting property name", s, end))
     end += 1
     encoding = getattr(context, 'encoding', None)
     strict = getattr(context, 'strict', True)
-    iterscan = JSONScanner.iterscan
+    scan_once = JSONScanner
     while True:
         key, end = scanstring(s, end, encoding, strict)
-        end = _w(s, end).end()
+
+        # To skip some function call overhead we optimize the fast paths where
+        # the JSON key separator is ": " or just ":".
         if s[end:end + 1] != ':':
-            raise ValueError(errmsg("Expecting : delimiter", s, end))
-        end = _w(s, end + 1).end()
+            end = _w(s, end).end()
+            if s[end:end + 1] != ':':
+                raise ValueError(errmsg("Expecting : delimiter", s, end))
+
+        end += 1
+
         try:
-            value, end = iterscan(s, idx=end, context=context).next()
+            if s[end] in _ws:
+                end += 1
+                if s[end] in _ws:
+                    end = _w(s, end).end()
+        except IndexError:
+            pass
+
+        try:
+            value, end = scan_once(s, end, context)
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
         pairs[key] = value
-        end = _w(s, end).end()
         nextchar = s[end:end + 1]
+        if nextchar in _ws:
+            end = _w(s, end).end()
+            nextchar = s[end:end + 1]
         end += 1
+
         if nextchar == '}':
             break
-        if nextchar != ',':
+        elif nextchar != ',':
             raise ValueError(errmsg("Expecting , delimiter", s, end - 1))
-        end = _w(s, end).end()
+
+        try:
+            if s[end] in _ws:
+                end += 1
+                if s[end] in _ws:
+                    end = _w(s, end).end()
+        except IndexError:
+            pass
+
         nextchar = s[end:end + 1]
         end += 1
         if nextchar != '"':
             raise ValueError(errmsg("Expecting property name", s, end - 1))
+
     object_hook = getattr(context, 'object_hook', None)
     if object_hook is not None:
         pairs = object_hook(pairs)
@@ -202,29 +233,40 @@ def JSONObject(match, context, _w=WHITESPACE.match):
 pattern(r'{')(JSONObject)
 
 
-def JSONArray(match, context, _w=WHITESPACE.match):
+def JSONArray((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     values = []
-    s = match.string
-    end = _w(s, match.end()).end()
-    # Look-ahead for trivial empty array
     nextchar = s[end:end + 1]
+    if nextchar in _ws:
+        end = _w(s, end).end()
+        nextchar = s[end:end + 1]
+    # Look-ahead for trivial empty array
     if nextchar == ']':
         return values, end + 1
-    iterscan = JSONScanner.iterscan
+    scan_once = JSONScanner
     while True:
         try:
-            value, end = iterscan(s, idx=end, context=context).next()
+            value, end = scan_once(s, end, context)
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
         values.append(value)
-        end = _w(s, end).end()
         nextchar = s[end:end + 1]
+        if nextchar in _ws:
+            end = _w(s, end).end()
+            nextchar = s[end:end + 1]
         end += 1
         if nextchar == ']':
             break
         if nextchar != ',':
             raise ValueError(errmsg("Expecting , delimiter", s, end))
-        end = _w(s, end).end()
+        
+        try:
+            if s[end] in _ws:
+                end += 1
+                if s[end] in _ws:
+                    end = _w(s, end).end()
+        except IndexError:
+            pass
+
     return values, end
 pattern(r'\[')(JSONArray)
 
@@ -237,7 +279,7 @@ ANYTHING = [
     JSONNumber,
 ]
 
-JSONScanner = Scanner(ANYTHING)
+JSONScanner = make_scanner(ANYTHING)
 
 
 class JSONDecoder(object):
@@ -270,7 +312,6 @@ class JSONDecoder(object):
     their corresponding ``float`` values, which is outside the JSON spec.
     """
 
-    _scanner = Scanner(ANYTHING)
     __all__ = ['__init__', 'decode', 'raw_decode']
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
@@ -330,9 +371,10 @@ class JSONDecoder(object):
         This can be used to decode a JSON document from a string that may
         have extraneous data at the end.
         """
-        kw.setdefault('context', self)
+        idx = kw.get('idx', 0)
+        context = kw.get('context', self)
         try:
-            obj, end = self._scanner.iterscan(s, **kw).next()
+            obj, end = JSONScanner(s, idx, context)
         except StopIteration:
             raise ValueError("No JSON object could be decoded")
         return obj, end
