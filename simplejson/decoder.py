@@ -125,7 +125,7 @@ scanstring = c_scanstring or py_scanstring
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 WHITESPACE_STR = ' \t\n\r'
 
-def JSONObject((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+def JSONObject((s, end), encoding, strict, scan_once, object_hook, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     pairs = {}
     nextchar = s[end:end + 1]
     # Normally we expect nextchar == '"'
@@ -139,9 +139,6 @@ def JSONObject((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
         elif nextchar != '"':
             raise ValueError(errmsg("Expecting property name", s, end))
     end += 1
-    encoding = context.encoding
-    strict = context.strict
-    scan_once = context.scan_once
     while True:
         key, end = scanstring(s, end, encoding, strict)
 
@@ -163,7 +160,7 @@ def JSONObject((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
             pass
 
         try:
-            value, end = scan_once(s, end, context)
+            value, end = scan_once(s, end)
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
         pairs[key] = value
@@ -197,12 +194,11 @@ def JSONObject((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
         if nextchar != '"':
             raise ValueError(errmsg("Expecting property name", s, end - 1))
 
-    object_hook = context.object_hook
     if object_hook is not None:
         pairs = object_hook(pairs)
     return pairs, end
 
-def JSONArray((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+def JSONArray((s, end), scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     values = []
     nextchar = s[end:end + 1]
     if nextchar in _ws:
@@ -211,11 +207,10 @@ def JSONArray((s, end), context, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     # Look-ahead for trivial empty array
     if nextchar == ']':
         return values, end + 1
-    scan_once = context.scan_once
     _append = values.append
     while True:
         try:
-            value, end = scan_once(s, end, context)
+            value, end = scan_once(s, end)
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
         _append(value)
@@ -313,7 +308,7 @@ class JSONDecoder(object):
         self.parse_int = parse_int or int
         self.parse_constant = parse_constant or _CONSTANTS.__getitem__
         self.strict = strict
-        self.scan_once = make_scanner(_LEXICON)
+        self.scan_once = make_scanner(_LEXICON, self)
 
     def decode(self, s, _w=WHITESPACE.match):
         """
@@ -326,7 +321,7 @@ class JSONDecoder(object):
             raise ValueError(errmsg("Extra data", s, end, len(s)))
         return obj
 
-    def raw_decode(self, s, **kw):
+    def raw_decode(self, s, idx=0):
         """
         Decode a JSON document from ``s`` (a ``str`` or ``unicode`` beginning
         with a JSON document) and return a 2-tuple of the Python
@@ -335,10 +330,8 @@ class JSONDecoder(object):
         This can be used to decode a JSON document from a string that may
         have extraneous data at the end.
         """
-        idx = kw.get('idx', 0)
-        context = kw.get('context', self)
         try:
-            obj, end = self.scan_once(s, idx, context)
+            obj, end = self.scan_once(s, idx)
         except StopIteration:
             raise ValueError("No JSON object could be decoded")
         return obj, end
