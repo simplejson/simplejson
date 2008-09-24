@@ -676,6 +676,26 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
 static void
 scanner_dealloc(PyObject *self)
 {
+    assert(PyScanner_Check(self));
+    PyScannerObject *s = (PyScannerObject *)self;
+    Py_XDECREF(s->encoding);
+    Py_XDECREF(s->strict);
+    Py_XDECREF(s->object_hook);
+    Py_XDECREF(s->parse_object);
+    Py_XDECREF(s->parse_array);
+    Py_XDECREF(s->parse_string);
+    Py_XDECREF(s->parse_float);
+    Py_XDECREF(s->parse_int);
+    Py_XDECREF(s->parse_constant);
+    s->encoding = NULL;
+    s->strict = NULL;
+    s->object_hook = NULL;
+    s->parse_object = NULL;
+    s->parse_array = NULL;
+    s->parse_string = NULL;
+    s->parse_float = NULL;
+    s->parse_int = NULL;
+    s->parse_constant = NULL;
     self->ob_type->tp_free(self);
 }
 
