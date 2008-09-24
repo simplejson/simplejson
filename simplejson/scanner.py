@@ -3,60 +3,54 @@ Iterator based sre token scanner
 """
 import re
 from re import VERBOSE, MULTILINE, DOTALL
-import sre_parse
-import sre_compile
-import sre_constants
-from sre_constants import BRANCH, SUBPATTERN
 
-__all__ = ['make_scanner', 'pattern']
+__all__ = ['make_scanner']
 
 FLAGS = (VERBOSE | MULTILINE | DOTALL)
 
-def make_scanner(lexicon, flags=FLAGS):
-    actions = [None]
-    # Combine phrases into a compound pattern
-    s = sre_parse.Pattern()
-    s.flags = flags
-    charpatterns = {}
-    p = []
-    idx = 0
-    for token in lexicon:
-        if token.pattern in (r'\[', r'{', r'"'):
-            charpatterns[token.pattern[-1]] = token
-        idx += 1
-        phrase = token.pattern
-        try:
-            subpattern = sre_parse.SubPattern(s,
-                [(SUBPATTERN, (idx, sre_parse.parse(phrase, flags)))])
-        except sre_constants.error:
-            raise
-        p.append(subpattern)
-        actions.append(token)
 
-    s.groups = len(p) + 1 # NOTE(guido): Added to make SRE validation work
-    p = sre_parse.SubPattern(s, [(BRANCH, (None, p))])
-    scanner = sre_compile.compile(p).scanner
+NUMBER_PATTERN = r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?'
 
-    def _scan_once(string, idx=0, context=None):
+def make_scanner(lexicon):
+    parse_object = lexicon['object']
+    parse_array = lexicon['array']
+    parse_string = lexicon['string']
+    match_number = re.compile(NUMBER_PATTERN, FLAGS).match
+
+    def _scan_once(string, idx, context):
         try:
-            action = charpatterns[string[idx]]
-        except KeyError:
-            pass
+            nextchar = string[idx]
         except IndexError:
             raise StopIteration
-        else:
-            return action((string, idx + 1), context)
         
-        m = scanner(string, idx).match()
-        if m is None or m.end() == idx:
+        if nextchar == '"':
+            return parse_string(string, idx + 1, context.encoding, context.strict)
+        elif nextchar == '{':
+            return parse_object((string, idx + 1), context)
+        elif nextchar == '[':
+            return parse_array((string, idx + 1), context)
+        elif nextchar == 'n' and string[idx:idx + 4] == 'null':
+            return None, idx + 4
+        elif nextchar == 't' and string[idx:idx + 4] == 'true':
+            return True, idx + 4
+        elif nextchar == 'f' and string[idx:idx + 5] == 'false':
+            return False, idx + 5
+        
+        m = match_number(string, idx)
+        if m is not None:
+            integer, frac, exp = m.groups()
+            if frac or exp:
+                res = context.parse_float(integer + (frac or '') + (exp or ''))
+            else:
+                res = context.parse_int(integer)
+            return res, m.end()
+        elif nextchar == 'N' and string[idx:idx + 3] == 'NaN':
+            return context.parse_constant('NaN'), idx + 3
+        elif nextchar == 'I' and string[idx:idx + 8] == 'Infinity':
+            return context.parse_constant('Infinity'), idx + 8
+        elif nextchar == '-' and string[idx:idx + 9] == '-Infinity':
+            return context.parse_constant('-Infinity'), idx + 9
+        else:
             raise StopIteration
-        return actions[m.lastindex](m, context)
     
     return _scan_once
-
-def pattern(pattern, flags=FLAGS):
-    def decorator(fn):
-        fn.pattern = pattern
-        fn.regex = re.compile(pattern, flags)
-        return fn
-    return decorator
