@@ -1,4 +1,5 @@
 #include "Python.h"
+#include "structmember.h"
 #if PY_VERSION_HEX < 0x02060000 && !defined(Py_TYPE)
 #define Py_TYPE(ob)     (((PyObject*)(ob))->ob_type)
 #endif
@@ -6,6 +7,7 @@
 typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
 #define PY_SSIZE_T_MIN INT_MIN
+#define PyInt_FromSsize_t PyInt_FromLong
 #endif
 
 #ifdef __GNUC__
@@ -15,6 +17,37 @@ typedef int Py_ssize_t;
 #endif
 
 #define DEFAULT_ENCODING "utf-8"
+
+#define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
+#define PyScanner_CheckExact(op) (Py_TYPE(op) == &PyScannerType)
+
+static PyTypeObject PyScannerType;
+
+typedef struct _PyScannerObject {
+    PyObject_HEAD
+    PyObject *encoding;
+    PyObject *strict;
+    PyObject *object_hook;
+    PyObject *parse_object;
+    PyObject *parse_array;
+    PyObject *parse_string;
+    PyObject *parse_float;
+    PyObject *parse_int;
+    PyObject *parse_constant;
+} PyScannerObject;
+
+static PyMemberDef scanner_members[] = {
+    {"encoding", T_OBJECT, offsetof(PyScannerObject, encoding), READONLY, "encoding"},
+    {"strict", T_OBJECT, offsetof(PyScannerObject, strict), READONLY, "strict"},
+    {"object_hook", T_OBJECT, offsetof(PyScannerObject, object_hook), READONLY, "object_hook"},
+    {"parse_object", T_OBJECT, offsetof(PyScannerObject, parse_object), READONLY, "parse_object"},
+    {"parse_array", T_OBJECT, offsetof(PyScannerObject, parse_array), READONLY, "parse_array"},
+    {"parse_string", T_OBJECT, offsetof(PyScannerObject, parse_string), READONLY, "parse_string"},
+    {"parse_float", T_OBJECT, offsetof(PyScannerObject, parse_float), READONLY, "parse_float"},
+    {"parse_int", T_OBJECT, offsetof(PyScannerObject, parse_int), READONLY, "parse_int"},
+    {"parse_constant", T_OBJECT, offsetof(PyScannerObject, parse_constant), READONLY, "parse_constant"},
+    {NULL}
+};
 
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars);
@@ -640,6 +673,450 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
     }
 }
 
+static void
+scanner_dealloc(PyObject *self)
+{
+    self->ob_type->tp_free(self);
+}
+
+static PyObject *
+_parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx) {
+    PyObject *cstr;
+    PyObject *rval;
+    PyObject *pyidx;
+    PyObject *tpl;
+    
+    cstr = PyString_InternFromString(constant);
+    if (cstr == NULL) return NULL;
+    rval = PyObject_CallFunctionObjArgs(s->parse_constant, cstr, NULL);
+    Py_DECREF(cstr);
+    if (rval == NULL) return NULL;
+    pyidx = PyInt_FromSsize_t(idx + PyString_GET_SIZE(cstr));
+    if (pyidx == NULL) { Py_DECREF(rval); return NULL; }
+    tpl = PyTuple_Pack(2, rval, pyidx);
+    Py_DECREF(rval);
+    Py_DECREF(pyidx);
+    return tpl;
+}
+
+/*static void
+_dp(char *name, PyObject *o) {
+    if (o == NULL) {
+        printf("%s = NULL\n", name);
+    } else {
+        PyObject *r = PyObject_Repr(o);
+        printf("%s = %s\n", name, PyString_AS_STRING(r));
+        Py_DECREF(r);
+    }
+}*/
+
+static PyObject *
+_match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
+    char *str = PyString_AS_STRING(pystr);
+    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
+    Py_ssize_t idx = start;
+    int is_float = 0;
+    PyObject *rval;
+    PyObject *numstr;
+    PyObject *tpl;
+    PyObject *pyidx;
+    if (str[idx] == '-') {
+        idx++;
+        if (idx > end_idx) {
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
+    }
+    if (str[idx] >= '1' && str[idx] <= '9') {
+        idx++;
+        while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+    } else if (str[idx] == '0') {
+        idx++;
+    } else {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    if (idx < end_idx && str[idx] == '.' && str[idx + 1] >= '0' && str[idx + 1] <= '9') {
+        is_float = 1;
+        idx += 2;
+        while (idx < end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+    }
+    if (idx < end_idx && (str[idx] == 'e' || str[idx] == 'E')) {
+        Py_ssize_t e_start = idx;
+        idx++;
+        if (idx < end_idx && (str[idx] == '-' || str[idx] == '+')) idx++;
+        while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+        if (str[idx - 1] >= '0' && str[idx - 1] <= '9') {
+            is_float = 1;
+        } else {
+            idx = e_start;
+        }
+    }
+    pyidx = PyInt_FromSsize_t(idx);
+    if (pyidx == NULL) return NULL;
+    numstr = PyString_FromStringAndSize(&str[start], idx - start);
+    if (numstr == NULL) { Py_DECREF(pyidx); return NULL; }
+    if (is_float) {
+        rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+    } else {
+        rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
+    }
+    Py_DECREF(numstr);
+    if (rval == NULL) { Py_DECREF(pyidx); return NULL; }
+    tpl = PyTuple_Pack(2, rval, pyidx);
+    Py_DECREF(pyidx);
+    Py_DECREF(rval);
+    return tpl;
+}
+
+static PyObject *
+_match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
+    Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
+    Py_ssize_t end_idx = PyUnicode_GET_SIZE(pystr) - 1;
+    Py_ssize_t idx = start;
+    int is_float = 0;
+    PyObject *rval;
+    PyObject *numstr;
+    PyObject *tpl;
+    PyObject *pyidx;
+    if (str[idx] == '-') {
+        idx++;
+        if (idx > end_idx) {
+            PyErr_SetNone(PyExc_StopIteration);
+            return NULL;
+        }
+    }
+    if (str[idx] >= '1' && str[idx] <= '9') {
+        idx++;
+        while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+    } else if (str[idx] == '0') {
+        idx++;
+    } else {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    if (idx < end_idx && str[idx] == '.' && str[idx + 1] >= '0' && str[idx + 1] <= '9') {
+        is_float = 1;
+        idx += 2;
+        while (idx < end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+    }
+    if (idx < end_idx && (str[idx] == 'e' || str[idx] == 'E')) {
+        Py_ssize_t e_start = idx;
+        idx++;
+        if (idx < end_idx && (str[idx] == '-' || str[idx] == '+')) idx++;
+        while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+        if (str[idx - 1] >= '0' && str[idx - 1] <= '9') {
+            is_float = 1;
+        } else {
+            idx = e_start;
+        }
+    }
+    pyidx = PyInt_FromSsize_t(idx);
+    if (pyidx == NULL) return NULL;
+    numstr = PyUnicode_FromUnicode(&str[start], idx - start);
+    if (numstr == NULL) { Py_DECREF(pyidx); return NULL; }
+    if (is_float) {
+        rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+    } else {
+        rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
+    }
+    Py_DECREF(numstr);
+    if (rval == NULL) { Py_DECREF(pyidx); return NULL; }
+    tpl = PyTuple_Pack(2, rval, pyidx);
+    Py_DECREF(pyidx);
+    Py_DECREF(rval);
+    return tpl;
+}
+
+static PyObject *
+scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
+{
+    char *str = PyString_AS_STRING(pystr);
+    Py_ssize_t length = PyString_GET_SIZE(pystr);
+    PyObject *tpl;
+    PyObject *pyidx;
+    PyObject *rval;
+    if (idx >= length) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    switch (str[idx]) {
+        case '"': 
+            return scanstring_str(pystr, idx + 1,
+                PyString_AS_STRING(s->encoding),
+                PyObject_IsTrue(s->strict));
+        case '{':
+            pyidx = PyInt_FromSsize_t(idx + 1);
+            if (pyidx == NULL) return NULL;
+            tpl = PyTuple_Pack(2, pystr, pyidx);
+            Py_DECREF(pyidx);
+            if (tpl == NULL) return NULL;
+            rval = PyObject_CallFunctionObjArgs(s->parse_object, tpl, s->encoding, s->strict, (PyObject *)s, s->object_hook, NULL);
+            Py_DECREF(tpl);
+            return rval;
+        case '[':
+            pyidx = PyInt_FromSsize_t(idx + 1);
+            if (pyidx == NULL) return NULL;
+            tpl = PyTuple_Pack(2, pystr, pyidx);
+            Py_DECREF(pyidx);
+            if (tpl == NULL) return NULL;
+            rval = PyObject_CallFunctionObjArgs(s->parse_array, tpl, (PyObject *)s, NULL);
+            Py_DECREF(tpl);
+            return rval;
+        case 'n':
+            if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
+                pyidx = PyInt_FromSsize_t(idx + 4);
+                if (pyidx == NULL) return NULL;
+                return PyTuple_Pack(2, Py_None, pyidx);
+            }
+            break;
+        case 't':
+            if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
+                pyidx = PyInt_FromSsize_t(idx + 4);
+                if (pyidx == NULL) return NULL;
+                return PyTuple_Pack(2, Py_True, pyidx);
+            }
+            break;
+        case 'f':
+            if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
+                pyidx = PyInt_FromSsize_t(idx + 5);
+                if (pyidx == NULL) return NULL;
+                return PyTuple_Pack(2, Py_False, pyidx);
+            }
+            break;
+        case 'N':
+            if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
+                return _parse_constant(s, "NaN", idx);
+            }
+            break;
+        case 'I':
+            if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
+                return _parse_constant(s, "Infinity", idx);
+            }
+            break;
+        case '-':
+            if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
+                return _parse_constant(s, "-Infinity", idx);
+            }
+            break;
+    }
+    return _match_number_str(s, pystr, idx);
+}
+
+static PyObject *
+scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
+{
+    Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
+    Py_ssize_t length = PyUnicode_GET_SIZE(pystr);
+    PyObject *tpl;
+    PyObject *pyidx;
+    PyObject *rval;
+    if (idx >= length) {
+        PyErr_SetNone(PyExc_StopIteration);
+        return NULL;
+    }
+    switch (str[idx]) {
+        case '"': 
+            return scanstring_unicode(pystr, idx + 1,
+                PyObject_IsTrue(s->strict));
+        case '{':
+            pyidx = PyInt_FromSsize_t(idx + 1);
+            if (pyidx == NULL) return NULL;
+            tpl = PyTuple_Pack(2, pystr, pyidx);
+            Py_DECREF(pyidx);
+            if (tpl == NULL) return NULL;
+            rval = PyObject_CallFunctionObjArgs(s->parse_object, tpl, s->encoding, s->strict, (PyObject *)s, s->object_hook, NULL);
+            Py_DECREF(tpl);
+            return rval;
+        case '[':
+            pyidx = PyInt_FromSsize_t(idx + 1);
+            if (pyidx == NULL) return NULL;
+            tpl = PyTuple_Pack(2, pystr, pyidx);
+            Py_DECREF(pyidx);
+            if (tpl == NULL) return NULL;
+            rval = PyObject_CallFunctionObjArgs(s->parse_array, tpl, (PyObject *)s, NULL);
+            Py_DECREF(tpl);
+            return rval;
+        case 'n':
+            if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
+                pyidx = PyInt_FromSsize_t(idx + 4);
+                if (pyidx == NULL) return NULL;
+                return PyTuple_Pack(2, Py_None, pyidx);
+            }
+            break;
+        case 't':
+            if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
+                pyidx = PyInt_FromSsize_t(idx + 4);
+                if (pyidx == NULL) return NULL;
+                return PyTuple_Pack(2, Py_True, pyidx);
+            }
+            break;
+        case 'f':
+            if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
+                pyidx = PyInt_FromSsize_t(idx + 5);
+                if (pyidx == NULL) return NULL;
+                return PyTuple_Pack(2, Py_False, pyidx);
+            }
+            break;
+        case 'N':
+            if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
+                return _parse_constant(s, "NaN", idx);
+            }
+            break;
+        case 'I':
+            if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
+                return _parse_constant(s, "Infinity", idx);
+            }
+            break;
+        case '-':
+            if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
+                return _parse_constant(s, "-Infinity", idx);
+            }
+            break;
+    }
+    return _match_number_unicode(s, pystr, idx);
+}
+
+static PyObject *
+scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *pystr;
+    Py_ssize_t idx;
+    static char *kwlist[] = {"string", "idx", NULL};
+    PyScannerObject *s = (PyScannerObject *)self;
+    assert(PyScanner_Check(self));
+#if PY_VERSION_HEX < 0x02050000 
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "On:scan_once", kwlist, &pystr, &idx))
+#else
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oi:scan_once", kwlist, &pystr, &idx))
+#endif
+        return NULL;
+    if (PyString_Check(pystr)) {
+        return scan_once_str(s, pystr, idx);
+    }
+    else if (PyUnicode_Check(pystr)) {
+        return scan_once_unicode(s, pystr, idx);
+    }
+    PyErr_Format(PyExc_TypeError,
+                 "first argument must be a string, not %.80s",
+                 Py_TYPE(pystr)->tp_name);
+    return NULL;
+}
+
+static int
+scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    PyObject *ctx;
+    static char *kwlist[] = {"context", NULL};
+
+    assert(PyScanner_Check(self));
+    PyScannerObject *s = (PyScannerObject *)self;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:make_scanner", kwlist, &ctx))
+        return -1;
+
+    s->encoding = NULL;
+    s->strict = NULL;
+    s->object_hook = NULL;
+    s->parse_object = NULL;
+    s->parse_array = NULL;
+    s->parse_string = NULL;
+    s->parse_float = NULL;
+    s->parse_int = NULL;
+    s->parse_constant = NULL;
+    s->encoding = PyObject_GetAttrString(ctx, "encoding");
+    if (s->encoding == Py_None) {
+        Py_DECREF(Py_None);
+        s->encoding = PyString_InternFromString(DEFAULT_ENCODING);
+    }
+    if (s->encoding == NULL) goto bail;
+    s->strict = PyObject_GetAttrString(ctx, "strict");
+    if (s->strict == NULL) goto bail;
+    s->object_hook = PyObject_GetAttrString(ctx, "object_hook");
+    if (s->object_hook == NULL) goto bail;
+    s->parse_object = PyObject_GetAttrString(ctx, "parse_object");
+    if (s->parse_object == NULL) goto bail;
+    s->parse_array = PyObject_GetAttrString(ctx, "parse_array");
+    if (s->parse_array == NULL) goto bail;
+    s->parse_string = PyObject_GetAttrString(ctx, "parse_string");
+    if (s->parse_string == NULL) goto bail;
+    s->parse_float = PyObject_GetAttrString(ctx, "parse_float");
+    if (s->parse_float == NULL) goto bail;
+    s->parse_int = PyObject_GetAttrString(ctx, "parse_int");
+    if (s->parse_int == NULL) goto bail;
+    s->parse_constant = PyObject_GetAttrString(ctx, "parse_constant");
+    if (s->parse_constant == NULL) goto bail;
+    
+    return 0;
+
+bail:
+    Py_XDECREF(s->encoding);
+    Py_XDECREF(s->strict);
+    Py_XDECREF(s->object_hook);
+    Py_XDECREF(s->parse_object);
+    Py_XDECREF(s->parse_array);
+    Py_XDECREF(s->parse_string);
+    Py_XDECREF(s->parse_float);
+    Py_XDECREF(s->parse_int);
+    Py_XDECREF(s->parse_constant);
+    s->encoding = NULL;
+    s->strict = NULL;
+    s->object_hook = NULL;
+    s->parse_object = NULL;
+    s->parse_array = NULL;
+    s->parse_string = NULL;
+    s->parse_float = NULL;
+    s->parse_int = NULL;
+    s->parse_constant = NULL;
+    return -1;
+}
+
+PyDoc_STRVAR(scanner_doc, "JSON scanner object");
+
+static
+PyTypeObject PyScannerType = {
+    PyObject_HEAD_INIT(0)
+    0,                    /* tp_internal */
+    "make_scanner",       /* tp_name */
+    sizeof(PyScannerObject), /* tp_basicsize */
+    0,                    /* tp_itemsize */
+    scanner_dealloc, /* tp_dealloc */
+    0,                    /* tp_print */
+    0,                    /* tp_getattr */
+    0,                    /* tp_setattr */
+    0,                    /* tp_compare */
+    0,                    /* tp_repr */
+    0,                    /* tp_as_number */
+    0,                    /* tp_as_sequence */
+    0,                    /* tp_as_mapping */
+    0,                    /* tp_hash */
+    scanner_call,         /* tp_call */
+    0,                    /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    PyObject_GenericSetAttr,                    /* tp_setattro */
+    0,                    /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,   /* tp_flags */
+    scanner_doc,          /* tp_doc */
+    0,                    /* tp_traverse */
+    0,                    /* tp_clear */
+    0,                    /* tp_richcompare */
+    0,                    /* tp_weaklistoffset */
+    0,                    /* tp_iter */
+    0,                    /* tp_iternext */
+    0,                    /* tp_methods */
+    scanner_members,                    /* tp_members */
+    0,                    /* tp_getset */
+    0,                    /* tp_base */
+    0,                    /* tp_dict */
+    0,                    /* tp_descr_get */
+    0,                    /* tp_descr_set */
+    0,                    /* tp_dictoffset */
+    scanner_init,                    /* tp_init */
+    PyType_GenericAlloc,                    /* tp_alloc */
+    PyType_GenericNew,          /* tp_new */
+    _PyObject_Del,                    /* tp_free */
+};
+
 static PyMethodDef speedups_methods[] = {
     {"encode_basestring_ascii",
         (PyCFunction)py_encode_basestring_ascii,
@@ -659,5 +1136,9 @@ void
 init_speedups(void)
 {
     PyObject *m;
+    if (PyType_Ready(&PyScannerType) < 0)
+        return;
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
+    Py_INCREF((PyObject*)&PyScannerType);
+    PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
 }

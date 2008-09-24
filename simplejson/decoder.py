@@ -234,12 +234,6 @@ def JSONArray((s, end), scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
 
     return values, end
 
-_LEXICON = dict(
-    object=JSONObject,
-    array=JSONArray,
-    string=scanstring,
-)
-
 class JSONDecoder(object):
     """
     Simple JSON <http://json.org> decoder
@@ -308,7 +302,10 @@ class JSONDecoder(object):
         self.parse_int = parse_int or int
         self.parse_constant = parse_constant or _CONSTANTS.__getitem__
         self.strict = strict
-        self.scan_once = make_scanner(_LEXICON, self)
+        self.parse_object = JSONObject
+        self.parse_array = JSONArray
+        self.parse_string = scanstring
+        self.scan_once = make_scanner(self)
 
     def decode(self, s, _w=WHITESPACE.match):
         """

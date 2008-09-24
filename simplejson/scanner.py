@@ -1,21 +1,23 @@
 """
-Iterator based sre token scanner
+JSON token scanner
 """
 import re
-from re import VERBOSE, MULTILINE, DOTALL
+try:
+    from simplejson._speedups import make_scanner as c_make_scanner
+except ImportError:
+    c_make_scanner = None
 
 __all__ = ['make_scanner']
 
-FLAGS = (VERBOSE | MULTILINE | DOTALL)
+NUMBER_RE = re.compile(
+    r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?',
+    (re.VERBOSE | re.MULTILINE | re.DOTALL))
 
-
-NUMBER_PATTERN = r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?'
-
-def make_scanner(lexicon, context):
-    parse_object = lexicon['object']
-    parse_array = lexicon['array']
-    parse_string = lexicon['string']
-    match_number = re.compile(NUMBER_PATTERN, FLAGS).match
+def py_make_scanner(context):
+    parse_object = context.parse_object
+    parse_array = context.parse_array
+    parse_string = context.parse_string
+    match_number = NUMBER_RE.match
     encoding = context.encoding
     strict = context.strict
     parse_float = context.parse_float
@@ -60,3 +62,5 @@ def make_scanner(lexicon, context):
             raise StopIteration
     
     return _scan_once
+
+make_scanner = c_make_scanner or py_make_scanner
