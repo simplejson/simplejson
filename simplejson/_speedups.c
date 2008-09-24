@@ -8,6 +8,7 @@ typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
 #define PY_SSIZE_T_MIN INT_MIN
 #define PyInt_FromSsize_t PyInt_FromLong
+#define PyInt_AsSsize_t PyInt_AsLong
 #endif
 
 #ifdef __GNUC__
@@ -28,9 +29,6 @@ typedef struct _PyScannerObject {
     PyObject *encoding;
     PyObject *strict;
     PyObject *object_hook;
-    PyObject *parse_object;
-    PyObject *parse_array;
-    PyObject *parse_string;
     PyObject *parse_float;
     PyObject *parse_int;
     PyObject *parse_constant;
@@ -40,9 +38,6 @@ static PyMemberDef scanner_members[] = {
     {"encoding", T_OBJECT, offsetof(PyScannerObject, encoding), READONLY, "encoding"},
     {"strict", T_OBJECT, offsetof(PyScannerObject, strict), READONLY, "strict"},
     {"object_hook", T_OBJECT, offsetof(PyScannerObject, object_hook), READONLY, "object_hook"},
-    {"parse_object", T_OBJECT, offsetof(PyScannerObject, parse_object), READONLY, "parse_object"},
-    {"parse_array", T_OBJECT, offsetof(PyScannerObject, parse_array), READONLY, "parse_array"},
-    {"parse_string", T_OBJECT, offsetof(PyScannerObject, parse_string), READONLY, "parse_string"},
     {"parse_float", T_OBJECT, offsetof(PyScannerObject, parse_float), READONLY, "parse_float"},
     {"parse_int", T_OBJECT, offsetof(PyScannerObject, parse_int), READONLY, "parse_int"},
     {"parse_constant", T_OBJECT, offsetof(PyScannerObject, parse_constant), READONLY, "parse_constant"},
@@ -58,7 +53,12 @@ ascii_escape_str(PyObject *pystr);
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
 void init_speedups(void);
+static PyObject *
+scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx);
+static PyObject *
+scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx);
 
+    
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 
 #define MIN_EXPANSION 6
@@ -67,6 +67,7 @@ void init_speedups(void);
 #else
 #define MAX_EXPANSION MIN_EXPANSION
 #endif
+
 
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars)
@@ -681,22 +682,287 @@ scanner_dealloc(PyObject *self)
     Py_XDECREF(s->encoding);
     Py_XDECREF(s->strict);
     Py_XDECREF(s->object_hook);
-    Py_XDECREF(s->parse_object);
-    Py_XDECREF(s->parse_array);
-    Py_XDECREF(s->parse_string);
     Py_XDECREF(s->parse_float);
     Py_XDECREF(s->parse_int);
     Py_XDECREF(s->parse_constant);
     s->encoding = NULL;
     s->strict = NULL;
     s->object_hook = NULL;
-    s->parse_object = NULL;
-    s->parse_array = NULL;
-    s->parse_string = NULL;
     s->parse_float = NULL;
     s->parse_int = NULL;
     s->parse_constant = NULL;
     self->ob_type->tp_free(self);
+}
+
+/*
+static void
+_dp(char *name, PyObject *o) {
+    if (o == NULL) {
+        printf("%s = NULL\n", name);
+    } else {
+        PyObject *r = PyObject_Repr(o);
+        printf("%s = %s\n", name, PyString_AS_STRING(r));
+        Py_DECREF(r);
+    }
+}
+*/
+
+#define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
+static PyObject *
+_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+    char *str = PyString_AS_STRING(pystr);
+    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
+    PyObject *pyidx = NULL;
+    PyObject *tpl= NULL;
+    PyObject *rval = PyDict_New();
+    PyObject *key = NULL;
+    char *encoding = PyString_AS_STRING(s->encoding);
+    int strict = PyObject_IsTrue(s->strict);
+    Py_ssize_t next_idx;
+    if (rval == NULL) return NULL;
+    while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+    if (idx <= end_idx && str[idx] != '}') {
+        while (idx <= end_idx) {
+            if (str[idx] != '"') {
+                raise_errmsg("Expecting property name", pystr, idx);
+                goto bail;
+            }
+            tpl = scanstring_str(pystr, idx + 1, encoding, strict);
+            if (tpl == NULL) goto bail;
+            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
+            if (next_idx == -1 && PyErr_Occurred()) goto bail;
+            key = PyTuple_GET_ITEM(tpl, 0);
+            if (key == NULL) goto bail;
+            Py_INCREF(key);
+            Py_DECREF(tpl);
+            idx = next_idx;
+            tpl = NULL;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            if (idx > end_idx || str[idx] != ':') {
+                raise_errmsg("Expecting : delimiter", pystr, idx);
+                goto bail;
+            }
+            idx++;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            
+            tpl = scan_once_str(s, pystr, idx);
+            if (tpl == NULL) goto bail;
+            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
+            if (next_idx == -1 && PyErr_Occurred()) goto bail;
+            if (PyDict_SetItem(rval, key, PyTuple_GET_ITEM(tpl, 0)) == -1) goto bail;
+            Py_DECREF(tpl);
+            idx = next_idx;
+            tpl = NULL;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            if (idx > end_idx) break;
+            if (str[idx] == '}') {
+                break;
+            } else if (str[idx] != ',') {
+                raise_errmsg("Expecting , delimiter", pystr, idx);
+                goto bail;
+            }
+            idx++;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+        }
+    }
+    if (idx > end_idx) {
+        raise_errmsg("Expecting object", pystr, end_idx);
+        goto bail;
+    }
+    if (s->object_hook != Py_None) {
+        tpl = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
+        if (tpl == NULL) goto bail;
+        Py_DECREF(rval);
+        rval = tpl;
+        tpl = NULL;
+    }
+    pyidx = PyInt_FromSsize_t(idx + 1);
+    if (pyidx == NULL) goto bail;
+    tpl = PyTuple_Pack(2, rval, pyidx);
+    Py_DECREF(pyidx);
+    Py_DECREF(rval);
+    return tpl;
+bail:
+    Py_XDECREF(key);
+    Py_XDECREF(tpl);
+    Py_DECREF(rval);
+    return NULL;    
+}
+
+static PyObject *
+_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+    Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
+    Py_ssize_t end_idx = PyUnicode_GET_SIZE(pystr) - 1;
+    PyObject *pyidx = NULL;
+    PyObject *tpl= NULL;
+    PyObject *rval = PyDict_New();
+    PyObject *key = NULL;
+    int strict = PyObject_IsTrue(s->strict);
+    Py_ssize_t next_idx;
+    if (rval == NULL) return NULL;
+    while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+    if (idx <= end_idx && str[idx] != '}') {
+        while (idx <= end_idx) {
+            if (str[idx] != '"') {
+                raise_errmsg("Expecting property name", pystr, idx);
+                goto bail;
+            }
+            tpl = scanstring_unicode(pystr, idx + 1, strict);
+            if (tpl == NULL) goto bail;
+            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
+            if (next_idx == -1 && PyErr_Occurred()) goto bail;
+            key = PyTuple_GET_ITEM(tpl, 0);
+            if (key == NULL) goto bail;
+            Py_INCREF(key);
+            Py_DECREF(tpl);
+            idx = next_idx;
+            tpl = NULL;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            if (idx > end_idx || str[idx] != ':') {
+                raise_errmsg("Expecting : delimiter", pystr, idx);
+                goto bail;
+            }
+            idx++;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            
+            tpl = scan_once_unicode(s, pystr, idx);
+            if (tpl == NULL) goto bail;
+            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
+            if (next_idx == -1 && PyErr_Occurred()) goto bail;
+            if (PyDict_SetItem(rval, key, PyTuple_GET_ITEM(tpl, 0)) == -1) goto bail;
+            Py_DECREF(tpl);
+            idx = next_idx;
+            tpl = NULL;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            if (idx > end_idx) break;
+            if (str[idx] == '}') {
+                break;
+            } else if (str[idx] != ',') {
+                raise_errmsg("Expecting , delimiter", pystr, idx);
+                goto bail;
+            }
+            idx++;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+        }
+    }
+    if (idx > end_idx) {
+        raise_errmsg("Expecting object", pystr, end_idx);
+        goto bail;
+    }
+    if (s->object_hook != Py_None) {
+        tpl = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
+        if (tpl == NULL) goto bail;
+        Py_DECREF(rval);
+        rval = tpl;
+        tpl = NULL;
+    }
+    pyidx = PyInt_FromSsize_t(idx + 1);
+    if (pyidx == NULL) goto bail;
+    tpl = PyTuple_Pack(2, rval, pyidx);
+    Py_DECREF(pyidx);
+    Py_DECREF(rval);
+    return tpl;
+bail:
+    Py_XDECREF(key);
+    Py_XDECREF(tpl);
+    Py_DECREF(rval);
+    return NULL;
+}
+
+static PyObject *
+_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+    char *str = PyString_AS_STRING(pystr);
+    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
+    PyObject *pyidx = NULL;
+    PyObject *tpl= NULL;
+    PyObject *rval = PyList_New(0);
+    Py_ssize_t next_idx;
+    if (rval == NULL) return NULL;
+    while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+    if (idx <= end_idx && str[idx] != ']') {
+        while (idx <= end_idx) {
+            tpl = scan_once_str(s, pystr, idx);
+            if (tpl == NULL) goto bail;
+            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
+            if (next_idx == -1 && PyErr_Occurred()) goto bail;
+            if (PyList_Append(rval, PyTuple_GET_ITEM(tpl, 0)) == -1) goto bail;
+            Py_DECREF(tpl);
+            idx = next_idx;
+            tpl = NULL;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            if (idx > end_idx) break;
+            if (str[idx] == ']') {
+                break;
+            } else if (str[idx] != ',') {
+                raise_errmsg("Expecting , delimiter", pystr, idx);
+                goto bail;
+            }
+            idx++;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+        }
+    }
+    if (idx > end_idx) {
+        raise_errmsg("Expecting object", pystr, end_idx);
+        goto bail;
+    }
+    pyidx = PyInt_FromSsize_t(idx + 1);
+    if (pyidx == NULL) goto bail;
+    tpl = PyTuple_Pack(2, rval, pyidx);
+    Py_DECREF(pyidx);
+    Py_DECREF(rval);
+    return tpl;
+bail:
+    Py_XDECREF(tpl);
+    Py_DECREF(rval);
+    return NULL;
+}
+
+static PyObject *
+_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+    Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
+    Py_ssize_t end_idx = PyUnicode_GET_SIZE(pystr) - 1;
+    PyObject *pyidx = NULL;
+    PyObject *tpl= NULL;
+    PyObject *rval = PyList_New(0);
+    Py_ssize_t next_idx;
+    if (rval == NULL) return NULL;
+    while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+    if (idx <= end_idx && str[idx] != ']') {
+        while (idx <= end_idx) {
+            tpl = scan_once_unicode(s, pystr, idx);
+            if (tpl == NULL) goto bail;
+            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
+            if (next_idx == -1 && PyErr_Occurred()) goto bail;
+            if (PyList_Append(rval, PyTuple_GET_ITEM(tpl, 0)) == -1) goto bail;
+            Py_DECREF(tpl);
+            idx = next_idx;
+            tpl = NULL;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+            if (idx > end_idx) break;
+            if (str[idx] == ']') {
+                break;
+            } else if (str[idx] != ',') {
+                raise_errmsg("Expecting , delimiter", pystr, idx);
+                goto bail;
+            }
+            idx++;
+            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+        }
+    }
+    if (idx > end_idx) {
+        raise_errmsg("Expecting object", pystr, end_idx);
+        goto bail;
+    }
+    pyidx = PyInt_FromSsize_t(idx + 1);
+    if (pyidx == NULL) goto bail;
+    tpl = PyTuple_Pack(2, rval, pyidx);
+    Py_DECREF(pyidx);
+    Py_DECREF(rval);
+    return tpl;
+bail:
+    Py_XDECREF(tpl);
+    Py_DECREF(rval);
+    return NULL;
 }
 
 static PyObject *
@@ -718,17 +984,6 @@ _parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx) {
     Py_DECREF(pyidx);
     return tpl;
 }
-
-/*static void
-_dp(char *name, PyObject *o) {
-    if (o == NULL) {
-        printf("%s = NULL\n", name);
-    } else {
-        PyObject *r = PyObject_Repr(o);
-        printf("%s = %s\n", name, PyString_AS_STRING(r));
-        Py_DECREF(r);
-    }
-}*/
 
 static PyObject *
 _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
@@ -777,9 +1032,17 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
     numstr = PyString_FromStringAndSize(&str[start], idx - start);
     if (numstr == NULL) { Py_DECREF(pyidx); return NULL; }
     if (is_float) {
-        rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+        if (s->parse_float != (PyObject *)&PyFloat_Type) {
+            rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+        } else {
+            rval = PyFloat_FromString(numstr, NULL);
+        }
     } else {
-        rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
+        if (s->parse_int != (PyObject *)&PyInt_Type) {
+            rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
+        } else {
+            rval = PyInt_FromString(PyString_AS_STRING(numstr), NULL, 10);
+        }
     }
     Py_DECREF(numstr);
     if (rval == NULL) { Py_DECREF(pyidx); return NULL; }
@@ -836,7 +1099,11 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
     numstr = PyUnicode_FromUnicode(&str[start], idx - start);
     if (numstr == NULL) { Py_DECREF(pyidx); return NULL; }
     if (is_float) {
-        rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+        if (s->parse_float != (PyObject *)&PyFloat_Type) {
+            rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+        } else {
+            rval = PyFloat_FromString(numstr, NULL);
+        }
     } else {
         rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
     }
@@ -853,9 +1120,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
 {
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t length = PyString_GET_SIZE(pystr);
-    PyObject *tpl;
     PyObject *pyidx;
-    PyObject *rval;
     if (idx >= length) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
@@ -866,23 +1131,9 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
                 PyString_AS_STRING(s->encoding),
                 PyObject_IsTrue(s->strict));
         case '{':
-            pyidx = PyInt_FromSsize_t(idx + 1);
-            if (pyidx == NULL) return NULL;
-            tpl = PyTuple_Pack(2, pystr, pyidx);
-            Py_DECREF(pyidx);
-            if (tpl == NULL) return NULL;
-            rval = PyObject_CallFunctionObjArgs(s->parse_object, tpl, s->encoding, s->strict, (PyObject *)s, s->object_hook, NULL);
-            Py_DECREF(tpl);
-            return rval;
+            return _parse_object_str(s, pystr, idx + 1);
         case '[':
-            pyidx = PyInt_FromSsize_t(idx + 1);
-            if (pyidx == NULL) return NULL;
-            tpl = PyTuple_Pack(2, pystr, pyidx);
-            Py_DECREF(pyidx);
-            if (tpl == NULL) return NULL;
-            rval = PyObject_CallFunctionObjArgs(s->parse_array, tpl, (PyObject *)s, NULL);
-            Py_DECREF(tpl);
-            return rval;
+            return _parse_array_str(s, pystr, idx + 1);
         case 'n':
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
                 pyidx = PyInt_FromSsize_t(idx + 4);
@@ -928,9 +1179,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
 {
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
     Py_ssize_t length = PyUnicode_GET_SIZE(pystr);
-    PyObject *tpl;
     PyObject *pyidx;
-    PyObject *rval;
     if (idx >= length) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
@@ -940,23 +1189,9 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
             return scanstring_unicode(pystr, idx + 1,
                 PyObject_IsTrue(s->strict));
         case '{':
-            pyidx = PyInt_FromSsize_t(idx + 1);
-            if (pyidx == NULL) return NULL;
-            tpl = PyTuple_Pack(2, pystr, pyidx);
-            Py_DECREF(pyidx);
-            if (tpl == NULL) return NULL;
-            rval = PyObject_CallFunctionObjArgs(s->parse_object, tpl, s->encoding, s->strict, (PyObject *)s, s->object_hook, NULL);
-            Py_DECREF(tpl);
-            return rval;
+            return _parse_object_unicode(s, pystr, idx + 1);
         case '[':
-            pyidx = PyInt_FromSsize_t(idx + 1);
-            if (pyidx == NULL) return NULL;
-            tpl = PyTuple_Pack(2, pystr, pyidx);
-            Py_DECREF(pyidx);
-            if (tpl == NULL) return NULL;
-            rval = PyObject_CallFunctionObjArgs(s->parse_array, tpl, (PyObject *)s, NULL);
-            Py_DECREF(tpl);
-            return rval;
+            return _parse_array_unicode(s, pystr, idx + 1);
         case 'n':
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
                 pyidx = PyInt_FromSsize_t(idx + 4);
@@ -1038,9 +1273,6 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->encoding = NULL;
     s->strict = NULL;
     s->object_hook = NULL;
-    s->parse_object = NULL;
-    s->parse_array = NULL;
-    s->parse_string = NULL;
     s->parse_float = NULL;
     s->parse_int = NULL;
     s->parse_constant = NULL;
@@ -1054,12 +1286,6 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     if (s->strict == NULL) goto bail;
     s->object_hook = PyObject_GetAttrString(ctx, "object_hook");
     if (s->object_hook == NULL) goto bail;
-    s->parse_object = PyObject_GetAttrString(ctx, "parse_object");
-    if (s->parse_object == NULL) goto bail;
-    s->parse_array = PyObject_GetAttrString(ctx, "parse_array");
-    if (s->parse_array == NULL) goto bail;
-    s->parse_string = PyObject_GetAttrString(ctx, "parse_string");
-    if (s->parse_string == NULL) goto bail;
     s->parse_float = PyObject_GetAttrString(ctx, "parse_float");
     if (s->parse_float == NULL) goto bail;
     s->parse_int = PyObject_GetAttrString(ctx, "parse_int");
@@ -1073,18 +1299,12 @@ bail:
     Py_XDECREF(s->encoding);
     Py_XDECREF(s->strict);
     Py_XDECREF(s->object_hook);
-    Py_XDECREF(s->parse_object);
-    Py_XDECREF(s->parse_array);
-    Py_XDECREF(s->parse_string);
     Py_XDECREF(s->parse_float);
     Py_XDECREF(s->parse_int);
     Py_XDECREF(s->parse_constant);
     s->encoding = NULL;
     s->strict = NULL;
     s->object_hook = NULL;
-    s->parse_object = NULL;
-    s->parse_array = NULL;
-    s->parse_string = NULL;
     s->parse_float = NULL;
     s->parse_int = NULL;
     s->parse_constant = NULL;
