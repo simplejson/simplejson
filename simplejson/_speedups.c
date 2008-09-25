@@ -120,6 +120,7 @@ ascii_escape_unicode(PyObject *pystr)
 
     input_chars = PyUnicode_GET_SIZE(pystr);
     input_unicode = PyUnicode_AS_UNICODE(pystr);
+
     /* One char input can be up to 6 chars output, estimate 4 of these */
     output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
     rval = PyString_FromStringAndSize(NULL, output_size);
@@ -170,31 +171,54 @@ ascii_escape_str(PyObject *pystr)
 
     input_chars = PyString_GET_SIZE(pystr);
     input_str = PyString_AS_STRING(pystr);
-    /* One char input can be up to 6 chars output, estimate 4 of these */
-    output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
+
+    /* Fast path for a string that's already ASCII */
+    for (i = 0; i < input_chars; i++) {
+        Py_UNICODE c = (Py_UNICODE)(unsigned char)input_str[i];
+        if (!S_CHAR(c)) {
+            /* If we have to escape something, scan the string for unicode */
+            Py_ssize_t j;
+            for (j = i; j < input_chars; j++) {
+                c = (Py_UNICODE)(unsigned char)input_str[j];
+                if (c > 0x7f) {
+                    /* We hit a non-ASCII character, bail to unicode mode */
+                    PyObject *uni;
+                    uni = PyUnicode_DecodeUTF8(input_str, input_chars, "strict");
+                    if (uni == NULL) {
+                        return NULL;
+                    }
+                    rval = ascii_escape_unicode(uni);
+                    Py_DECREF(uni);
+                    return rval;
+                }
+            }
+            break;
+        }
+    }
+
+    if (i == input_chars) {
+        /* Input is already ASCII */
+        output_size = 2 + input_chars;
+    }
+    else {
+        /* One char input can be up to 6 chars output, estimate 4 of these */
+        output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
+    }
     rval = PyString_FromStringAndSize(NULL, output_size);
     if (rval == NULL) {
         return NULL;
     }
     output = PyString_AS_STRING(rval);
-    chars = 0;
-    output[chars++] = '"';
-    for (i = 0; i < input_chars; i++) {
+    output[0] = '"';
+    
+    /* We know that everything up to i is ASCII already */
+    chars = i + 1;
+    memcpy(&output[1], input_str, i);
+
+    for (; i < input_chars; i++) {
         Py_UNICODE c = (Py_UNICODE)(unsigned char)input_str[i];
         if (S_CHAR(c)) {
             output[chars++] = (char)c;
-        }
-        else if (c > 0x7f) {
-            /* We hit a non-ASCII character, bail to unicode mode */
-            PyObject *uni;
-            Py_DECREF(rval);
-            uni = PyUnicode_DecodeUTF8(input_str, input_chars, "strict");
-            if (uni == NULL) {
-                return NULL;
-            }
-            rval = ascii_escape_unicode(uni);
-            Py_DECREF(uni);
-            return rval;
         }
         else {
             chars = ascii_escape_char(c, output, chars);
