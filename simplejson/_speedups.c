@@ -1330,9 +1330,9 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     PyScannerObject *s = (PyScannerObject *)self;
     assert(PyScanner_Check(self));
 #if PY_VERSION_HEX < 0x02050000 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "On:scan_once", kwlist, &pystr, &idx))
-#else
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oi:scan_once", kwlist, &pystr, &idx))
+#else
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "On:scan_once", kwlist, &pystr, &idx))
 #endif
         return NULL;
     if (PyString_Check(pystr)) {
