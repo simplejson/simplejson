@@ -382,18 +382,18 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
             }
             /* Decode 4 hex digits */
             for (; next < end; next++) {
-                Py_ssize_t shl = (end - next - 1) << 2;
+                c <<= 4;
                 Py_UNICODE digit = buf[next];
                 switch (digit) {
                     case '0': case '1': case '2': case '3': case '4':
                     case '5': case '6': case '7': case '8': case '9':
-                        c |= (digit - '0') << shl; break;
+                        c |= (digit - '0'); break;
                     case 'a': case 'b': case 'c': case 'd': case 'e':
                     case 'f':
-                        c |= (digit - 'a' + 10) << shl; break;
+                        c |= (digit - 'a' + 10); break;
                     case 'A': case 'B': case 'C': case 'D': case 'E':
                     case 'F':
-                        c |= (digit - 'A' + 10) << shl; break;
+                        c |= (digit - 'A' + 10); break;
                     default:
                         raise_errmsg("Invalid \\uXXXX escape", pystr, end - 5);
                         goto bail;
@@ -414,18 +414,18 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                 end += 6;
                 /* Decode 4 hex digits */
                 for (; next < end; next++) {
-                    Py_ssize_t shl = (end - next - 1) << 2;
+                    c2 <<= 4;
                     Py_UNICODE digit = buf[next];
                     switch (digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
-                            c2 |= (digit - '0') << shl; break;
+                            c2 |= (digit - '0'); break;
                         case 'a': case 'b': case 'c': case 'd': case 'e':
                         case 'f':
-                            c2 |= (digit - 'a' + 10) << shl; break;
+                            c2 |= (digit - 'a' + 10); break;
                         case 'A': case 'B': case 'C': case 'D': case 'E':
                         case 'F':
-                            c2 |= (digit - 'A' + 10) << shl; break;
+                            c2 |= (digit - 'A' + 10); break;
                         default:
                             raise_errmsg("Invalid \\uXXXX escape", pystr, end - 5);
                             goto bail;
@@ -556,18 +556,18 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
             }
             /* Decode 4 hex digits */
             for (; next < end; next++) {
-                Py_ssize_t shl = (end - next - 1) << 2;
+                c <<= 4;
                 Py_UNICODE digit = buf[next];
                 switch (digit) {
                     case '0': case '1': case '2': case '3': case '4':
                     case '5': case '6': case '7': case '8': case '9':
-                        c |= (digit - '0') << shl; break;
+                        c |= (digit - '0'); break;
                     case 'a': case 'b': case 'c': case 'd': case 'e':
                     case 'f':
-                        c |= (digit - 'a' + 10) << shl; break;
+                        c |= (digit - 'a' + 10); break;
                     case 'A': case 'B': case 'C': case 'D': case 'E':
                     case 'F':
-                        c |= (digit - 'A' + 10) << shl; break;
+                        c |= (digit - 'A' + 10); break;
                     default:
                         raise_errmsg("Invalid \\uXXXX escape", pystr, end - 5);
                         goto bail;
@@ -588,18 +588,18 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                 end += 6;
                 /* Decode 4 hex digits */
                 for (; next < end; next++) {
-                    Py_ssize_t shl = (end - next - 1) << 2;
+                    c2 <<= 4;
                     Py_UNICODE digit = buf[next];
                     switch (digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
-                            c2 |= (digit - '0') << shl; break;
+                            c2 |= (digit - '0'); break;
                         case 'a': case 'b': case 'c': case 'd': case 'e':
                         case 'f':
-                            c2 |= (digit - 'a' + 10) << shl; break;
+                            c2 |= (digit - 'a' + 10); break;
                         case 'A': case 'B': case 'C': case 'D': case 'E':
                         case 'F':
-                            c2 |= (digit - 'A' + 10) << shl; break;
+                            c2 |= (digit - 'A' + 10); break;
                         default:
                             raise_errmsg("Invalid \\uXXXX escape", pystr, end - 5);
                             goto bail;
