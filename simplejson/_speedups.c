@@ -74,7 +74,6 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars)
 {
-    Py_UNICODE x;
     output[chars++] = '\\';
     switch (c) {
         case '\\': output[chars++] = (char)c; break;
@@ -91,27 +90,19 @@ ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars)
                 Py_UNICODE v = c - 0x10000;
                 c = 0xd800 | ((v >> 10) & 0x3ff);
                 output[chars++] = 'u';
-                x = (c & 0xf000) >> 12;
-                output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
-                x = (c & 0x0f00) >> 8;
-                output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
-                x = (c & 0x00f0) >> 4;
-                output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
-                x = (c & 0x000f);
-                output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
+                output[chars++] = "0123456789abcdef"[(c >> 12) & 0xf];
+                output[chars++] = "0123456789abcdef"[(c >>  8) & 0xf];
+                output[chars++] = "0123456789abcdef"[(c >>  4) & 0xf];
+                output[chars++] = "0123456789abcdef"[(c      ) & 0xf];
                 c = 0xdc00 | (v & 0x3ff);
                 output[chars++] = '\\';
             }
 #endif
             output[chars++] = 'u';
-            x = (c & 0xf000) >> 12;
-            output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
-            x = (c & 0x0f00) >> 8;
-            output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
-            x = (c & 0x00f0) >> 4;
-            output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
-            x = (c & 0x000f);
-            output[chars++] = (x < 10) ? '0' + x : 'a' + (x - 10);
+            output[chars++] = "0123456789abcdef"[(c >> 12) & 0xf];
+            output[chars++] = "0123456789abcdef"[(c >>  8) & 0xf];
+            output[chars++] = "0123456789abcdef"[(c >>  4) & 0xf];
+            output[chars++] = "0123456789abcdef"[(c      ) & 0xf];
     }
     return chars;
 }
