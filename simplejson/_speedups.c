@@ -193,7 +193,7 @@ ascii_escape_str(PyObject *pystr)
         if (S_CHAR(c)) {
             output[chars++] = (char)c;
         }
-        else if (c > 0x7F) {
+        else if (c > 0x7f) {
             /* We hit a non-ASCII character, bail to unicode mode */
             PyObject *uni;
             Py_DECREF(rval);
@@ -237,8 +237,8 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
         PyObject *decoder = PyImport_ImportModule("simplejson.decoder");
         if (decoder == NULL) return;
         errmsg_fn = PyObject_GetAttrString(decoder, "errmsg");
+        Py_DECREF(decoder);
         if (errmsg_fn == NULL) return;
-        Py_XDECREF(decoder);
     }
 #if PY_VERSION_HEX < 0x02050000 
     pymsg = PyObject_CallFunction(errmsg_fn, "(zOi)", msg, s, end);
@@ -247,25 +247,6 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
 #endif
     PyErr_SetObject(PyExc_ValueError, pymsg);
     Py_DECREF(pymsg);
-/*
-
-def linecol(doc, pos):
-    lineno = doc.count('\n', 0, pos) + 1
-    if lineno == 1:
-        colno = pos
-    else:
-        colno = pos - doc.rindex('\n', 0, pos)
-    return lineno, colno
-
-def errmsg(msg, doc, pos, end=None):
-    lineno, colno = linecol(doc, pos)
-    if end is None:
-        return '%s: line %d column %d (char %d)' % (msg, lineno, colno, pos)
-    endlineno, endcolno = linecol(doc, end)
-    return '%s: line %d column %d - line %d column %d (char %d - %d)' % (
-        msg, lineno, colno, endlineno, endcolno, pos, end)
-
-*/
 }
 
 static PyObject *
@@ -285,6 +266,9 @@ join_list_string(PyObject *lst)
 
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
+    /*
+    steal a reference to rval, returns (rval, idx)
+    */
     if (rval == NULL) {
         return NULL;
     }
@@ -743,9 +727,14 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
     int strict = PyObject_IsTrue(s->strict);
     Py_ssize_t next_idx;
     if (rval == NULL) return NULL;
+
+    /* skip whitespace after { */
     while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+    /* only loop if the object is non-empty */
     if (idx <= end_idx && str[idx] != '}') {
         while (idx <= end_idx) {
+            /* read key */
             if (str[idx] != '"') {
                 raise_errmsg("Expecting property name", pystr, idx);
                 goto bail;
@@ -754,6 +743,8 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             if (key == NULL) goto bail;
             Py_INCREF(key);
             idx = next_idx;
+            
+            /* skip whitespace between key and : delimiter, read :, skip whitespace */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             if (idx > end_idx || str[idx] != ':') {
                 raise_errmsg("Expecting : delimiter", pystr, idx);
@@ -762,6 +753,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             idx++;
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             
+            /* read any JSON data type and de-tuplefy the (rval, idx) */
             tpl = scan_once_str(s, pystr, idx);
             if (tpl == NULL) goto bail;
             next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
@@ -770,7 +762,11 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             Py_DECREF(tpl);
             idx = next_idx;
             tpl = NULL;
+            
+            /* skip whitespace before } or , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+            /* bail if the object is closed or we didn't get the , delimiter */
             if (idx > end_idx) break;
             if (str[idx] == '}') {
                 break;
@@ -780,13 +776,17 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             }
             idx++;
+
+            /* skip whitespace after , delimiter */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
         }
     }
-    if (idx > end_idx) {
+    /* verify that idx < end_idx, str[idx] should be '}' */
+    if (idx > end_idx || str[idx] != '}') {
         raise_errmsg("Expecting object", pystr, end_idx);
         goto bail;
     }
+    /* if object_hook is not None: rval = object_hook(rval) */
     if (s->object_hook != Py_None) {
         tpl = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
         if (tpl == NULL) goto bail;
@@ -812,9 +812,14 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
     int strict = PyObject_IsTrue(s->strict);
     Py_ssize_t next_idx;
     if (rval == NULL) return NULL;
+    
+    /* skip whitespace after { */
     while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+    /* only loop if the object is non-empty */
     if (idx <= end_idx && str[idx] != '}') {
         while (idx <= end_idx) {
+            /* read key */
             if (str[idx] != '"') {
                 raise_errmsg("Expecting property name", pystr, idx);
                 goto bail;
@@ -822,7 +827,8 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             key = scanstring_unicode(pystr, idx + 1, strict, &next_idx);
             if (key == NULL) goto bail;
             idx = next_idx;
-            tpl = NULL;
+
+            /* skip whitespace between key and : delimiter, read :, skip whitespace */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             if (idx > end_idx || str[idx] != ':') {
                 raise_errmsg("Expecting : delimiter", pystr, idx);
@@ -831,6 +837,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             idx++;
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             
+            /* read any JSON term and de-tuplefy the (rval, idx) */
             tpl = scan_once_unicode(s, pystr, idx);
             if (tpl == NULL) goto bail;
             next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
@@ -839,7 +846,11 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             Py_DECREF(tpl);
             idx = next_idx;
             tpl = NULL;
+
+            /* skip whitespace before } or , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+            /* bail if the object is closed or we didn't get the , delimiter */
             if (idx > end_idx) break;
             if (str[idx] == '}') {
                 break;
@@ -849,13 +860,19 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             }
             idx++;
+
+            /* skip whitespace after , delimiter */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
         }
     }
-    if (idx > end_idx) {
+
+    /* verify that idx < end_idx, str[idx] should be '}' */
+    if (idx > end_idx || str[idx] != '}') {
         raise_errmsg("Expecting object", pystr, end_idx);
         goto bail;
     }
+
+    /* if object_hook is not None: rval = object_hook(rval) */
     if (s->object_hook != Py_None) {
         tpl = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
         if (tpl == NULL) goto bail;
@@ -879,9 +896,15 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
     PyObject *rval = PyList_New(0);
     Py_ssize_t next_idx;
     if (rval == NULL) return NULL;
+
+    /* skip whitespace after [ */
     while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+    /* only loop if the array is non-empty */
     if (idx <= end_idx && str[idx] != ']') {
         while (idx <= end_idx) {
+
+            /* read any JSON term and de-tuplefy the (rval, idx) */
             tpl = scan_once_str(s, pystr, idx);
             if (tpl == NULL) goto bail;
             next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
@@ -890,7 +913,11 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             Py_DECREF(tpl);
             idx = next_idx;
             tpl = NULL;
+            
+            /* skip whitespace between term and , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+            /* bail if the array is closed or we didn't get the , delimiter */
             if (idx > end_idx) break;
             if (str[idx] == ']') {
                 break;
@@ -900,10 +927,14 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             }
             idx++;
+            
+            /* skip whitespace after , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
         }
     }
-    if (idx > end_idx) {
+
+    /* verify that idx < end_idx, str[idx] should be ']' */
+    if (idx > end_idx || str[idx] != ']') {
         raise_errmsg("Expecting object", pystr, end_idx);
         goto bail;
     }
@@ -922,9 +953,15 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
     PyObject *rval = PyList_New(0);
     Py_ssize_t next_idx;
     if (rval == NULL) return NULL;
+
+    /* skip whitespace after [ */
     while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+    /* only loop if the array is non-empty */
     if (idx <= end_idx && str[idx] != ']') {
         while (idx <= end_idx) {
+
+            /* read any JSON term and de-tuplefy the (rval, idx) */
             tpl = scan_once_unicode(s, pystr, idx);
             if (tpl == NULL) goto bail;
             next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
@@ -933,7 +970,11 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             Py_DECREF(tpl);
             idx = next_idx;
             tpl = NULL;
+
+            /* skip whitespace between term and , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
+
+            /* bail if the array is closed or we didn't get the , delimiter */
             if (idx > end_idx) break;
             if (str[idx] == ']') {
                 break;
@@ -943,10 +984,14 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             }
             idx++;
+
+            /* skip whitespace after , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
         }
     }
-    if (idx > end_idx) {
+
+    /* verify that idx < end_idx, str[idx] should be ']' */
+    if (idx > end_idx || str[idx] != ']') {
         raise_errmsg("Expecting object", pystr, end_idx);
         goto bail;
     }
@@ -961,9 +1006,11 @@ static PyObject *
 _parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx) {
     PyObject *cstr;
     PyObject *rval;
-    
+    /* constant is "NaN", "Infinity", or "-Infinity" */
     cstr = PyString_InternFromString(constant);
     if (cstr == NULL) return NULL;
+
+    /* rval = parse_constant(constant) */
     rval = PyObject_CallFunctionObjArgs(s->parse_constant, cstr, NULL);
     idx += PyString_GET_SIZE(cstr);
     Py_DECREF(cstr);
@@ -978,6 +1025,8 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
     int is_float = 0;
     PyObject *rval;
     PyObject *numstr;
+    
+    /* read a sign if it's there, make sure it's not the end of the string */
     if (str[idx] == '-') {
         idx++;
         if (idx > end_idx) {
@@ -985,27 +1034,43 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
             return NULL;
         }
     }
+
+    /* read as many integer digits as we find as long as it doesn't start with 0 */
     if (str[idx] >= '1' && str[idx] <= '9') {
         idx++;
         while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
     }
+    /* if it starts with 0 we only expect one integer digit */
     else if (str[idx] == '0') {
         idx++;
     }
+    /* no integer digits, error */
     else {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
+    
+    /* if the next char is '.' followed by a digit then read all float digits */
     if (idx < end_idx && str[idx] == '.' && str[idx + 1] >= '0' && str[idx + 1] <= '9') {
         is_float = 1;
         idx += 2;
         while (idx < end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
     }
+
+    /* if the next char is 'e' or 'E' then maybe read the exponent (or backtrack) */
     if (idx < end_idx && (str[idx] == 'e' || str[idx] == 'E')) {
+
+        /* save the index of the 'e' or 'E' just in case we need to backtrack */
         Py_ssize_t e_start = idx;
         idx++;
+
+        /* read an exponent sign if present */
         if (idx < end_idx && (str[idx] == '-' || str[idx] == '+')) idx++;
+
+        /* read all digits */
         while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+
+        /* if we got a digit, then parse as float. if not, backtrack */
         if (str[idx - 1] >= '0' && str[idx - 1] <= '9') {
             is_float = 1;
         }
@@ -1013,17 +1078,21 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
             idx = e_start;
         }
     }
+    
+    /* copy the section we determined to be a number */
     numstr = PyString_FromStringAndSize(&str[start], idx - start);
     if (numstr == NULL) return NULL;
     if (is_float) {
+        /* parse as a float using a fast path if available, otherwise call user defined method */
         if (s->parse_float != (PyObject *)&PyFloat_Type) {
             rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
         }
         else {
-            rval = PyFloat_FromString(numstr, NULL);
+            rval = PyFloat_FromDouble(PyOS_ascii_atof(PyString_AS_STRING(numstr)));
         }
     }
     else {
+        /* parse as an int using a fast path if available, otherwise call user defined method */
         if (s->parse_int != (PyObject *)&PyInt_Type) {
             rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
         }
@@ -1043,6 +1112,8 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
     int is_float = 0;
     PyObject *rval;
     PyObject *numstr;
+
+    /* read a sign if it's there, make sure it's not the end of the string */
     if (str[idx] == '-') {
         idx++;
         if (idx > end_idx) {
@@ -1050,27 +1121,41 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
             return NULL;
         }
     }
+
+    /* read as many integer digits as we find as long as it doesn't start with 0 */
     if (str[idx] >= '1' && str[idx] <= '9') {
         idx++;
         while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
     }
+    /* if it starts with 0 we only expect one integer digit */
     else if (str[idx] == '0') {
         idx++;
     }
+    /* no integer digits, error */
     else {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
+
+    /* if the next char is '.' followed by a digit then read all float digits */
     if (idx < end_idx && str[idx] == '.' && str[idx + 1] >= '0' && str[idx + 1] <= '9') {
         is_float = 1;
         idx += 2;
         while (idx < end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
     }
+
+    /* if the next char is 'e' or 'E' then maybe read the exponent (or backtrack) */
     if (idx < end_idx && (str[idx] == 'e' || str[idx] == 'E')) {
         Py_ssize_t e_start = idx;
         idx++;
+
+        /* read an exponent sign if present */
         if (idx < end_idx && (str[idx] == '-' || str[idx] == '+')) idx++;
+
+        /* read all digits */
         while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
+
+        /* if we got a digit, then parse as float. if not, backtrack */
         if (str[idx - 1] >= '0' && str[idx - 1] <= '9') {
             is_float = 1;
         }
@@ -1078,9 +1163,12 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
             idx = e_start;
         }
     }
+
+    /* copy the section we determined to be a number */
     numstr = PyUnicode_FromUnicode(&str[start], idx - start);
     if (numstr == NULL) return NULL;
     if (is_float) {
+        /* parse as a float using a fast path if available, otherwise call user defined method */
         if (s->parse_float != (PyObject *)&PyFloat_Type) {
             rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
         }
@@ -1089,6 +1177,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
         }
     }
     else {
+        /* no fast path for unicode -> int, just call */
         rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
     }
     Py_DECREF(numstr);
@@ -1107,50 +1196,60 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
         return NULL;
     }
     switch (str[idx]) {
-        case '"': 
+        case '"':
+            /* string */
             rval = scanstring_str(pystr, idx + 1,
                 PyString_AS_STRING(s->encoding),
                 PyObject_IsTrue(s->strict),
                 &next_idx);
             return _build_rval_index_tuple(rval, next_idx);
         case '{':
+            /* object */
             return _parse_object_str(s, pystr, idx + 1);
         case '[':
+            /* array */
             return _parse_array_str(s, pystr, idx + 1);
         case 'n':
+            /* null */
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
                 Py_INCREF(Py_None);
                 return _build_rval_index_tuple(Py_None, idx + 4);
             }
             break;
         case 't':
+            /* true */
             if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
                 Py_INCREF(Py_True);
                 return _build_rval_index_tuple(Py_True, idx + 4);
             }
             break;
         case 'f':
+            /* false */
             if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
                 Py_INCREF(Py_False);
                 return _build_rval_index_tuple(Py_False, idx + 5);
             }
             break;
         case 'N':
+            /* NaN */
             if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
                 return _parse_constant(s, "NaN", idx);
             }
             break;
         case 'I':
+            /* Infinity */
             if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
                 return _parse_constant(s, "Infinity", idx);
             }
             break;
         case '-':
+            /* -Infinity */
             if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
                 return _parse_constant(s, "-Infinity", idx);
             }
             break;
     }
+    /* Didn't find a string, object, array, or named constant. Look for a number. */
     return _match_number_str(s, pystr, idx);
 }
 
@@ -1167,48 +1266,58 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
     }
     switch (str[idx]) {
         case '"':
+            /* string */
             rval = scanstring_unicode(pystr, idx + 1,
                 PyObject_IsTrue(s->strict),
                 &next_idx);
             return _build_rval_index_tuple(rval, next_idx);
         case '{':
+            /* object */
             return _parse_object_unicode(s, pystr, idx + 1);
         case '[':
+            /* array */
             return _parse_array_unicode(s, pystr, idx + 1);
         case 'n':
+            /* null */
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
                 Py_INCREF(Py_None);
                 return _build_rval_index_tuple(Py_None, idx + 4);
             }
             break;
         case 't':
+            /* true */
             if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
                 Py_INCREF(Py_True);
                 return _build_rval_index_tuple(Py_True, idx + 4);
             }
             break;
         case 'f':
+            /* false */
             if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
                 Py_INCREF(Py_False);
                 return _build_rval_index_tuple(Py_False, idx + 5);
             }
             break;
         case 'N':
+            /* NaN */
             if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
                 return _parse_constant(s, "NaN", idx);
             }
             break;
         case 'I':
+            /* Infinity */
             if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
                 return _parse_constant(s, "Infinity", idx);
             }
             break;
         case '-':
+            /* -Infinity */
             if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
                 return _parse_constant(s, "-Infinity", idx);
             }
             break;
     }
+    /* Didn't find a string, object, array, or named constant. Look for a number. */
     return _match_number_unicode(s, pystr, idx);
 }
 
@@ -1232,10 +1341,12 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     else if (PyUnicode_Check(pystr)) {
         return scan_once_unicode(s, pystr, idx);
     }
-    PyErr_Format(PyExc_TypeError,
+    else {
+        PyErr_Format(PyExc_TypeError,
                  "first argument must be a string, not %.80s",
                  Py_TYPE(pystr)->tp_name);
-    return NULL;
+        return NULL;
+    }
 }
 
 static int
@@ -1256,12 +1367,21 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->parse_float = NULL;
     s->parse_int = NULL;
     s->parse_constant = NULL;
+
+    /* PyString_AS_STRING is used on encoding */
     s->encoding = PyObject_GetAttrString(ctx, "encoding");
     if (s->encoding == Py_None) {
         Py_DECREF(Py_None);
         s->encoding = PyString_InternFromString(DEFAULT_ENCODING);
     }
-    if (s->encoding == NULL) goto bail;
+    else if (PyUnicode_Check(s->encoding)) {
+        PyObject *tmp = PyUnicode_AsEncodedString(s->encoding, NULL, NULL);
+        Py_DECREF(s->encoding);
+        s->encoding = tmp;
+    }
+    if (s->encoding == NULL || !PyString_Check(s->encoding)) goto bail;
+    
+    /* All of these will fail "gracefully" so we don't need to verify them */
     s->strict = PyObject_GetAttrString(ctx, "strict");
     if (s->strict == NULL) goto bail;
     s->object_hook = PyObject_GetAttrString(ctx, "object_hook");

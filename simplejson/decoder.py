@@ -34,6 +34,7 @@ def linecol(doc, pos):
 
 
 def errmsg(msg, doc, pos, end=None):
+    # Note that this function is called from _speedups
     lineno, colno = linecol(doc, pos)
     if end is None:
         return '%s: line %d column %d (char %d)' % (msg, lineno, colno, pos)
