@@ -297,7 +297,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         Py_UNICODE c = 0;
         PyObject *chunk = NULL;
         for (next = end; next < len; next++) {
-            c = buf[next];
+            c = (unsigned char)buf[next];
             if (c == '"' || c == '\\') {
                 break;
             }
