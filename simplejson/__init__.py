@@ -47,14 +47,14 @@ Pretty printing::
 Decoding JSON::
     
     >>> import simplejson
-    >>> simplejson.loads('["foo", {"bar":["baz", null, 1.0, 2]}]')
-    [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
-    >>> simplejson.loads('"\\"foo\\bar"')
-    u'"foo\x08ar'
+    >>> simplejson.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == ["foo", {"bar":["baz", None, 1.0, 2]}]
+    True
+    >>> simplejson.loads('"\\"foo\\bar"') == '"foo\x08ar'
+    True
     >>> from StringIO import StringIO
     >>> io = StringIO('["streaming API"]')
-    >>> simplejson.load(io)
-    [u'streaming API']
+    >>> simplejson.load(io) == ["streaming API"]
+    True
 
 Specializing JSON object decoding::
 
@@ -101,7 +101,7 @@ pretty-print::
 Note that the JSON produced by this module's default settings
 is a subset of YAML, so it may be used as a serializer for that as well.
 """
-__version__ = '1.9.4'
+__version__ = '2.0.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONEncoder',
