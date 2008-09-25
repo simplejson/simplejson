@@ -180,7 +180,7 @@ ascii_escape_str(PyObject *pystr)
     chars = 0;
     output[chars++] = '"';
     for (i = 0; i < input_chars; i++) {
-        Py_UNICODE c = (Py_UNICODE)input_str[i];
+        Py_UNICODE c = (Py_UNICODE)(unsigned char)input_str[i];
         if (S_CHAR(c)) {
             output[chars++] = (char)c;
         }
