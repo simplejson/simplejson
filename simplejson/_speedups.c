@@ -53,12 +53,12 @@ typedef struct _PyEncoderObject {
     PyObject *defaultfn;
     PyObject *encoder;
     PyObject *indent;
-    PyObject *floatstr;
     PyObject *key_separator;
     PyObject *item_separator;
     PyObject *sort_keys;
     PyObject *skipkeys;
     int fast_encode;
+    int allow_nan;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -66,7 +66,6 @@ static PyMemberDef encoder_members[] = {
     {"default", T_OBJECT, offsetof(PyEncoderObject, defaultfn), READONLY, "default"},
     {"encoder", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoder"},
     {"indent", T_OBJECT, offsetof(PyEncoderObject, indent), READONLY, "indent"},
-    {"floatstr", T_OBJECT, offsetof(PyEncoderObject, floatstr), READONLY, "floatstr"},
     {"key_separator", T_OBJECT, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
     {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
     {"sort_keys", T_OBJECT, offsetof(PyEncoderObject, sort_keys), READONLY, "sort_keys"},
@@ -113,6 +112,8 @@ static int
 _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr);
 static PyObject *
 _convertPyInt_FromSsize_t(Py_ssize_t *size_ptr);
+static PyObject *
+encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
@@ -1582,36 +1583,35 @@ PyTypeObject PyScannerType = {
 static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "floatstr", "key_separator", "item_separator", "sort_keys", "skipkeys", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", NULL};
 
     assert(PyEncoder_Check(self));
     PyEncoderObject *s = (PyEncoderObject *)self;
+    PyObject *allow_nan;
 
     s->markers = NULL;
     s->defaultfn = NULL;
     s->encoder = NULL;
     s->indent = NULL;
-    s->floatstr = NULL;
     s->key_separator = NULL;
     s->item_separator = NULL;
     s->sort_keys = NULL;
     s->skipkeys = NULL;
     
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOO:make_encoder", kwlist,
-        &s->markers, &s->defaultfn, &s->encoder, &s->indent, &s->floatstr, &s->key_separator, &s->item_separator, &s->sort_keys, &s->skipkeys))
+        &s->markers, &s->defaultfn, &s->encoder, &s->indent, &s->key_separator, &s->item_separator, &s->sort_keys, &s->skipkeys, &allow_nan))
         return -1;
     
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
     Py_INCREF(s->encoder);
     Py_INCREF(s->indent);
-    Py_INCREF(s->floatstr);
     Py_INCREF(s->key_separator);
     Py_INCREF(s->item_separator);
     Py_INCREF(s->sort_keys);
     Py_INCREF(s->skipkeys);
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
-    
+    s->allow_nan = PyObject_IsTrue(allow_nan);
     return 0;
 }
 
@@ -1668,6 +1668,29 @@ _encoded_const(PyObject *obj)
 }
 
 static PyObject *
+encoder_encode_float(PyEncoderObject *s, PyObject *obj)
+{
+    double i = PyFloat_AS_DOUBLE(obj);
+    if (!Py_IS_FINITE(i)) {
+        if (!s->allow_nan) {
+            PyErr_SetString(PyExc_ValueError, "Out of range float values are not JSON compliant");
+            return NULL;
+        }
+        if (i > 0) {
+            return PyString_FromString("Infinity");
+        }
+        else if (i < 0) {
+            return PyString_FromString("-Infinity");
+        }
+        else {
+            return PyString_FromString("NaN");
+        }
+    }
+    /* Use a better float format here? */
+    return PyObject_Repr(obj);
+}
+
+static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj)
 {
     if (s->fast_encode)
@@ -1699,7 +1722,7 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         return PyList_Append(rval, encoded);
     }
     else if (PyFloat_Check(obj)) {
-        PyObject *encoded = PyObject_CallFunctionObjArgs(s->floatstr, obj, NULL);
+        PyObject *encoded = encoder_encode_float(s, obj);
         if (encoded == NULL)
             return -1;
         return PyList_Append(rval, encoded);
@@ -1812,7 +1835,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             kstr = key;
         }
         else if (PyFloat_Check(key)) {
-            kstr = PyObject_CallFunctionObjArgs(s->floatstr, key, NULL);
+            kstr = encoder_encode_float(s, key);
             if (kstr == NULL)
                 goto bail;
         }
@@ -1973,8 +1996,6 @@ encoder_dealloc(PyObject *self)
     s->encoder = NULL;
     Py_XDECREF(s->indent);
     s->indent = NULL;
-    Py_XDECREF(s->floatstr);
-    s->floatstr = NULL;
     Py_XDECREF(s->key_separator);
     s->key_separator = NULL;
     Py_XDECREF(s->item_separator);
