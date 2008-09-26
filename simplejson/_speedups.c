@@ -105,6 +105,10 @@ static int
 encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ssize_t indent_level);
 static PyObject *
 _encoded_const(PyObject *const);
+static void
+raise_errmsg(char *msg, PyObject *s, Py_ssize_t end);
+static PyObject *
+encoder_encode_string(PyEncoderObject *s, PyObject *obj);
 
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
@@ -290,7 +294,7 @@ ascii_escape_str(PyObject *pystr)
     return rval;
 }
 
-void
+static void
 raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
 {
     static PyObject *errmsg_fn = NULL;
@@ -1696,7 +1700,7 @@ py_encoder_iterencode_list(PyObject *self, PyObject *args)
     return rval;
 }
 
-PyObject *
+static PyObject *
 _encoded_const(PyObject *obj)
 {
     if (obj == Py_None) {
@@ -1726,7 +1730,7 @@ _encoded_const(PyObject *obj)
     }
 }
 
-PyObject *
+static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj)
 {
     if (s->fast_encode)
