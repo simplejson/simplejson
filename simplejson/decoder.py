@@ -3,6 +3,7 @@ Implementation of JSONDecoder
 """
 import re
 import sys
+import struct
 
 from simplejson.scanner import make_scanner
 try:
@@ -13,8 +14,6 @@ except ImportError:
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 
 def _floatconstants():
-    import struct
-    import sys
     _BYTES = '7FF80000000000007FF0000000000000'.decode('hex')
     if sys.byteorder != 'big':
         _BYTES = _BYTES[:8][::-1] + _BYTES[8:][::-1]
