@@ -270,12 +270,12 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separ
             if markerid in markers:
                 raise ValueError("Circular reference detected")
             markers[markerid] = lst
-        yield '['
+        buf = '['
         if _indent is not None:
             _current_indent_level += 1
             newline_indent = '\n' + (' ' * (_indent * _current_indent_level))
             separator = _item_separator + newline_indent
-            yield newline_indent
+            buf += newline_indent
         else:
             newline_indent = None
             separator = _item_separator
@@ -284,20 +284,21 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separ
             if first:
                 first = False
             else:
-                yield separator
+                buf = separator
             if isinstance(value, basestring):
-                yield _encoder(value)
+                yield buf + _encoder(value)
             elif value is None:
-                yield 'null'
+                yield buf + 'null'
             elif value is True:
-                yield 'true'
+                yield buf + 'true'
             elif value is False:
-                yield 'false'
+                yield buf + 'false'
             elif isinstance(value, (int, long)):
-                yield str(value)
+                yield buf + str(value)
             elif isinstance(value, float):
-                yield _floatstr(value)
+                yield buf + _floatstr(value)
             else:
+                yield buf
                 if isinstance(value, (list, tuple)):
                     chunks = _iterencode_list(value, _current_indent_level)
                 elif isinstance(value, dict):

@@ -84,8 +84,8 @@ Extending JSONEncoder::
     '[2.0, 1.0]'
     >>> ComplexEncoder().encode(2 + 1j)
     '[2.0, 1.0]'
-    >>> list(ComplexEncoder().iterencode(2 + 1j))
-    ['[', '2.0', ', ', '1.0', ']']
+    >>> ''.join(ComplexEncoder().iterencode(2 + 1j))
+    '[2.0, 1.0]'
     
 
 Using simplejson from the shell to validate and
