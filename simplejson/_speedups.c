@@ -21,8 +21,11 @@ typedef int Py_ssize_t;
 
 #define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
 #define PyScanner_CheckExact(op) (Py_TYPE(op) == &PyScannerType)
+#define PyEncoder_Check(op) PyObject_TypeCheck(op, &PyEncoderType)
+#define PyEncoder_CheckExact(op) (Py_TYPE(op) == &PyEncoderType)
 
 static PyTypeObject PyScannerType;
+static PyTypeObject PyEncoderType;
 
 typedef struct _PyScannerObject {
     PyObject_HEAD
@@ -44,6 +47,33 @@ static PyMemberDef scanner_members[] = {
     {NULL}
 };
 
+typedef struct _PyEncoderObject {
+    PyObject_HEAD
+    PyObject *markers;
+    PyObject *defaultfn;
+    PyObject *encoder;
+    PyObject *indent;
+    PyObject *floatstr;
+    PyObject *key_separator;
+    PyObject *item_separator;
+    PyObject *sort_keys;
+    PyObject *skipkeys;
+    int fast_encode;
+} PyEncoderObject;
+
+static PyMemberDef encoder_members[] = {
+    {"markers", T_OBJECT, offsetof(PyEncoderObject, markers), READONLY, "markers"},
+    {"default", T_OBJECT, offsetof(PyEncoderObject, defaultfn), READONLY, "default"},
+    {"encoder", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoder"},
+    {"indent", T_OBJECT, offsetof(PyEncoderObject, indent), READONLY, "indent"},
+    {"floatstr", T_OBJECT, offsetof(PyEncoderObject, floatstr), READONLY, "floatstr"},
+    {"key_separator", T_OBJECT, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
+    {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
+    {"sort_keys", T_OBJECT, offsetof(PyEncoderObject, sort_keys), READONLY, "sort_keys"},
+    {"skipkeys", T_OBJECT, offsetof(PyEncoderObject, skipkeys), READONLY, "skipkeys"},
+    {NULL}
+};
+
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars);
 static PyObject *
@@ -59,7 +89,24 @@ static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx);
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
-    
+static int
+scanner_init(PyObject *self, PyObject *args, PyObject *kwds);
+static void
+scanner_dealloc(PyObject *self);
+static int
+encoder_init(PyObject *self, PyObject *args, PyObject *kwds);
+static void
+encoder_dealloc(PyObject *self);
+static int
+encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ssize_t indent_level);
+static int
+encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssize_t indent_level);
+static int
+encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ssize_t indent_level);
+static PyObject *
+_encoded_const(PyObject *const);
+
+
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
 
@@ -1488,6 +1535,509 @@ PyTypeObject PyScannerType = {
     _PyObject_Del,                    /* tp_free */
 };
 
+static int
+encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "floatstr", "key_separator", "item_separator", "sort_keys", "skipkeys", NULL};
+
+    assert(PyEncoder_Check(self));
+    PyEncoderObject *s = (PyEncoderObject *)self;
+
+    s->markers = NULL;
+    s->defaultfn = NULL;
+    s->encoder = NULL;
+    s->indent = NULL;
+    s->floatstr = NULL;
+    s->key_separator = NULL;
+    s->item_separator = NULL;
+    s->sort_keys = NULL;
+    s->skipkeys = NULL;
+    
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOO:make_encoder", kwlist,
+        &s->markers, &s->defaultfn, &s->encoder, &s->indent, &s->floatstr, &s->key_separator, &s->item_separator, &s->sort_keys, &s->skipkeys))
+        return -1;
+    
+    Py_INCREF(s->markers);
+    Py_INCREF(s->defaultfn);
+    Py_INCREF(s->encoder);
+    Py_INCREF(s->indent);
+    Py_INCREF(s->floatstr);
+    Py_INCREF(s->key_separator);
+    Py_INCREF(s->item_separator);
+    Py_INCREF(s->sort_keys);
+    Py_INCREF(s->skipkeys);
+    s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
+    
+    return 0;
+}
+
+PyDoc_STRVAR(pydoc_encoder_iterencode,
+    "_iterencode(obj, _current_indent_level) -> iterable\n"
+    "\n"
+    "..."
+);
+
+static PyObject *
+py_encoder_iterencode(PyObject *self, PyObject *args)
+{
+    PyObject *obj;
+    PyObject *rval;
+    Py_ssize_t indent_level;
+    PyEncoderObject *s = (PyEncoderObject *)self;
+    assert(PyEncoder_Check(self));
+#if PY_VERSION_HEX < 0x02050000 
+    if (!PyArg_ParseTuple(args, "Oi|_iterencode", &obj, &indent_level))
+#else
+    if (!PyArg_ParseTuple(args, "On|_iterencode", &obj, &indent_level))
+#endif
+        return NULL;
+    rval = PyList_New(0);
+    if (rval == NULL) return NULL;
+    if (encoder_listencode_obj(s, rval, obj, indent_level)) {
+        Py_DECREF(rval);
+        return NULL;
+    }
+    return rval;
+}
+
+PyDoc_STRVAR(pydoc_encoder_iterencode_dict,
+    "_iterencode_dict(lst, _current_indent_level) -> iterable\n"
+    "\n"
+    "..."
+);
+
+static PyObject *
+py_encoder_iterencode_dict(PyObject *self, PyObject *args)
+{
+    PyObject *dct;
+    PyObject *rval;
+    Py_ssize_t indent_level;
+    PyEncoderObject *s = (PyEncoderObject *)self;
+    assert(PyEncoder_Check(self));
+#if PY_VERSION_HEX < 0x02050000 
+    if (!PyArg_ParseTuple(args, "Oi|_iterencode_dict", &dct, &indent_level))
+#else
+    if (!PyArg_ParseTuple(args, "On|_iterencode_dict", &dct, &indent_level))
+#endif
+        return NULL;
+    rval = PyList_New(0);
+    if (rval == NULL) return NULL;
+    if (encoder_listencode_dict(s, rval, dct, indent_level)) {
+        Py_DECREF(rval);
+        return NULL;
+    }
+    return rval;
+}
+
+PyDoc_STRVAR(pydoc_encoder_iterencode_list,
+    "_iterencode_list(lst, _current_indent_level) -> iterable\n"
+    "\n"
+    "..."
+);
+
+static PyObject *
+py_encoder_iterencode_list(PyObject *self, PyObject *args)
+{
+    PyObject *seq;
+    PyObject *rval;
+    Py_ssize_t indent_level;
+    PyEncoderObject *s = (PyEncoderObject *)self;
+    assert(PyEncoder_Check(self));
+#if PY_VERSION_HEX < 0x02050000 
+    if (!PyArg_ParseTuple(args, "Oi|_iterencode_list", &seq, &indent_level))
+#else
+    if (!PyArg_ParseTuple(args, "On|_iterencode_list", &seq, &indent_level))
+#endif
+        return NULL;
+    rval = PyList_New(0);
+    if (rval == NULL) return NULL;
+    if (encoder_listencode_list(s, rval, seq, indent_level)) {
+        Py_DECREF(rval);
+        return NULL;
+    }
+    return rval;
+}
+
+PyObject *
+_encoded_const(PyObject *obj)
+{
+    if (obj == Py_None) {
+        static PyObject *s_null = NULL;
+        if (s_null == NULL) {
+            s_null = PyString_InternFromString("null");
+        }
+        return s_null;
+    }
+    else if (obj == Py_True) {
+        static PyObject *s_true = NULL;
+        if (s_true == NULL) {
+            s_true = PyString_InternFromString("true");
+        }
+        return s_true;
+    }
+    else if (obj == Py_False) {
+        static PyObject *s_false = NULL;
+        if (s_false == NULL) {
+            s_false = PyString_InternFromString("false");
+        }
+        return s_false;
+    }
+    else {
+        PyErr_SetString(PyExc_ValueError, "not a const");
+        return NULL;
+    }
+}
+
+PyObject *
+encoder_encode_string(PyEncoderObject *s, PyObject *obj)
+{
+    if (s->fast_encode)
+        return py_encode_basestring_ascii(NULL, obj);
+    else
+        return PyObject_CallFunctionObjArgs(s->encoder, obj, NULL);
+}
+
+static int
+encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssize_t indent_level)
+{
+    if (obj == Py_None || obj == Py_True || obj == Py_False) {
+        PyObject *cstr = _encoded_const(obj);
+        if (cstr == NULL) return -1;
+        return PyList_Append(rval, cstr);
+    }
+    else if (PyString_Check(obj) || PyUnicode_Check(obj))
+    {
+        PyObject *encoded = encoder_encode_string(s, obj);
+        if (encoded == NULL) return -1;
+        return PyList_Append(rval, encoded);
+    }
+    else if (PyInt_Check(obj) || PyLong_Check(obj)) {
+        PyObject *encoded = PyObject_Repr(obj);
+        if (encoded == NULL) return -1;
+        return PyList_Append(rval, encoded);
+    }
+    else if (PyFloat_Check(obj)) {
+        PyObject *encoded = PyObject_CallFunctionObjArgs(s->floatstr, obj, NULL);
+        if (encoded == NULL) return -1;
+        return PyList_Append(rval, encoded);
+    }
+    else if (PyList_Check(obj) || PyTuple_Check(obj)) {
+        return encoder_listencode_list(s, rval, obj, indent_level);
+    }
+    else if (PyDict_Check(obj)) {
+        return encoder_listencode_dict(s, rval, obj, indent_level);
+    }
+    else {
+        PyObject *ident = NULL;
+        if (s->markers != Py_None) {
+            ident = PyLong_FromVoidPtr(obj);
+            int has_key;
+            if (ident == NULL) return -1;
+            has_key = PyDict_Contains(s->markers, ident);
+            if (has_key) {
+                if (has_key != -1)
+                    PyErr_SetString(PyExc_ValueError, "Circular reference detected");
+                Py_DECREF(ident);
+                return -1;
+            }
+            if (PyDict_SetItem(s->markers, ident, obj)) {
+                Py_DECREF(ident);
+                return -1;
+            }
+        }
+        PyObject *newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
+        if (newobj == NULL) {
+            Py_DECREF(ident);
+            return -1;
+        }
+        int rv = encoder_listencode_obj(s, rval, newobj, indent_level);
+        Py_DECREF(newobj);
+        if (rv) {
+            Py_DECREF(ident);
+            return -1;
+        }
+        if (ident != NULL) {
+            if (PyDict_DelItem(s->markers, ident)) {
+                Py_DECREF(ident);
+                ident = NULL;
+                return -1;
+            }
+            Py_DECREF(ident);
+            ident = NULL;
+        }
+        return rv;
+    }
+}
+
+static int
+encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ssize_t indent_level)
+{
+    static PyObject *open_dict = NULL;
+    static PyObject *close_dict = NULL;
+    static PyObject *empty_dict = NULL;
+    PyObject *kstr = NULL;
+    if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
+        open_dict = PyString_InternFromString("{");
+        close_dict = PyString_InternFromString("}");
+        empty_dict = PyString_InternFromString("{}");
+        if (open_dict == NULL || close_dict == NULL || empty_dict == NULL)
+            return -1;
+    }
+    PyObject *ident = NULL;
+    if (PyDict_Size(dct) == 0)
+        return PyList_Append(rval, empty_dict);
+    
+    if (s->markers != Py_None) {
+        ident = PyLong_FromVoidPtr(dct);
+        int has_key;
+        if (ident == NULL) goto bail;
+        has_key = PyDict_Contains(s->markers, ident);
+        if (has_key) {
+            if (has_key != -1)
+                PyErr_SetString(PyExc_ValueError, "Circular reference detected");
+            goto bail;
+        }
+        if (PyDict_SetItem(s->markers, ident, dct)) {
+            goto bail;
+        }
+    }
+
+    if (PyList_Append(rval, open_dict)) goto bail;
+
+    if (s->indent != Py_None) {
+        /* TODO: DOES NOT RUN */
+        indent_level += 1;
+        /*
+            newline_indent = '\n' + (' ' * (_indent * _current_indent_level))
+            separator = _item_separator + newline_indent
+            buf += newline_indent
+        */
+    }
+
+    /* TODO: C speedup not implemented for sort_keys */
+
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+    int skipkeys = PyObject_IsTrue(s->skipkeys);
+    Py_ssize_t idx = 0;
+    while (PyDict_Next(dct, &pos, &key, &value)) {
+        if (PyString_Check(key) || PyUnicode_Check(key)) {
+            Py_INCREF(key);
+            kstr = key;
+        }
+        else if (PyFloat_Check(key)) {
+            kstr = PyObject_CallFunctionObjArgs(s->floatstr, key, NULL);
+            if (kstr == NULL) goto bail;
+        }
+        else if (PyInt_Check(key) || PyLong_Check(key)) {
+            kstr = PyObject_Repr(key);
+            if (kstr == NULL) goto bail;
+        }
+        else if (key == Py_True || key == Py_False || key == Py_None) {
+            kstr = _encoded_const(key);
+        }
+        else if (skipkeys) {
+            continue;
+        }
+        else {
+            /* TODO: include repr of key */
+            PyErr_SetString(PyExc_ValueError, "keys must be a string");
+            goto bail;
+        }
+        
+        if (idx) {
+            if (PyList_Append(rval, s->item_separator)) goto bail;
+        }
+        
+        PyObject *encoded = encoder_encode_string(s, kstr);
+        Py_DECREF(kstr);
+        kstr = NULL;
+        if (encoded == NULL) goto bail;
+        if (PyList_Append(rval, encoded)) goto bail;
+        if (PyList_Append(rval, s->key_separator)) goto bail;
+        if (encoder_listencode_obj(s, rval, value, indent_level)) goto bail;
+        idx += 1;
+    }
+    if (ident != NULL) {
+        if (PyDict_DelItem(s->markers, ident)) goto bail;
+        Py_DECREF(ident);
+        ident = NULL;
+    }
+    if (s->indent != Py_None) {
+        /* TODO: DOES NOT RUN */
+        indent_level -= 1;
+        /*
+            yield '\n' + (' ' * (_indent * _current_indent_level))
+        */
+    }
+    if (PyList_Append(rval, close_dict)) goto bail;
+    return 0;
+    
+bail:
+    Py_XDECREF(kstr);
+    Py_XDECREF(ident);
+    return -1;
+}
+
+
+static int
+encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ssize_t indent_level)
+{
+    static PyObject *open_array = NULL;
+    static PyObject *close_array = NULL;
+    static PyObject *empty_array = NULL;
+    if (open_array == NULL || close_array == NULL || empty_array == NULL) {
+        open_array = PyString_InternFromString("[");
+        close_array = PyString_InternFromString("]");
+        empty_array = PyString_InternFromString("[]");
+        if (open_array == NULL || close_array == NULL || empty_array == NULL)
+            return -1;
+    }
+    PyObject *ident = NULL;
+    PyObject *s_fast = PySequence_Fast(seq, "_iterencode_list needs a sequence");
+    if (s_fast == NULL)
+        return -1;
+    Py_ssize_t num_items = PySequence_Fast_GET_SIZE(s_fast);
+    if (num_items == 0) {
+        Py_DECREF(s_fast);
+        return PyList_Append(rval, empty_array);
+    }
+    
+    if (s->markers != Py_None) {
+        ident = PyLong_FromVoidPtr(seq);
+        int has_key;
+        if (ident == NULL) goto bail;
+        has_key = PyDict_Contains(s->markers, ident);
+        if (has_key) {
+            if (has_key != -1)
+                PyErr_SetString(PyExc_ValueError, "Circular reference detected");
+            goto bail;
+        }
+        if (PyDict_SetItem(s->markers, ident, seq)) {
+            goto bail;
+        }
+    }
+    
+    PyObject **seq_items = PySequence_Fast_ITEMS(s_fast);
+    if (PyList_Append(rval, open_array)) goto bail;
+    Py_ssize_t i;
+    if (s->indent != Py_None) {
+        /* TODO: DOES NOT RUN */
+        indent_level += 1;
+        /*
+            newline_indent = '\n' + (' ' * (_indent * _current_indent_level))
+            separator = _item_separator + newline_indent
+            buf += newline_indent
+        */
+    }
+    for (i = 0; i < num_items; i++) {
+        PyObject *obj = seq_items[i];
+        if (i) {
+            if (PyList_Append(rval, s->item_separator)) goto bail;
+        }
+        if (encoder_listencode_obj(s, rval, obj, indent_level)) goto bail;
+    }
+    if (ident != NULL) {
+        if (PyDict_DelItem(s->markers, ident)) goto bail;
+        Py_DECREF(ident);
+        ident = NULL;
+    }
+    if (s->indent != Py_None) {
+        /* TODO: DOES NOT RUN */
+        indent_level -= 1;
+        /*
+            yield '\n' + (' ' * (_indent * _current_indent_level))
+        */
+    }
+    if (PyList_Append(rval, close_array)) goto bail;
+    Py_DECREF(s_fast);
+    return 0;
+    
+bail:
+    Py_XDECREF(ident);
+    Py_DECREF(s_fast);
+    return -1;
+}
+
+static void
+encoder_dealloc(PyObject *self)
+{
+    assert(PyEncoder_Check(self));
+    PyEncoderObject *s = (PyEncoderObject *)self;
+    Py_XDECREF(s->markers); s->markers = NULL;
+    Py_XDECREF(s->defaultfn); s->defaultfn = NULL;
+    Py_XDECREF(s->encoder); s->encoder = NULL;
+    Py_XDECREF(s->indent); s->indent = NULL;
+    Py_XDECREF(s->floatstr); s->floatstr = NULL;
+    Py_XDECREF(s->key_separator); s->key_separator = NULL;
+    Py_XDECREF(s->item_separator); s->item_separator = NULL;
+    Py_XDECREF(s->sort_keys); s->sort_keys = NULL;
+    Py_XDECREF(s->skipkeys); s->skipkeys = NULL;
+    self->ob_type->tp_free(self);
+}
+
+PyDoc_STRVAR(encoder_doc, "JSON encoder object");
+
+static PyMethodDef encoder_methods[] = {
+    {"_iterencode_list",
+        (PyCFunction)py_encoder_iterencode_list,
+        METH_VARARGS,
+        pydoc_encoder_iterencode_list},
+    {"_iterencode_dict",
+        (PyCFunction)py_encoder_iterencode_dict,
+        METH_VARARGS,
+        pydoc_encoder_iterencode_dict},
+    {"_iterencode",
+        (PyCFunction)py_encoder_iterencode,
+        METH_VARARGS,
+        pydoc_encoder_iterencode},
+    {NULL, NULL, 0, NULL}
+};
+
+static
+PyTypeObject PyEncoderType = {
+    PyObject_HEAD_INIT(0)
+    0,                    /* tp_internal */
+    "make_encoder",       /* tp_name */
+    sizeof(PyEncoderObject), /* tp_basicsize */
+    0,                    /* tp_itemsize */
+    encoder_dealloc, /* tp_dealloc */
+    0,                    /* tp_print */
+    0,                    /* tp_getattr */
+    0,                    /* tp_setattr */
+    0,                    /* tp_compare */
+    0,                    /* tp_repr */
+    0,                    /* tp_as_number */
+    0,                    /* tp_as_sequence */
+    0,                    /* tp_as_mapping */
+    0,                    /* tp_hash */
+    0,                    /* tp_call */
+    0,                    /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    PyObject_GenericSetAttr,                    /* tp_setattro */
+    0,                    /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT,   /* tp_flags */
+    encoder_doc,          /* tp_doc */
+    0,                    /* tp_traverse */
+    0,                    /* tp_clear */
+    0,                    /* tp_richcompare */
+    0,                    /* tp_weaklistoffset */
+    0,                    /* tp_iter */
+    0,                    /* tp_iternext */
+    encoder_methods,                    /* tp_methods */
+    encoder_members,                    /* tp_members */
+    0,                    /* tp_getset */
+    0,                    /* tp_base */
+    0,                    /* tp_dict */
+    0,                    /* tp_descr_get */
+    0,                    /* tp_descr_set */
+    0,                    /* tp_dictoffset */
+    encoder_init,                    /* tp_init */
+    PyType_GenericAlloc,                    /* tp_alloc */
+    PyType_GenericNew,          /* tp_new */
+    _PyObject_Del,                    /* tp_free */
+};
+
 static PyMethodDef speedups_methods[] = {
     {"encode_basestring_ascii",
         (PyCFunction)py_encode_basestring_ascii,
@@ -1509,7 +2059,11 @@ init_speedups(void)
     PyObject *m;
     if (PyType_Ready(&PyScannerType) < 0)
         return;
+    if (PyType_Ready(&PyEncoderType) < 0)
+        return;
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
     Py_INCREF((PyObject*)&PyScannerType);
     PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
+    Py_INCREF((PyObject*)&PyEncoderType);
+    PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType);
 }

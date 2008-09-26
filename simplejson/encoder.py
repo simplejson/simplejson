@@ -7,6 +7,10 @@ try:
     from simplejson._speedups import encode_basestring_ascii as c_encode_basestring_ascii
 except ImportError:
     c_encode_basestring_ascii = None
+try:
+    from simplejson._speedups import make_encoder as c_make_encoder
+except ImportError:
+    c_make_encoder = None
 
 ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
@@ -189,10 +193,12 @@ class JSONEncoder(object):
         # This doesn't pass the iterator directly to ''.join() because the
         # exceptions aren't as detailed.  The list call should be roughly
         # equivalent to the PySequence_Fast that ''.join() would do.
-        chunks = list(self.iterencode(o))
+        chunks = self.iterencode(o, _one_shot=True)
+        if not isinstance(chunks, (list, tuple)):
+            chunks = list(chunks)
         return ''.join(chunks)
 
-    def iterencode(self, o):
+    def iterencode(self, o, _one_shot=False):
         """
         Encode the given object and yield each string
         representation as available.
@@ -236,20 +242,26 @@ class JSONEncoder(object):
             return text
         
         
-        _iterencode = _make_iterencode(
-            markers, self.default, _encoder, self.indent, floatstr,
-            self.key_separator, self.item_separator, self.sort_keys, self.skipkeys)
+        if _one_shot and c_make_encoder is not None and not self.indent and not self.sort_keys:
+            c_encoder = c_make_encoder(
+                markers, self.default, _encoder, self.indent, floatstr,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys)
+            _iterencode = c_encoder._iterencode
+        else:
+            _iterencode = _make_iterencode(
+                markers, self.default, _encoder, self.indent, floatstr,
+                self.key_separator, self.item_separator, self.sort_keys,
+                self.skipkeys, _one_shot)
         return _iterencode(o, 0)
 
-def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separator, _item_separator, _sort_keys, _skipkeys,
+def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
         ## HACK: hand-optimized bytecode; turn globals into locals
         False=False,
         True=True,
         ValueError=ValueError,
         basestring=basestring,
         dict=dict,
-        encode_basestring_ascii=encode_basestring_ascii,
-        encode_basestring=encode_basestring,
         float=float,
         id=id,
         int=int,
@@ -259,7 +271,6 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separ
         str=str,
         tuple=tuple,
     ):
-
 
     def _iterencode_list(lst, _current_indent_level):
         if not lst:
