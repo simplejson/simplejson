@@ -109,7 +109,10 @@ static void
 raise_errmsg(char *msg, PyObject *s, Py_ssize_t end);
 static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj);
-
+static int
+_convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr);
+static PyObject *
+_convertPyInt_FromSsize_t(Py_ssize_t *size_ptr);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
@@ -121,6 +124,20 @@ encoder_encode_string(PyEncoderObject *s, PyObject *obj);
 #define MAX_EXPANSION MIN_EXPANSION
 #endif
 
+static int
+_convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr)
+{
+    *size_ptr = PyInt_AsSsize_t(o);
+    if (*size_ptr == -1 && PyErr_Occurred());
+        return 1;
+    return 0;
+}
+
+static PyObject *
+_convertPyInt_FromSsize_t(Py_ssize_t *size_ptr)
+{
+    return PyInt_FromSsize_t(*size_ptr);
+}
 
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars)
@@ -308,11 +325,7 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
         if (errmsg_fn == NULL)
             return;
     }
-#if PY_VERSION_HEX < 0x02050000 
-    pymsg = PyObject_CallFunction(errmsg_fn, "(zOi)", msg, s, end);
-#else
-    pymsg = PyObject_CallFunction(errmsg_fn, "(zOn)", msg, s, end);
-#endif
+    pymsg = PyObject_CallFunction(errmsg_fn, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
     if (pymsg) {
         PyErr_SetObject(PyExc_ValueError, pymsg);
         Py_DECREF(pymsg);
@@ -735,11 +748,7 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
     Py_ssize_t next_end = -1;
     char *encoding = NULL;
     int strict = 0;
-#if PY_VERSION_HEX < 0x02050000 
-    if (!PyArg_ParseTuple(args, "Oi|zi:scanstring", &pystr, &end, &encoding, &strict)) {
-#else
-    if (!PyArg_ParseTuple(args, "On|zi:scanstring", &pystr, &end, &encoding, &strict)) {
-#endif
+    if (!PyArg_ParseTuple(args, "OO&|zi:scanstring", &pystr, _convertPyInt_AsSsize_t, &end, &encoding, &strict)) {
         return NULL;
     }
     if (encoding == NULL) {
@@ -1440,11 +1449,7 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     static char *kwlist[] = {"string", "idx", NULL};
     PyScannerObject *s = (PyScannerObject *)self;
     assert(PyScanner_Check(self));
-#if PY_VERSION_HEX < 0x02050000 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "Oi:scan_once", kwlist, &pystr, &idx))
-#else
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "On:scan_once", kwlist, &pystr, &idx))
-#endif
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:scan_once", kwlist, &pystr, _convertPyInt_AsSsize_t, &idx))
         return NULL;
     if (PyString_Check(pystr)) {
         return scan_once_str(s, pystr, idx);
@@ -1610,90 +1615,22 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     return 0;
 }
 
-PyDoc_STRVAR(pydoc_encoder_iterencode,
-    "_iterencode(obj, _current_indent_level) -> iterable\n"
-    "\n"
-    "..."
-);
-
 static PyObject *
-py_encoder_iterencode(PyObject *self, PyObject *args)
+encoder_call(PyObject *self, PyObject *args, PyObject *kwds)
 {
+    static char *kwlist[] = {"obj", "_current_indent_level", NULL};
     PyObject *obj;
     PyObject *rval;
     Py_ssize_t indent_level;
     PyEncoderObject *s = (PyEncoderObject *)self;
     assert(PyEncoder_Check(self));
-#if PY_VERSION_HEX < 0x02050000 
-    if (!PyArg_ParseTuple(args, "Oi|_iterencode", &obj, &indent_level))
-#else
-    if (!PyArg_ParseTuple(args, "On|_iterencode", &obj, &indent_level))
-#endif
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:_iterencode", kwlist,
+        &obj, _convertPyInt_AsSsize_t, &indent_level))
         return NULL;
     rval = PyList_New(0);
     if (rval == NULL)
         return NULL;
     if (encoder_listencode_obj(s, rval, obj, indent_level)) {
-        Py_DECREF(rval);
-        return NULL;
-    }
-    return rval;
-}
-
-PyDoc_STRVAR(pydoc_encoder_iterencode_dict,
-    "_iterencode_dict(lst, _current_indent_level) -> iterable\n"
-    "\n"
-    "..."
-);
-
-static PyObject *
-py_encoder_iterencode_dict(PyObject *self, PyObject *args)
-{
-    PyObject *dct;
-    PyObject *rval;
-    Py_ssize_t indent_level;
-    PyEncoderObject *s = (PyEncoderObject *)self;
-    assert(PyEncoder_Check(self));
-#if PY_VERSION_HEX < 0x02050000 
-    if (!PyArg_ParseTuple(args, "Oi|_iterencode_dict", &dct, &indent_level))
-#else
-    if (!PyArg_ParseTuple(args, "On|_iterencode_dict", &dct, &indent_level))
-#endif
-        return NULL;
-    rval = PyList_New(0);
-    if (rval == NULL)
-        return NULL;
-    if (encoder_listencode_dict(s, rval, dct, indent_level)) {
-        Py_DECREF(rval);
-        return NULL;
-    }
-    return rval;
-}
-
-PyDoc_STRVAR(pydoc_encoder_iterencode_list,
-    "_iterencode_list(lst, _current_indent_level) -> iterable\n"
-    "\n"
-    "..."
-);
-
-static PyObject *
-py_encoder_iterencode_list(PyObject *self, PyObject *args)
-{
-    PyObject *seq;
-    PyObject *rval;
-    Py_ssize_t indent_level;
-    PyEncoderObject *s = (PyEncoderObject *)self;
-    assert(PyEncoder_Check(self));
-#if PY_VERSION_HEX < 0x02050000 
-    if (!PyArg_ParseTuple(args, "Oi|_iterencode_list", &seq, &indent_level))
-#else
-    if (!PyArg_ParseTuple(args, "On|_iterencode_list", &seq, &indent_level))
-#endif
-        return NULL;
-    rval = PyList_New(0);
-    if (rval == NULL)
-        return NULL;
-    if (encoder_listencode_list(s, rval, seq, indent_level)) {
         Py_DECREF(rval);
         return NULL;
     }
@@ -2049,23 +1986,7 @@ encoder_dealloc(PyObject *self)
     self->ob_type->tp_free(self);
 }
 
-PyDoc_STRVAR(encoder_doc, "JSON encoder object");
-
-static PyMethodDef encoder_methods[] = {
-    {"_iterencode_list",
-        (PyCFunction)py_encoder_iterencode_list,
-        METH_VARARGS,
-        pydoc_encoder_iterencode_list},
-    {"_iterencode_dict",
-        (PyCFunction)py_encoder_iterencode_dict,
-        METH_VARARGS,
-        pydoc_encoder_iterencode_dict},
-    {"_iterencode",
-        (PyCFunction)py_encoder_iterencode,
-        METH_VARARGS,
-        pydoc_encoder_iterencode},
-    {NULL, NULL, 0, NULL}
-};
+PyDoc_STRVAR(encoder_doc, "_iterencode(obj, _current_indent_level) -> iterable");
 
 static
 PyTypeObject PyEncoderType = {
@@ -2084,7 +2005,7 @@ PyTypeObject PyEncoderType = {
     0,                    /* tp_as_sequence */
     0,                    /* tp_as_mapping */
     0,                    /* tp_hash */
-    0,                    /* tp_call */
+    encoder_call,                    /* tp_call */
     0,                    /* tp_str */
     PyObject_GenericGetAttr,                    /* tp_getattro */
     PyObject_GenericSetAttr,                    /* tp_setattro */
@@ -2097,7 +2018,7 @@ PyTypeObject PyEncoderType = {
     0,                    /* tp_weaklistoffset */
     0,                    /* tp_iter */
     0,                    /* tp_iternext */
-    encoder_methods,                    /* tp_methods */
+    0,                    /* tp_methods */
     encoder_members,                    /* tp_members */
     0,                    /* tp_getset */
     0,                    /* tp_base */
