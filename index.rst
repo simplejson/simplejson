@@ -53,14 +53,15 @@ Pretty printing::
 Decoding JSON::
     
     >>> import simplejson as json
-    >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]')
-    [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
-    >>> json.loads('"\\"foo\\bar"')
-    u'"foo\x08ar'
+    >>> obj = [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
+    >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == obj
+    True
+    >>> json.loads('"\\"foo\\bar"') == u'"foo\x08ar'
+    True
     >>> from StringIO import StringIO
     >>> io = StringIO('["streaming API"]')
-    >>> json.load(io)
-    [u'streaming API']
+    >>> json.load(io)[0] == 'streaming API'
+    True
 
 Specializing JSON object decoding::
 
@@ -74,24 +75,23 @@ Specializing JSON object decoding::
     ...     object_hook=as_complex)
     (1+2j)
     >>> import decimal
-    >>> json.loads('1.1', parse_float=decimal.Decimal)
-    Decimal('1.1')
+    >>> json.loads('1.1', parse_float=decimal.Decimal) == decimal.Decimal('1.1')
+    True
 
-Extending :class:`JSONEncoder`::
+Specializing JSON object encoding::
     
-    >>> import json
-    >>> class ComplexEncoder(json.JSONEncoder):
-    ...     def default(self, obj):
-    ...         if isinstance(obj, complex):
-    ...             return [obj.real, obj.imag]
-    ...         return json.JSONEncoder.default(self, obj)
-    ... 
-    >>> dumps(2 + 1j, cls=ComplexEncoder)
+    >>> import simplejson as json
+    >>> def encode_complex(obj):
+    ...     if isinstance(obj, complex):
+    ...         return [obj.real, obj.imag]
+    ...     raise TypeError("%r is not JSON serializable" % (o,))
+    ...
+    >>> json.dumps(2 + 1j, default=encode_complex)
     '[2.0, 1.0]'
-    >>> ComplexEncoder().encode(2 + 1j)
+    >>> json.JSONEncoder(default=encode_complex).encode(2 + 1j)
     '[2.0, 1.0]'
-    >>> list(ComplexEncoder().iterencode(2 + 1j))
-    ['[', '2.0', ', ', '1.0', ']']
+    >>> ''.join(json.JSONEncoder(default=encode_complex).iterencode(2 + 1j))
+    '[2.0, 1.0]'
     
 
 .. highlight:: none
@@ -388,7 +388,8 @@ Encoders and decoders
       Return a JSON string representation of a Python data structure, *o*.  For
       example::
 
-        >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
+        >>> import simplejson as json
+        >>> json.JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo": ["bar", "baz"]}'
 
 

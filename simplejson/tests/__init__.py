@@ -8,6 +8,7 @@ def additional_tests():
     suite = unittest.TestSuite()
     for mod in (simplejson, simplejson.encoder, simplejson.decoder):
         suite.addTest(doctest.DocTestSuite(mod))
+    suite.addTest(doctest.DocFileSuite('../../index.rst'))
     return suite
 
 def main():
