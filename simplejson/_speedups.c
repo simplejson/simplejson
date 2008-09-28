@@ -1555,8 +1555,8 @@ PyTypeObject PyScannerType = {
     0,                    /* tp_hash */
     scanner_call,         /* tp_call */
     0,                    /* tp_str */
-    PyObject_GenericGetAttr,                    /* tp_getattro */
-    PyObject_GenericSetAttr,                    /* tp_setattro */
+    0,/* PyObject_GenericGetAttr, */                    /* tp_getattro */
+    0,/* PyObject_GenericSetAttr, */                    /* tp_setattro */
     0,                    /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,   /* tp_flags */
     scanner_doc,          /* tp_doc */
@@ -1575,9 +1575,9 @@ PyTypeObject PyScannerType = {
     0,                    /* tp_descr_set */
     0,                    /* tp_dictoffset */
     scanner_init,                    /* tp_init */
-    PyType_GenericAlloc,                    /* tp_alloc */
-    PyType_GenericNew,          /* tp_new */
-    _PyObject_Del,                    /* tp_free */
+    0,/* PyType_GenericAlloc, */        /* tp_alloc */
+    0,/* PyType_GenericNew, */          /* tp_new */
+    0,/* _PyObject_Del, */              /* tp_free */
 };
 
 static int
@@ -2028,8 +2028,8 @@ PyTypeObject PyEncoderType = {
     0,                    /* tp_hash */
     encoder_call,                    /* tp_call */
     0,                    /* tp_str */
-    PyObject_GenericGetAttr,                    /* tp_getattro */
-    PyObject_GenericSetAttr,                    /* tp_setattro */
+    0,/* PyObject_GenericGetAttr, */                    /* tp_getattro */
+    0,/* PyObject_GenericSetAttr, */                    /* tp_setattro */
     0,                    /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,   /* tp_flags */
     encoder_doc,          /* tp_doc */
@@ -2048,9 +2048,9 @@ PyTypeObject PyEncoderType = {
     0,                    /* tp_descr_set */
     0,                    /* tp_dictoffset */
     encoder_init,                    /* tp_init */
-    PyType_GenericAlloc,                    /* tp_alloc */
-    PyType_GenericNew,          /* tp_new */
-    _PyObject_Del,                    /* tp_free */
+    0,/* PyType_GenericAlloc, */       /* tp_alloc */
+    0,/* PyType_GenericNew, */         /* tp_new */
+    0,/* _PyObject_Del, */             /* tp_free */
 };
 
 static PyMethodDef speedups_methods[] = {
@@ -2072,8 +2072,18 @@ void
 init_speedups(void)
 {
     PyObject *m;
+    PyScannerType.tp_getattro = PyObject_GenericGetAttr;
+    PyScannerType.tp_setattro = PyObject_GenericSetAttr;
+    PyScannerType.tp_alloc  = PyType_GenericAlloc;
+    PyScannerType.tp_new = PyType_GenericNew;
+    PyScannerType.tp_free = _PyObject_Del;
     if (PyType_Ready(&PyScannerType) < 0)
         return;
+    PyEncoderType.tp_getattro = PyObject_GenericGetAttr;
+    PyEncoderType.tp_setattro = PyObject_GenericSetAttr;
+    PyEncoderType.tp_alloc  = PyType_GenericAlloc;
+    PyEncoderType.tp_new = PyType_GenericNew;
+    PyEncoderType.tp_free = _PyObject_Del;
     if (PyType_Ready(&PyEncoderType) < 0)
         return;
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
