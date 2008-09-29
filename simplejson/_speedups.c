@@ -1716,7 +1716,7 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         return PyList_Append(rval, encoded);
     }
     else if (PyInt_Check(obj) || PyLong_Check(obj)) {
-        PyObject *encoded = PyObject_Repr(obj);
+        PyObject *encoded = PyObject_Str(obj);
         if (encoded == NULL)
             return -1;
         return PyList_Append(rval, encoded);
@@ -1840,7 +1840,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
                 goto bail;
         }
         else if (PyInt_Check(key) || PyLong_Check(key)) {
-            kstr = PyObject_Repr(key);
+            kstr = PyObject_Str(key);
             if (kstr == NULL)
                 goto bail;
         }
