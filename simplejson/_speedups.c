@@ -352,14 +352,15 @@ join_list_string(PyObject *lst)
 
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
+    PyObject *tpl;
+    PyObject *pyidx;
     /*
     steal a reference to rval, returns (rval, idx)
     */
     if (rval == NULL) {
         return NULL;
     }
-    PyObject *tpl;
-    PyObject *pyidx = PyInt_FromSsize_t(idx);
+    pyidx = PyInt_FromSsize_t(idx);
     if (pyidx == NULL) {
         Py_DECREF(rval);
         return NULL;
@@ -468,8 +469,8 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
             }
             /* Decode 4 hex digits */
             for (; next < end; next++) {
-                c <<= 4;
                 Py_UNICODE digit = buf[next];
+                c <<= 4;
                 switch (digit) {
                     case '0': case '1': case '2': case '3': case '4':
                     case '5': case '6': case '7': case '8': case '9':
@@ -650,8 +651,8 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
             }
             /* Decode 4 hex digits */
             for (; next < end; next++) {
-                c <<= 4;
                 Py_UNICODE digit = buf[next];
+                c <<= 4;
                 switch (digit) {
                     case '0': case '1': case '2': case '3': case '4':
                     case '5': case '6': case '7': case '8': case '9':
@@ -797,8 +798,9 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
 static void
 scanner_dealloc(PyObject *self)
 {
+    PyScannerObject *s;
     assert(PyScanner_Check(self));
-    PyScannerObject *s = (PyScannerObject *)self;
+    s = (PyScannerObject *)self;
     Py_XDECREF(s->encoding);
     Py_XDECREF(s->strict);
     Py_XDECREF(s->object_hook);
@@ -1448,8 +1450,9 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject *pystr;
     Py_ssize_t idx;
     static char *kwlist[] = {"string", "idx", NULL};
-    PyScannerObject *s = (PyScannerObject *)self;
+    PyScannerObject *s;
     assert(PyScanner_Check(self));
+    s = (PyScannerObject *)self;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:scan_once", kwlist, &pystr, _convertPyInt_AsSsize_t, &idx))
         return NULL;
     if (PyString_Check(pystr)) {
@@ -1471,9 +1474,10 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *ctx;
     static char *kwlist[] = {"context", NULL};
+    PyScannerObject *s;
 
     assert(PyScanner_Check(self));
-    PyScannerObject *s = (PyScannerObject *)self;
+    s = (PyScannerObject *)self;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:make_scanner", kwlist, &ctx))
         return -1;
@@ -1585,9 +1589,11 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", NULL};
 
-    assert(PyEncoder_Check(self));
-    PyEncoderObject *s = (PyEncoderObject *)self;
+    PyEncoderObject *s;
     PyObject *allow_nan;
+
+    assert(PyEncoder_Check(self));
+    s = (PyEncoderObject *)self;
 
     s->markers = NULL;
     s->defaultfn = NULL;
@@ -1622,8 +1628,9 @@ encoder_call(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject *obj;
     PyObject *rval;
     Py_ssize_t indent_level;
-    PyEncoderObject *s = (PyEncoderObject *)self;
+    PyEncoderObject *s;
     assert(PyEncoder_Check(self));
+    s = (PyEncoderObject *)self;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:_iterencode", kwlist,
         &obj, _convertPyInt_AsSsize_t, &indent_level))
         return NULL;
@@ -1702,6 +1709,9 @@ encoder_encode_string(PyEncoderObject *s, PyObject *obj)
 static int
 encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssize_t indent_level)
 {
+    PyObject *newobj;
+    int rv;
+    
     if (obj == Py_None || obj == Py_True || obj == Py_False) {
         PyObject *cstr = _encoded_const(obj);
         if (cstr == NULL)
@@ -1736,8 +1746,8 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
     else {
         PyObject *ident = NULL;
         if (s->markers != Py_None) {
-            ident = PyLong_FromVoidPtr(obj);
             int has_key;
+            ident = PyLong_FromVoidPtr(obj);
             if (ident == NULL)
                 return -1;
             has_key = PyDict_Contains(s->markers, ident);
@@ -1752,12 +1762,12 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
                 return -1;
             }
         }
-        PyObject *newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
+        newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
         if (newobj == NULL) {
             Py_DECREF(ident);
             return -1;
         }
-        int rv = encoder_listencode_obj(s, rval, newobj, indent_level);
+        rv = encoder_listencode_obj(s, rval, newobj, indent_level);
         Py_DECREF(newobj);
         if (rv) {
             Py_DECREF(ident);
@@ -1783,6 +1793,12 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     static PyObject *close_dict = NULL;
     static PyObject *empty_dict = NULL;
     PyObject *kstr = NULL;
+    PyObject *ident = NULL;
+    PyObject *key, *value;
+    Py_ssize_t pos;
+    int skipkeys;
+    Py_ssize_t idx;
+    
     if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
         open_dict = PyString_InternFromString("{");
         close_dict = PyString_InternFromString("}");
@@ -1790,13 +1806,12 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         if (open_dict == NULL || close_dict == NULL || empty_dict == NULL)
             return -1;
     }
-    PyObject *ident = NULL;
     if (PyDict_Size(dct) == 0)
         return PyList_Append(rval, empty_dict);
     
     if (s->markers != Py_None) {
-        ident = PyLong_FromVoidPtr(dct);
         int has_key;
+        ident = PyLong_FromVoidPtr(dct);
         if (ident == NULL)
             goto bail;
         has_key = PyDict_Contains(s->markers, ident);
@@ -1825,11 +1840,12 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
 
     /* TODO: C speedup not implemented for sort_keys */
 
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-    int skipkeys = PyObject_IsTrue(s->skipkeys);
-    Py_ssize_t idx = 0;
+    pos = 0;
+    skipkeys = PyObject_IsTrue(s->skipkeys);
+    idx = 0;
     while (PyDict_Next(dct, &pos, &key, &value)) {
+        PyObject *encoded;
+
         if (PyString_Check(key) || PyUnicode_Check(key)) {
             Py_INCREF(key);
             kstr = key;
@@ -1861,7 +1877,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
                 goto bail;
         }
         
-        PyObject *encoded = encoder_encode_string(s, kstr);
+        encoded = encoder_encode_string(s, kstr);
         Py_DECREF(kstr);
         kstr = NULL;
         if (encoded == NULL)
@@ -1904,6 +1920,12 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
     static PyObject *open_array = NULL;
     static PyObject *close_array = NULL;
     static PyObject *empty_array = NULL;
+    PyObject *ident = NULL;
+    PyObject *s_fast = NULL;
+    Py_ssize_t num_items;
+    PyObject **seq_items;
+    Py_ssize_t i;
+    
     if (open_array == NULL || close_array == NULL || empty_array == NULL) {
         open_array = PyString_InternFromString("[");
         close_array = PyString_InternFromString("]");
@@ -1911,19 +1933,19 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
         if (open_array == NULL || close_array == NULL || empty_array == NULL)
             return -1;
     }
-    PyObject *ident = NULL;
-    PyObject *s_fast = PySequence_Fast(seq, "_iterencode_list needs a sequence");
+    ident = NULL;
+    s_fast = PySequence_Fast(seq, "_iterencode_list needs a sequence");
     if (s_fast == NULL)
         return -1;
-    Py_ssize_t num_items = PySequence_Fast_GET_SIZE(s_fast);
+    num_items = PySequence_Fast_GET_SIZE(s_fast);
     if (num_items == 0) {
         Py_DECREF(s_fast);
         return PyList_Append(rval, empty_array);
     }
     
     if (s->markers != Py_None) {
-        ident = PyLong_FromVoidPtr(seq);
         int has_key;
+        ident = PyLong_FromVoidPtr(seq);
         if (ident == NULL)
             goto bail;
         has_key = PyDict_Contains(s->markers, ident);
@@ -1937,10 +1959,9 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
         }
     }
     
-    PyObject **seq_items = PySequence_Fast_ITEMS(s_fast);
+    seq_items = PySequence_Fast_ITEMS(s_fast);
     if (PyList_Append(rval, open_array))
         goto bail;
-    Py_ssize_t i;
     if (s->indent != Py_None) {
         /* TODO: DOES NOT RUN */
         indent_level += 1;
@@ -1986,8 +2007,9 @@ bail:
 static void
 encoder_dealloc(PyObject *self)
 {
+    PyEncoderObject *s;
     assert(PyEncoder_Check(self));
-    PyEncoderObject *s = (PyEncoderObject *)self;
+    s = (PyEncoderObject *)self;
     Py_XDECREF(s->markers);
     s->markers = NULL;
     Py_XDECREF(s->defaultfn);
