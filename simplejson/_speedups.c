@@ -10,6 +10,9 @@ typedef int Py_ssize_t;
 #define PyInt_FromSsize_t PyInt_FromLong
 #define PyInt_AsSsize_t PyInt_AsLong
 #endif
+#ifndef Py_IS_FINITE
+#define Py_IS_FINITE(X) (!Py_IS_INFINITY(X) && !Py_IS_NAN(X))
+#endif
 
 #ifdef __GNUC__
 #define UNUSED __attribute__((__unused__))
