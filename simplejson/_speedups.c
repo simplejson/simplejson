@@ -429,6 +429,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                 chunk = strchunk;
             }
             if (PyList_Append(chunks, chunk)) {
+                Py_DECREF(chunk);
                 goto bail;
             }
             Py_DECREF(chunk);
@@ -550,6 +551,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
             }
         }
         if (PyList_Append(chunks, chunk)) {
+            Py_DECREF(chunk);
             goto bail;
         }
         Py_DECREF(chunk);
@@ -559,8 +561,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
     if (rval == NULL) {
         goto bail;
     }
-    Py_DECREF(chunks);
-    chunks = NULL;
+    Py_CLEAR(chunks);
     *next_end_ptr = end;
     return rval;
 bail:
@@ -611,6 +612,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                 goto bail;
             }
             if (PyList_Append(chunks, chunk)) {
+                Py_DECREF(chunk);
                 goto bail;
             }
             Py_DECREF(chunk);
@@ -720,6 +722,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
             goto bail;
         }
         if (PyList_Append(chunks, chunk)) {
+            Py_DECREF(chunk);
             goto bail;
         }
         Py_DECREF(chunk);
@@ -804,18 +807,12 @@ scanner_dealloc(PyObject *self)
     PyScannerObject *s;
     assert(PyScanner_Check(self));
     s = (PyScannerObject *)self;
-    Py_XDECREF(s->encoding);
-    Py_XDECREF(s->strict);
-    Py_XDECREF(s->object_hook);
-    Py_XDECREF(s->parse_float);
-    Py_XDECREF(s->parse_int);
-    Py_XDECREF(s->parse_constant);
-    s->encoding = NULL;
-    s->strict = NULL;
-    s->object_hook = NULL;
-    s->parse_float = NULL;
-    s->parse_int = NULL;
-    s->parse_constant = NULL;
+    Py_CLEAR(s->encoding);
+    Py_CLEAR(s->strict);
+    Py_CLEAR(s->object_hook);
+    Py_CLEAR(s->parse_float);
+    Py_CLEAR(s->parse_int);
+    Py_CLEAR(s->parse_constant);
     self->ob_type->tp_free(self);
 }
 
@@ -867,9 +864,8 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             if (PyDict_SetItem(rval, key, PyTuple_GET_ITEM(tpl, 0)) == -1)
                 goto bail;
-            Py_DECREF(tpl);
+            Py_CLEAR(tpl);
             idx = next_idx;
-            tpl = NULL;
             
             /* skip whitespace before } or , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
@@ -957,9 +953,8 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             if (PyDict_SetItem(rval, key, PyTuple_GET_ITEM(tpl, 0)) == -1)
                 goto bail;
-            Py_DECREF(tpl);
+            Py_CLEAR(tpl);
             idx = next_idx;
-            tpl = NULL;
 
             /* skip whitespace before } or , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
@@ -1029,9 +1024,8 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             if (PyList_Append(rval, PyTuple_GET_ITEM(tpl, 0)) == -1)
                 goto bail;
-            Py_DECREF(tpl);
+            Py_CLEAR(tpl);
             idx = next_idx;
-            tpl = NULL;
             
             /* skip whitespace between term and , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
@@ -1090,9 +1084,8 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
                 goto bail;
             if (PyList_Append(rval, PyTuple_GET_ITEM(tpl, 0)) == -1)
                 goto bail;
-            Py_DECREF(tpl);
+            Py_CLEAR(tpl);
             idx = next_idx;
-            tpl = NULL;
 
             /* skip whitespace between term and , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
@@ -1526,18 +1519,12 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     return 0;
 
 bail:
-    Py_XDECREF(s->encoding);
-    Py_XDECREF(s->strict);
-    Py_XDECREF(s->object_hook);
-    Py_XDECREF(s->parse_float);
-    Py_XDECREF(s->parse_int);
-    Py_XDECREF(s->parse_constant);
-    s->encoding = NULL;
-    s->strict = NULL;
-    s->object_hook = NULL;
-    s->parse_float = NULL;
-    s->parse_int = NULL;
-    s->parse_constant = NULL;
+    Py_CLEAR(s->encoding);
+    Py_CLEAR(s->strict);
+    Py_CLEAR(s->object_hook);
+    Py_CLEAR(s->parse_float);
+    Py_CLEAR(s->parse_int);
+    Py_CLEAR(s->parse_constant);
     return -1;
 }
 
@@ -1779,11 +1766,9 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         if (ident != NULL) {
             if (PyDict_DelItem(s->markers, ident)) {
                 Py_DECREF(ident);
-                ident = NULL;
                 return -1;
             }
             Py_DECREF(ident);
-            ident = NULL;
         }
         return rv;
     }
@@ -1881,8 +1866,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         }
         
         encoded = encoder_encode_string(s, kstr);
-        Py_DECREF(kstr);
-        kstr = NULL;
+        Py_CLEAR(kstr);
         if (encoded == NULL)
             goto bail;
         if (PyList_Append(rval, encoded))
@@ -1896,8 +1880,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
-        Py_DECREF(ident);
-        ident = NULL;
+        Py_CLEAR(ident);
     }
     if (s->indent != Py_None) {
         /* TODO: DOES NOT RUN */
@@ -1986,8 +1969,7 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
-        Py_DECREF(ident);
-        ident = NULL;
+        Py_CLEAR(ident);
     }
     if (s->indent != Py_None) {
         /* TODO: DOES NOT RUN */
@@ -2013,22 +1995,14 @@ encoder_dealloc(PyObject *self)
     PyEncoderObject *s;
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
-    Py_XDECREF(s->markers);
-    s->markers = NULL;
-    Py_XDECREF(s->defaultfn);
-    s->defaultfn = NULL;
-    Py_XDECREF(s->encoder);
-    s->encoder = NULL;
-    Py_XDECREF(s->indent);
-    s->indent = NULL;
-    Py_XDECREF(s->key_separator);
-    s->key_separator = NULL;
-    Py_XDECREF(s->item_separator);
-    s->item_separator = NULL;
-    Py_XDECREF(s->sort_keys);
-    s->sort_keys = NULL;
-    Py_XDECREF(s->skipkeys);
-    s->skipkeys = NULL;
+    Py_CLEAR(s->markers);
+    Py_CLEAR(s->defaultfn);
+    Py_CLEAR(s->encoder);
+    Py_CLEAR(s->indent);
+    Py_CLEAR(s->key_separator);
+    Py_CLEAR(s->item_separator);
+    Py_CLEAR(s->sort_keys);
+    Py_CLEAR(s->skipkeys);
     self->ob_type->tp_free(self);
 }
 
