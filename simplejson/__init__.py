@@ -109,7 +109,7 @@ __all__ = [
 
 if __name__ == '__main__':
     import warnings
-    warnings.warn('python -msimplejson is deprecated, use python -msiplejson.tool', DeprecationWarning)
+    warnings.warn('python -msimplejson is deprecated, use python -msimplejson.tool', DeprecationWarning)
     from simplejson.decoder import JSONDecoder
     from simplejson.encoder import JSONEncoder
 else:
