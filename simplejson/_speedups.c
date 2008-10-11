@@ -86,9 +86,9 @@ static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
 void init_speedups(void);
 static PyObject *
-scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx);
+scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
-scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx);
+scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
 static int
@@ -822,12 +822,12 @@ scanner_dealloc(PyObject *self)
 }
 
 static PyObject *
-_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
-    PyObject *tpl = NULL;
     PyObject *rval = PyDict_New();
     PyObject *key = NULL;
+    PyObject *val = NULL;
     char *encoding = PyString_AS_STRING(s->encoding);
     int strict = PyObject_IsTrue(s->strict);
     Py_ssize_t next_idx;
@@ -848,7 +848,6 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             key = scanstring_str(pystr, idx + 1, encoding, strict, &next_idx);
             if (key == NULL)
                 goto bail;
-            Py_INCREF(key);
             idx = next_idx;
             
             /* skip whitespace between key and : delimiter, read :, skip whitespace */
@@ -860,16 +859,16 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             idx++;
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             
-            /* read any JSON data type and de-tuplefy the (rval, idx) */
-            tpl = scan_once_str(s, pystr, idx);
-            if (tpl == NULL)
+            /* read any JSON data type */
+            val = scan_once_str(s, pystr, idx, &next_idx);
+            if (val == NULL)
                 goto bail;
-            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
-            if (next_idx == -1 && PyErr_Occurred())
+
+            if (PyDict_SetItem(rval, key, val) == -1)
                 goto bail;
-            if (PyDict_SetItem(rval, key, PyTuple_GET_ITEM(tpl, 0)) == -1)
-                goto bail;
-            Py_CLEAR(tpl);
+
+            Py_CLEAR(key);
+            Py_CLEAR(val);
             idx = next_idx;
             
             /* skip whitespace before } or , */
@@ -897,26 +896,27 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
     }
     /* if object_hook is not None: rval = object_hook(rval) */
     if (s->object_hook != Py_None) {
-        tpl = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
-        if (tpl == NULL)
+        val = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
+        if (val == NULL)
             goto bail;
         Py_DECREF(rval);
-        rval = tpl;
-        tpl = NULL;
+        rval = val;
+        val = NULL;
     }
-    return _build_rval_index_tuple(rval, idx + 1);
+    *next_idx_ptr = idx + 1;
+    return rval;
 bail:
     Py_XDECREF(key);
-    Py_XDECREF(tpl);
+    Py_XDECREF(val);
     Py_DECREF(rval);
     return NULL;    
 }
 
 static PyObject *
-_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_SIZE(pystr) - 1;
-    PyObject *tpl = NULL;
+    PyObject *val = NULL;
     PyObject *rval = PyDict_New();
     PyObject *key = NULL;
     int strict = PyObject_IsTrue(s->strict);
@@ -949,16 +949,16 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
             idx++;
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             
-            /* read any JSON term and de-tuplefy the (rval, idx) */
-            tpl = scan_once_unicode(s, pystr, idx);
-            if (tpl == NULL)
+            /* read any JSON term */
+            val = scan_once_unicode(s, pystr, idx, &next_idx);
+            if (val == NULL)
                 goto bail;
-            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
-            if (next_idx == -1 && PyErr_Occurred())
+
+            if (PyDict_SetItem(rval, key, val) == -1)
                 goto bail;
-            if (PyDict_SetItem(rval, key, PyTuple_GET_ITEM(tpl, 0)) == -1)
-                goto bail;
-            Py_CLEAR(tpl);
+
+            Py_CLEAR(key);
+            Py_CLEAR(val);
             idx = next_idx;
 
             /* skip whitespace before } or , */
@@ -988,26 +988,27 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
 
     /* if object_hook is not None: rval = object_hook(rval) */
     if (s->object_hook != Py_None) {
-        tpl = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
-        if (tpl == NULL)
+        val = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
+        if (val == NULL)
             goto bail;
         Py_DECREF(rval);
-        rval = tpl;
-        tpl = NULL;
+        rval = val;
+        val = NULL;
     }
-    return _build_rval_index_tuple(rval, idx + 1);
+    *next_idx_ptr = idx + 1;
+    return rval;
 bail:
     Py_XDECREF(key);
-    Py_XDECREF(tpl);
+    Py_XDECREF(val);
     Py_DECREF(rval);
     return NULL;
 }
 
 static PyObject *
-_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
-    PyObject *tpl = NULL;
+    PyObject *val = NULL;
     PyObject *rval = PyList_New(0);
     Py_ssize_t next_idx;
     if (rval == NULL)
@@ -1021,15 +1022,14 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
         while (idx <= end_idx) {
 
             /* read any JSON term and de-tuplefy the (rval, idx) */
-            tpl = scan_once_str(s, pystr, idx);
-            if (tpl == NULL)
+            val = scan_once_str(s, pystr, idx, &next_idx);
+            if (val == NULL)
                 goto bail;
-            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
-            if (next_idx == -1 && PyErr_Occurred())
+
+            if (PyList_Append(rval, val) == -1)
                 goto bail;
-            if (PyList_Append(rval, PyTuple_GET_ITEM(tpl, 0)) == -1)
-                goto bail;
-            Py_CLEAR(tpl);
+
+            Py_CLEAR(val);
             idx = next_idx;
             
             /* skip whitespace between term and , */
@@ -1056,18 +1056,19 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
         raise_errmsg("Expecting object", pystr, end_idx);
         goto bail;
     }
-    return _build_rval_index_tuple(rval, idx + 1);
+    *next_idx_ptr = idx + 1;
+    return rval;
 bail:
-    Py_XDECREF(tpl);
+    Py_XDECREF(val);
     Py_DECREF(rval);
     return NULL;
 }
 
 static PyObject *
-_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
+_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_SIZE(pystr) - 1;
-    PyObject *tpl = NULL;
+    PyObject *val = NULL;
     PyObject *rval = PyList_New(0);
     Py_ssize_t next_idx;
     if (rval == NULL)
@@ -1080,16 +1081,15 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
     if (idx <= end_idx && str[idx] != ']') {
         while (idx <= end_idx) {
 
-            /* read any JSON term and de-tuplefy the (rval, idx) */
-            tpl = scan_once_unicode(s, pystr, idx);
-            if (tpl == NULL)
+            /* read any JSON term  */
+            val = scan_once_unicode(s, pystr, idx, &next_idx);
+            if (val == NULL)
                 goto bail;
-            next_idx = PyInt_AsSsize_t(PyTuple_GET_ITEM(tpl, 1));
-            if (next_idx == -1 && PyErr_Occurred())
+
+            if (PyList_Append(rval, val) == -1)
                 goto bail;
-            if (PyList_Append(rval, PyTuple_GET_ITEM(tpl, 0)) == -1)
-                goto bail;
-            Py_CLEAR(tpl);
+
+            Py_CLEAR(val);
             idx = next_idx;
 
             /* skip whitespace between term and , */
@@ -1116,15 +1116,16 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx) {
         raise_errmsg("Expecting object", pystr, end_idx);
         goto bail;
     }
-    return _build_rval_index_tuple(rval, idx + 1);
+    *next_idx_ptr = idx + 1;
+    return rval;
 bail:
-    Py_XDECREF(tpl);
+    Py_XDECREF(val);
     Py_DECREF(rval);
     return NULL;
 }
 
 static PyObject *
-_parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx) {
+_parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     PyObject *cstr;
     PyObject *rval;
     /* constant is "NaN", "Infinity", or "-Infinity" */
@@ -1136,11 +1137,12 @@ _parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx) {
     rval = PyObject_CallFunctionObjArgs(s->parse_constant, cstr, NULL);
     idx += PyString_GET_SIZE(cstr);
     Py_DECREF(cstr);
-    return _build_rval_index_tuple(rval, idx);
+    *next_idx_ptr = idx;
+    return rval;
 }
 
 static PyObject *
-_match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
+_match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr) {
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
     Py_ssize_t idx = start;
@@ -1224,11 +1226,12 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
         }
     }
     Py_DECREF(numstr);
-    return _build_rval_index_tuple(rval, idx);
+    *next_idx_ptr = idx;
+    return rval;
 }
 
 static PyObject *
-_match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
+_match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr) {
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_SIZE(pystr) - 1;
     Py_ssize_t idx = start;
@@ -1305,16 +1308,15 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start) {
         rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
     }
     Py_DECREF(numstr);
-    return _build_rval_index_tuple(rval, idx);
+    *next_idx_ptr = idx;
+    return rval;
 }
 
 static PyObject *
-scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
+scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
 {
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t length = PyString_GET_SIZE(pystr);
-    Py_ssize_t next_idx = -1;
-    PyObject *rval;
     if (idx >= length) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
@@ -1322,68 +1324,68 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
     switch (str[idx]) {
         case '"':
             /* string */
-            rval = scanstring_str(pystr, idx + 1,
+            return scanstring_str(pystr, idx + 1,
                 PyString_AS_STRING(s->encoding),
                 PyObject_IsTrue(s->strict),
-                &next_idx);
-            return _build_rval_index_tuple(rval, next_idx);
+                next_idx_ptr);
         case '{':
             /* object */
-            return _parse_object_str(s, pystr, idx + 1);
+            return _parse_object_str(s, pystr, idx + 1, next_idx_ptr);
         case '[':
             /* array */
-            return _parse_array_str(s, pystr, idx + 1);
+            return _parse_array_str(s, pystr, idx + 1, next_idx_ptr);
         case 'n':
             /* null */
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
                 Py_INCREF(Py_None);
-                return _build_rval_index_tuple(Py_None, idx + 4);
+                *next_idx_ptr = idx + 4;
+                return Py_None;
             }
             break;
         case 't':
             /* true */
             if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
                 Py_INCREF(Py_True);
-                return _build_rval_index_tuple(Py_True, idx + 4);
+                *next_idx_ptr = idx + 4;
+                return Py_True;
             }
             break;
         case 'f':
             /* false */
             if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
                 Py_INCREF(Py_False);
-                return _build_rval_index_tuple(Py_False, idx + 5);
+                *next_idx_ptr = idx + 5;
+                return Py_False;
             }
             break;
         case 'N':
             /* NaN */
             if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
-                return _parse_constant(s, "NaN", idx);
+                return _parse_constant(s, "NaN", idx, next_idx_ptr);
             }
             break;
         case 'I':
             /* Infinity */
             if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
-                return _parse_constant(s, "Infinity", idx);
+                return _parse_constant(s, "Infinity", idx, next_idx_ptr);
             }
             break;
         case '-':
             /* -Infinity */
             if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
-                return _parse_constant(s, "-Infinity", idx);
+                return _parse_constant(s, "-Infinity", idx, next_idx_ptr);
             }
             break;
     }
     /* Didn't find a string, object, array, or named constant. Look for a number. */
-    return _match_number_str(s, pystr, idx);
+    return _match_number_str(s, pystr, idx, next_idx_ptr);
 }
 
 static PyObject *
-scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
+scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
 {
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
     Py_ssize_t length = PyUnicode_GET_SIZE(pystr);
-    Py_ssize_t next_idx = -1;
-    PyObject *rval;
     if (idx >= length) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
@@ -1391,76 +1393,81 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx)
     switch (str[idx]) {
         case '"':
             /* string */
-            rval = scanstring_unicode(pystr, idx + 1,
+            return scanstring_unicode(pystr, idx + 1,
                 PyObject_IsTrue(s->strict),
-                &next_idx);
-            return _build_rval_index_tuple(rval, next_idx);
+                next_idx_ptr);
         case '{':
             /* object */
-            return _parse_object_unicode(s, pystr, idx + 1);
+            return _parse_object_unicode(s, pystr, idx + 1, next_idx_ptr);
         case '[':
             /* array */
-            return _parse_array_unicode(s, pystr, idx + 1);
+            return _parse_array_unicode(s, pystr, idx + 1, next_idx_ptr);
         case 'n':
             /* null */
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
                 Py_INCREF(Py_None);
-                return _build_rval_index_tuple(Py_None, idx + 4);
+                *next_idx_ptr = idx + 4;
+                return Py_None;
             }
             break;
         case 't':
             /* true */
             if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
                 Py_INCREF(Py_True);
-                return _build_rval_index_tuple(Py_True, idx + 4);
+                *next_idx_ptr = idx + 4;
+                return Py_True;
             }
             break;
         case 'f':
             /* false */
             if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
                 Py_INCREF(Py_False);
-                return _build_rval_index_tuple(Py_False, idx + 5);
+                *next_idx_ptr = idx + 5;
+                return Py_False;
             }
             break;
         case 'N':
             /* NaN */
             if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
-                return _parse_constant(s, "NaN", idx);
+                return _parse_constant(s, "NaN", idx, next_idx_ptr);
             }
             break;
         case 'I':
             /* Infinity */
             if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
-                return _parse_constant(s, "Infinity", idx);
+                return _parse_constant(s, "Infinity", idx, next_idx_ptr);
             }
             break;
         case '-':
             /* -Infinity */
             if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
-                return _parse_constant(s, "-Infinity", idx);
+                return _parse_constant(s, "-Infinity", idx, next_idx_ptr);
             }
             break;
     }
     /* Didn't find a string, object, array, or named constant. Look for a number. */
-    return _match_number_unicode(s, pystr, idx);
+    return _match_number_unicode(s, pystr, idx, next_idx_ptr);
 }
 
 static PyObject *
 scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *pystr;
+    PyObject *rval;
     Py_ssize_t idx;
+    Py_ssize_t next_idx = -1;
     static char *kwlist[] = {"string", "idx", NULL};
     PyScannerObject *s;
     assert(PyScanner_Check(self));
     s = (PyScannerObject *)self;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:scan_once", kwlist, &pystr, _convertPyInt_AsSsize_t, &idx))
         return NULL;
+
     if (PyString_Check(pystr)) {
-        return scan_once_str(s, pystr, idx);
+        rval = scan_once_str(s, pystr, idx, &next_idx);
     }
     else if (PyUnicode_Check(pystr)) {
-        return scan_once_unicode(s, pystr, idx);
+        rval = scan_once_unicode(s, pystr, idx, &next_idx);
     }
     else {
         PyErr_Format(PyExc_TypeError,
@@ -1468,6 +1475,7 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
                  Py_TYPE(pystr)->tp_name);
         return NULL;
     }
+    return _build_rval_index_tuple(rval, next_idx);
 }
 
 static int
