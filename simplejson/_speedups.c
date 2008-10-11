@@ -368,9 +368,14 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
         Py_DECREF(rval);
         return NULL;
     }
-    tpl = PyTuple_Pack(2, rval, pyidx);
-    Py_DECREF(pyidx);
-    Py_DECREF(rval);
+    tpl = PyTuple_New(2);
+    if (tpl == NULL) {
+        Py_DECREF(pyidx);
+        Py_DECREF(rval);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(tpl, 0, rval);
+    PyTuple_SET_ITEM(tpl, 1, pyidx);
     return tpl;
 }
 
