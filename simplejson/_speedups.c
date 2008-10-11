@@ -1655,6 +1655,7 @@ _encoded_const(PyObject *obj)
         if (s_null == NULL) {
             s_null = PyString_InternFromString("null");
         }
+        Py_INCREF(s_null);
         return s_null;
     }
     else if (obj == Py_True) {
@@ -1662,6 +1663,7 @@ _encoded_const(PyObject *obj)
         if (s_true == NULL) {
             s_true = PyString_InternFromString("true");
         }
+        Py_INCREF(s_true);
         return s_true;
     }
     else if (obj == Py_False) {
@@ -1669,6 +1671,7 @@ _encoded_const(PyObject *obj)
         if (s_false == NULL) {
             s_false = PyString_InternFromString("false");
         }
+        Py_INCREF(s_false);
         return s_false;
     }
     else {
@@ -1710,6 +1713,14 @@ encoder_encode_string(PyEncoderObject *s, PyObject *obj)
 }
 
 static int
+_steal_list_append(PyObject *lst, PyObject *stolen)
+{
+    int rval = PyList_Append(lst, stolen);
+    Py_DECREF(stolen);
+    return rval;
+}
+
+static int
 encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssize_t indent_level)
 {
     PyObject *newobj;
@@ -1719,26 +1730,26 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         PyObject *cstr = _encoded_const(obj);
         if (cstr == NULL)
             return -1;
-        return PyList_Append(rval, cstr);
+        return _steal_list_append(rval, cstr);
     }
     else if (PyString_Check(obj) || PyUnicode_Check(obj))
     {
         PyObject *encoded = encoder_encode_string(s, obj);
         if (encoded == NULL)
             return -1;
-        return PyList_Append(rval, encoded);
+        return _steal_list_append(rval, encoded);
     }
     else if (PyInt_Check(obj) || PyLong_Check(obj)) {
         PyObject *encoded = PyObject_Str(obj);
         if (encoded == NULL)
             return -1;
-        return PyList_Append(rval, encoded);
+        return _steal_list_append(rval, encoded);
     }
     else if (PyFloat_Check(obj)) {
         PyObject *encoded = encoder_encode_float(s, obj);
         if (encoded == NULL)
             return -1;
-        return PyList_Append(rval, encoded);
+        return _steal_list_append(rval, encoded);
     }
     else if (PyList_Check(obj) || PyTuple_Check(obj)) {
         return encoder_listencode_list(s, rval, obj, indent_level);
@@ -1863,6 +1874,8 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         }
         else if (key == Py_True || key == Py_False || key == Py_None) {
             kstr = _encoded_const(key);
+            if (kstr == NULL)
+                goto bail;
         }
         else if (skipkeys) {
             continue;
@@ -1882,8 +1895,11 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         Py_CLEAR(kstr);
         if (encoded == NULL)
             goto bail;
-        if (PyList_Append(rval, encoded))
+        if (PyList_Append(rval, encoded)) {
+            Py_DECREF(encoded);
             goto bail;
+        }
+        Py_DECREF(encoded);
         if (PyList_Append(rval, s->key_separator))
             goto bail;
         if (encoder_listencode_obj(s, rval, value, indent_level))
