@@ -67,9 +67,9 @@ Specializing JSON object decoding::
     >>> simplejson.loads('{"__complex__": true, "real": 1, "imag": 2}',
     ...     object_hook=as_complex)
     (1+2j)
-    >>> import decimal
-    >>> simplejson.loads('1.1', parse_float=decimal.Decimal)
-    Decimal("1.1")
+    >>> from decimal import Decimal
+    >>> simplejson.loads('1.1', parse_float=Decimal) == Decimal("1.1")
+    True
 
 Extending JSONEncoder::
     
