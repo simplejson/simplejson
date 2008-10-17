@@ -1,5 +1,4 @@
-"""
-Implementation of JSONDecoder
+"""Implementation of JSONDecoder
 """
 import re
 import sys
@@ -10,6 +9,8 @@ try:
     from simplejson._speedups import scanstring as c_scanstring
 except ImportError:
     c_scanstring = None
+
+__all__ = ['JSONDecoder']
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 
@@ -164,7 +165,7 @@ def JSONObject((s, end), encoding, strict, scan_once, object_hook, _w=WHITESPACE
         except StopIteration:
             raise ValueError(errmsg("Expecting object", s, end))
         pairs[key] = value
-        
+
         try:
             nextchar = s[end]
             if nextchar in _ws:
@@ -223,7 +224,7 @@ def JSONArray((s, end), scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
             break
         elif nextchar != ',':
             raise ValueError(errmsg("Expecting , delimiter", s, end))
-        
+
         try:
             if s[end] in _ws:
                 end += 1
@@ -235,11 +236,10 @@ def JSONArray((s, end), scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     return values, end
 
 class JSONDecoder(object):
-    """
-    Simple JSON <http://json.org> decoder
+    """Simple JSON <http://json.org> decoder
 
     Performs the following translations in decoding by default:
-    
+
     +---------------+-------------------+
     | JSON          | Python            |
     +===============+===================+
@@ -262,17 +262,15 @@ class JSONDecoder(object):
 
     It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as
     their corresponding ``float`` values, which is outside the JSON spec.
-    """
 
-    __all__ = ['__init__', 'decode', 'raw_decode']
+    """
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
             parse_int=None, parse_constant=None, strict=True):
-        """
-        ``encoding`` determines the encoding used to interpret any ``str``
+        """``encoding`` determines the encoding used to interpret any ``str``
         objects decoded by this instance (utf-8 by default).  It has no
         effect when decoding ``unicode`` objects.
-        
+
         Note that currently only encodings that are a superset of ASCII work,
         strings of other encodings should be passed in as ``unicode``.
 
@@ -295,6 +293,7 @@ class JSONDecoder(object):
         following strings: -Infinity, Infinity, NaN.
         This can be used to raise an exception if invalid JSON numbers
         are encountered.
+
         """
         self.encoding = encoding
         self.object_hook = object_hook
@@ -308,9 +307,9 @@ class JSONDecoder(object):
         self.scan_once = make_scanner(self)
 
     def decode(self, s, _w=WHITESPACE.match):
-        """
-        Return the Python representation of ``s`` (a ``str`` or ``unicode``
+        """Return the Python representation of ``s`` (a ``str`` or ``unicode``
         instance containing a JSON document)
+
         """
         obj, end = self.raw_decode(s, idx=_w(s, 0).end())
         end = _w(s, end).end()
@@ -319,18 +318,16 @@ class JSONDecoder(object):
         return obj
 
     def raw_decode(self, s, idx=0):
-        """
-        Decode a JSON document from ``s`` (a ``str`` or ``unicode`` beginning
+        """Decode a JSON document from ``s`` (a ``str`` or ``unicode`` beginning
         with a JSON document) and return a 2-tuple of the Python
         representation and the index in ``s`` where the document ended.
 
         This can be used to decode a JSON document from a string that may
         have extraneous data at the end.
+
         """
         try:
             obj, end = self.scan_once(s, idx)
         except StopIteration:
             raise ValueError("No JSON object could be decoded")
         return obj, end
-
-__all__ = ['JSONDecoder']

@@ -8,6 +8,6 @@ class TestDump(TestCase):
         sio = StringIO()
         S.dump({}, sio)
         self.assertEquals(sio.getvalue(), '{}')
-    
+
     def test_dumps(self):
         self.assertEquals(S.dumps({}), '{}')

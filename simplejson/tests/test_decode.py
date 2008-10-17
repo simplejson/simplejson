@@ -15,7 +15,7 @@ class TestDecode(TestCase):
         self.assertEquals(rval, 1.0)
 
     def test_decoder_optimizations(self):
-        # Several optimizations were made that skip over calls to 
+        # Several optimizations were made that skip over calls to
         # the whitespace regex, so this test is designed to try and
         # exercise the uncommon cases. The array cases are already covered.
         rval = S.loads('{   "key"    :    "value"    ,  "k":"v"    }')

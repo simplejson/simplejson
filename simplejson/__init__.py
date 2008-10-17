@@ -1,5 +1,4 @@
-r"""
-A simple, fast, extensible JSON encoder and decoder
+r"""A simple, fast, extensible JSON encoder and decoder
 
 JSON (JavaScript Object Notation) <http://json.org> is a subset of
 JavaScript syntax (ECMA-262 3rd edition) used as a lightweight data
@@ -9,7 +8,7 @@ simplejson exposes an API familiar to uses of the standard library
 marshal and pickle modules.
 
 Encoding basic Python object hierarchies::
-    
+
     >>> import simplejson
     >>> simplejson.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
     '["foo", {"bar": ["baz", null, 1.0, 2]}]'
@@ -35,17 +34,14 @@ Compact encoding::
     >>> compact in ('[1,2,3,{"4":5,"6":7}]', '[1,2,3,{"6":7,"4":5}]')
     True
 
-Pretty printing::
+Pretty printing (using repr() because of extraneous whitespace in the output)::
 
     >>> import simplejson
-    >>> print simplejson.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4)
-    {
-        "4": 5, 
-        "6": 7
-    }
+    >>> print repr(simplejson.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4))
+    '{\n    "4": 5, \n    "6": 7\n}'
 
 Decoding JSON::
-    
+
     >>> import simplejson
     >>> simplejson.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == ["foo", {"bar":["baz", None, 1.0, 2]}]
     True
@@ -63,7 +59,7 @@ Specializing JSON object decoding::
     ...     if '__complex__' in dct:
     ...         return complex(dct['real'], dct['imag'])
     ...     return dct
-    ... 
+    ...
     >>> simplejson.loads('{"__complex__": true, "real": 1, "imag": 2}',
     ...     object_hook=as_complex)
     (1+2j)
@@ -72,49 +68,40 @@ Specializing JSON object decoding::
     True
 
 Extending JSONEncoder::
-    
+
     >>> import simplejson
     >>> class ComplexEncoder(simplejson.JSONEncoder):
     ...     def default(self, obj):
     ...         if isinstance(obj, complex):
     ...             return [obj.real, obj.imag]
     ...         return simplejson.JSONEncoder.default(self, obj)
-    ... 
+    ...
     >>> dumps(2 + 1j, cls=ComplexEncoder)
     '[2.0, 1.0]'
     >>> ComplexEncoder().encode(2 + 1j)
     '[2.0, 1.0]'
     >>> ''.join(ComplexEncoder().iterencode(2 + 1j))
     '[2.0, 1.0]'
-    
+
 
 Using simplejson from the shell to validate and
 pretty-print::
-    
+
     $ echo '{"json":"obj"}' | python -msimplejson.tool
     {
         "json": "obj"
     }
     $ echo '{ 1.2:3.4}' | python -msimplejson.tool
     Expecting property name: line 1 column 2 (char 2)
-
-Note that the JSON produced by this module's default settings
-is a subset of YAML, so it may be used as a serializer for that as well.
 """
-__version__ = '2.0.3'
+__version__ = '2.0.4'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONEncoder',
 ]
 
-if __name__ == '__main__':
-    import warnings
-    warnings.warn('python -msimplejson is deprecated, use python -msimplejson.tool', DeprecationWarning)
-    from simplejson.decoder import JSONDecoder
-    from simplejson.encoder import JSONEncoder
-else:
-    from decoder import JSONDecoder
-    from encoder import JSONEncoder
+from decoder import JSONDecoder
+from encoder import JSONEncoder
 
 _default_encoder = JSONEncoder(
     skipkeys=False,
@@ -130,12 +117,11 @@ _default_encoder = JSONEncoder(
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, **kw):
-    """
-    Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
+    """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
     If ``skipkeys`` is ``True`` then ``dict`` keys that are not basic types
-    (``str``, ``unicode``, ``int``, ``long``, ``float``, ``bool``, ``None``) 
+    (``str``, ``unicode``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
 
     If ``ensure_ascii`` is ``False``, then the some chunks written to ``fp``
@@ -169,6 +155,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
+
     """
     # cached encoder
     if (skipkeys is False and ensure_ascii is True and
@@ -192,11 +179,10 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
 def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, **kw):
-    """
-    Serialize ``obj`` to a JSON formatted ``str``.
+    """Serialize ``obj`` to a JSON formatted ``str``.
 
     If ``skipkeys`` is ``True`` then ``dict`` keys that are not basic types
-    (``str``, ``unicode``, ``int``, ``long``, ``float``, ``bool``, ``None``) 
+    (``str``, ``unicode``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
 
     If ``ensure_ascii`` is ``False``, then the return value will be a
@@ -229,6 +215,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
+
     """
     # cached encoder
     if (skipkeys is False and ensure_ascii is True and
@@ -250,8 +237,7 @@ _default_decoder = JSONDecoder(encoding=None, object_hook=None)
 
 def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
         parse_int=None, parse_constant=None, **kw):
-    """
-    Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
+    """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
     a JSON document) to a Python object.
 
     If the contents of ``fp`` is encoded with an ASCII based encoding other
@@ -265,9 +251,10 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
     result of any object literal decode (a ``dict``). The return value of
     ``object_hook`` will be used instead of the ``dict``. This feature
     can be used to implement custom decoders (e.g. JSON-RPC class hinting).
-    
+
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
+
     """
     return loads(fp.read(),
         encoding=encoding, cls=cls, object_hook=object_hook,
@@ -277,8 +264,7 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
 
 def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
         parse_int=None, parse_constant=None, **kw):
-    """
-    Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
+    """Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
     document) to a Python object.
 
     If ``s`` is a ``str`` instance and is encoded with an ASCII based encoding
@@ -308,6 +294,7 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
 
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
+
     """
     if (cls is None and encoding is None and object_hook is None and
             parse_int is None and parse_float is None and
@@ -324,55 +311,3 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
     if parse_constant is not None:
         kw['parse_constant'] = parse_constant
     return cls(encoding=encoding, **kw).decode(s)
-
-
-#
-# Compatibility cruft from other libraries
-#
-
-
-def decode(s):
-    """
-    demjson, python-cjson API compatibility hook. Use loads(s) instead.
-    """
-    import warnings
-    warnings.warn("simplejson.loads(s) should be used instead of decode(s)",
-        DeprecationWarning)
-    return loads(s)
-
-
-def encode(obj):
-    """
-    demjson, python-cjson compatibility hook. Use dumps(s) instead.
-    """
-    import warnings
-    warnings.warn("simplejson.dumps(s) should be used instead of encode(s)",
-        DeprecationWarning)
-    return dumps(obj)
-
-
-def read(s):
-    """
-    jsonlib, JsonUtils, python-json, json-py API compatibility hook.
-    Use loads(s) instead.
-    """
-    import warnings
-    warnings.warn("simplejson.loads(s) should be used instead of read(s)",
-        DeprecationWarning)
-    return loads(s)
-
-
-def write(obj):
-    """
-    jsonlib, JsonUtils, python-json, json-py API compatibility hook.
-    Use dumps(s) instead.
-    """
-    import warnings
-    warnings.warn("simplejson.dumps(s) should be used instead of write(s)",
-        DeprecationWarning)
-    return dumps(obj)
-
-
-if __name__ == '__main__':
-    import simplejson.tool
-    simplejson.tool.main()

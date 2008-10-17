@@ -1,5 +1,4 @@
-"""
-Implementation of JSONEncoder
+"""Implementation of JSONEncoder
 """
 import re
 
@@ -32,8 +31,8 @@ INFINITY = float('1e66666')
 FLOAT_REPR = repr
 
 def encode_basestring(s):
-    """
-    Return a JSON representation of a Python string
+    """Return a JSON representation of a Python string
+
     """
     def replace(match):
         return ESCAPE_DCT[match.group(0)]
@@ -63,11 +62,10 @@ def py_encode_basestring_ascii(s):
 encode_basestring_ascii = c_encode_basestring_ascii or py_encode_basestring_ascii
 
 class JSONEncoder(object):
-    """
-    Extensible JSON <http://json.org> encoder for Python data structures.
+    """Extensible JSON <http://json.org> encoder for Python data structures.
 
     Supports the following objects and types by default:
-    
+
     +-------------------+---------------+
     | Python            | JSON          |
     +===================+===============+
@@ -90,15 +88,14 @@ class JSONEncoder(object):
     ``.default()`` method with another method that returns a serializable
     object for ``o`` if possible, otherwise it should call the superclass
     implementation (to raise ``TypeError``).
+
     """
-    __all__ = ['__init__', 'default', 'encode', 'iterencode']
     item_separator = ', '
     key_separator = ': '
     def __init__(self, skipkeys=False, ensure_ascii=True,
             check_circular=True, allow_nan=True, sort_keys=False,
             indent=None, separators=None, encoding='utf-8', default=None):
-        """
-        Constructor for JSONEncoder, with sensible defaults.
+        """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is False, then it is a TypeError to attempt
         encoding of keys that are not str, int, long, float or None.  If
@@ -138,6 +135,7 @@ class JSONEncoder(object):
         If encoding is not None, then all input strings will be
         transformed into unicode using that encoding prior to JSON-encoding.
         The default is UTF-8.
+
         """
 
         self.skipkeys = skipkeys
@@ -153,14 +151,13 @@ class JSONEncoder(object):
         self.encoding = encoding
 
     def default(self, o):
-        """
-        Implement this method in a subclass such that it returns
+        """Implement this method in a subclass such that it returns
         a serializable object for ``o``, or calls the base implementation
         (to raise a ``TypeError``).
 
         For example, to support arbitrary iterators, you could
         implement default like this::
-            
+
             def default(self, o):
                 try:
                     iterable = iter(o)
@@ -169,21 +166,22 @@ class JSONEncoder(object):
                 else:
                     return list(iterable)
                 return JSONEncoder.default(self, o)
+
         """
         raise TypeError("%r is not JSON serializable" % (o,))
 
     def encode(self, o):
-        """
-        Return a JSON string representation of a Python data structure.
+        """Return a JSON string representation of a Python data structure.
 
         >>> JSONEncoder().encode({"foo": ["bar", "baz"]})
         '{"foo": ["bar", "baz"]}'
+
         """
         # This is for extremely simple cases and benchmarks.
         if isinstance(o, basestring):
             if isinstance(o, str):
                 _encoding = self.encoding
-                if (_encoding is not None 
+                if (_encoding is not None
                         and not (_encoding == 'utf-8')):
                     o = o.decode(_encoding)
             if self.ensure_ascii:
@@ -199,14 +197,14 @@ class JSONEncoder(object):
         return ''.join(chunks)
 
     def iterencode(self, o, _one_shot=False):
-        """
-        Encode the given object and yield each string
+        """Encode the given object and yield each string
         representation as available.
-        
+
         For example::
-            
+
             for chunk in JSONEncoder().iterencode(bigobject):
                 mysocket.write(chunk)
+
         """
         if self.check_circular:
             markers = {}
@@ -240,8 +238,8 @@ class JSONEncoder(object):
                     % (o,))
 
             return text
-        
-        
+
+
         if _one_shot and c_make_encoder is not None and not self.indent and not self.sort_keys:
             _iterencode = c_make_encoder(
                 markers, self.default, _encoder, self.indent,
@@ -433,7 +431,3 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separ
                 del markers[markerid]
 
     return _iterencode
-
-
-
-__all__ = ['JSONEncoder']

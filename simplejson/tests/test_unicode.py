@@ -10,7 +10,7 @@ class TestUnicode(TestCase):
         ju = encoder.encode(u)
         js = encoder.encode(s)
         self.assertEquals(ju, js)
-    
+
     def test_encoding2(self):
         u = u'\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}'
         s = u.encode('utf-8')
@@ -53,7 +53,7 @@ class TestUnicode(TestCase):
             u = unichr(i)
             json = '"\\u%04x"' % (i,)
             self.assertEquals(S.loads(json), u)
-    
+
     def test_default_encoding(self):
         self.assertEquals(S.loads(u'{"a": "\xe9"}'.encode('utf-8')),
             {'a': u'\xe9'})

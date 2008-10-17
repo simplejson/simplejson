@@ -1,5 +1,4 @@
-"""
-JSON token scanner
+"""JSON token scanner
 """
 import re
 try:
@@ -30,7 +29,7 @@ def py_make_scanner(context):
             nextchar = string[idx]
         except IndexError:
             raise StopIteration
-        
+
         if nextchar == '"':
             return parse_string(string, idx + 1, encoding, strict)
         elif nextchar == '{':
@@ -43,7 +42,7 @@ def py_make_scanner(context):
             return True, idx + 4
         elif nextchar == 'f' and string[idx:idx + 5] == 'false':
             return False, idx + 5
-        
+
         m = match_number(string, idx)
         if m is not None:
             integer, frac, exp = m.groups()
@@ -60,7 +59,7 @@ def py_make_scanner(context):
             return parse_constant('-Infinity'), idx + 9
         else:
             raise StopIteration
-    
+
     return _scan_once
 
 make_scanner = c_make_scanner or py_make_scanner
