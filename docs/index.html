@@ -2,7 +2,7 @@
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>simplejson &#8212; JSON encoder and decoder &mdash; simlejson v2.0.0 documentation</title>
+    <title>simplejson &#8212; JSON encoder and decoder &mdash; simplejson v2.0.0 documentation</title>
     <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript">
@@ -19,7 +19,7 @@
     <link rel="contents" title="Global table of contents" href="contents.html" />
     <link rel="index" title="Global index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="top" title="simlejson v2.0.0 documentation" href="" />
+    <link rel="top" title="simplejson v2.0.0 documentation" href="" />
   </head>
   <body>
     <div class="related">
@@ -28,7 +28,7 @@
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
-        <li><a href="">simlejson v2.0.0 documentation</a> &raquo;</li>
+        <li><a href="">simplejson v2.0.0 documentation</a> &raquo;</li>
       </ul>
     </div>
     <div class="document">
@@ -37,9 +37,9 @@
           <div class="body">
             
   
-  <div class="section">
+  <div class="section" id="module-simplejson">
 <h1 id="module-simplejson"><tt class="xref docutils literal"><span class="pre">simplejson</span></tt> &#8212; JSON encoder and decoder<a class="headerlink" href="#module-simplejson" title="Permalink to this headline">¶</a></h1>
-<p>JSON (JavaScript Object Notation) &lt;<a class="reference" href="http://json.org">http://json.org</a>&gt; is a subset of JavaScript
+<p>JSON (JavaScript Object Notation) &lt;<a class="reference external" href="http://json.org">http://json.org</a>&gt; is a subset of JavaScript
 syntax (ECMA-262 3rd edition) used as a lightweight data interchange format.</p>
 <p><tt class="xref docutils literal"><span class="pre">simplejson</span></tt> exposes an API familiar to users of the standard library
 <tt class="xref docutils literal"><span class="pre">marshal</span></tt> and <tt class="xref docutils literal"><span class="pre">pickle</span></tt> modules. It is the externally maintained
@@ -131,7 +131,7 @@ Expecting property name: line 1 column 2 (char 2)
 <p class="last">The JSON produced by this module&#8217;s default settings is a subset of
 YAML, so it may be used as a serializer for that as well.</p>
 </div>
-<div class="section">
+<div class="section" id="basic-usage">
 <h2 id="basic-usage">Basic Usage<a class="headerlink" href="#basic-usage" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="simplejson.dump">
@@ -176,12 +176,12 @@ will be used instead of the default <tt class="docutils literal"><span class="pr
 <dd><p>Serialize <em>obj</em> to a JSON formatted <tt class="xref docutils literal"><span class="pre">str</span></tt>.</p>
 <p>If <em>ensure_ascii</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt>, then the return value will be a
 <tt class="xref docutils literal"><span class="pre">unicode</span></tt> instance.  The other arguments have the same meaning as in
-<a title="simplejson.dump" class="reference" href="#simplejson.dump"><tt class="xref docutils literal"><span class="pre">dump()</span></tt></a>. Note that the default <em>ensure_ascii</em> setting has much
+<a title="simplejson.dump" class="reference internal" href="#simplejson.dump"><tt class="xref docutils literal"><span class="pre">dump()</span></tt></a>. Note that the default <em>ensure_ascii</em> setting has much
 better performance.</p>
 </dd></dl>
 
 </div>
-<div class="section">
+<div class="section" id="encoders-and-decoders">
 <h2 id="encoders-and-decoders">Encoders and decoders<a class="headerlink" href="#encoders-and-decoders" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="simplejson.JSONDecoder">
@@ -305,7 +305,7 @@ extraneous data at the end.</p>
 </tbody>
 </table>
 <p>To extend this to recognize other objects, subclass and implement a
-<a title="simplejson.JSONEncoder.default" class="reference" href="#simplejson.JSONEncoder.default"><tt class="xref docutils literal"><span class="pre">default()</span></tt></a> method with another method that returns a serializable object
+<a title="simplejson.JSONEncoder.default" class="reference internal" href="#simplejson.JSONEncoder.default"><tt class="xref docutils literal"><span class="pre">default()</span></tt></a> method with another method that returns a serializable object
 for <tt class="docutils literal"><span class="pre">o</span></tt> if possible, otherwise it should call the superclass implementation
 (to raise <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>).</p>
 <p>If <em>skipkeys</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt> (the default), then it is a <tt class="xref docutils literal"><span class="pre">TypeError</span></tt> to
@@ -377,8 +377,8 @@ available.  For example:</p>
 <div class="highlight"><pre><span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">JSONEncoder</span><span class="p">()</span><span class="o">.</span><span class="n">iterencode</span><span class="p">(</span><span class="n">bigobject</span><span class="p">):</span>
     <span class="n">mysocket</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
 </pre></div>
-<p>Note that <a title="simplejson.JSONEncoder.encode" class="reference" href="#simplejson.JSONEncoder.encode"><tt class="xref docutils literal"><span class="pre">encode()</span></tt></a> has much better performance than
-<a title="simplejson.JSONEncoder.iterencode" class="reference" href="#simplejson.JSONEncoder.iterencode"><tt class="xref docutils literal"><span class="pre">iterencode()</span></tt></a>.</p>
+<p>Note that <a title="simplejson.JSONEncoder.encode" class="reference internal" href="#simplejson.JSONEncoder.encode"><tt class="xref docutils literal"><span class="pre">encode()</span></tt></a> has much better performance than
+<a title="simplejson.JSONEncoder.iterencode" class="reference internal" href="#simplejson.JSONEncoder.iterencode"><tt class="xref docutils literal"><span class="pre">iterencode()</span></tt></a>.</p>
 </dd></dl>
 
 </dd></dl>
@@ -394,9 +394,9 @@ available.  For example:</p>
         <div class="sphinxsidebarwrapper">
             <h3>Table Of Contents</h3>
             <ul>
-<li><a class="reference" href=""><tt class="docutils literal"><span class="pre">simplejson</span></tt> &#8212; JSON encoder and decoder</a><ul>
-<li><a class="reference" href="#basic-usage">Basic Usage</a></li>
-<li><a class="reference" href="#encoders-and-decoders">Encoders and decoders</a></li>
+<li><a class="reference external" href=""><tt class="docutils literal"><span class="pre">simplejson</span></tt> &#8212; JSON encoder and decoder</a><ul>
+<li><a class="reference external" href="#basic-usage">Basic Usage</a></li>
+<li><a class="reference external" href="#encoders-and-decoders">Encoders and decoders</a></li>
 </ul>
 </li>
 </ul>
@@ -421,12 +421,12 @@ available.  For example:</p>
         <li class="right" style="margin-right: 10px">
           <a href="genindex.html" title="General Index"
              accesskey="I">index</a></li>
-        <li><a href="">simlejson v2.0.0 documentation</a> &raquo;</li>
+        <li><a href="">simplejson v2.0.0 documentation</a> &raquo;</li>
       </ul>
     </div>
     <div class="footer">
       &copy; Copyright 2008, Bob Ippolito.
-      Last updated on Sep 27, 2008.
+      Last updated on Nov 07, 2008.
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
     </div>
   </body>
