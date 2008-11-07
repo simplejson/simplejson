@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# simlejson documentation build configuration file, created by
+# simplejson documentation build configuration file, created by
 # sphinx-quickstart on Fri Sep 26 18:58:30 2008.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -35,7 +35,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General substitutions.
-project = 'simlejson'
+project = 'simplejson'
 copyright = '2008, Bob Ippolito'
 
 # The default replacements for |version| and |release|, also used in various
@@ -142,7 +142,7 @@ html_use_modindex = False
 html_file_suffix = '.html'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'simlejsondoc'
+htmlhelp_basename = 'simplejsondoc'
 
 
 # Options for LaTeX output
@@ -157,7 +157,7 @@ htmlhelp_basename = 'simlejsondoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, document class [howto/manual]).
 latex_documents = [
-  ('index', 'simlejson.tex', 'simlejson Documentation',
+  ('index', 'simplejson.tex', 'simplejson Documentation',
    'Bob Ippolito', 'manual'),
 ]
 
