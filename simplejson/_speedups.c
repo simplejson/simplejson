@@ -1778,21 +1778,21 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         }
         newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
         if (newobj == NULL) {
-            Py_DECREF(ident);
+            Py_XDECREF(ident);
             return -1;
         }
         rv = encoder_listencode_obj(s, rval, newobj, indent_level);
         Py_DECREF(newobj);
         if (rv) {
-            Py_DECREF(ident);
+            Py_XDECREF(ident);
             return -1;
         }
         if (ident != NULL) {
             if (PyDict_DelItem(s->markers, ident)) {
-                Py_DECREF(ident);
+                Py_XDECREF(ident);
                 return -1;
             }
-            Py_DECREF(ident);
+            Py_XDECREF(ident);
         }
         return rv;
     }
