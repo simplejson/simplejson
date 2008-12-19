@@ -54,6 +54,14 @@ speedups = Feature(
     ],
 )
 
+if sys.platform == 'win32' and sys.version_info > (2, 6):
+   # 2.6's distutils.msvc9compiler can raise an IOError when failing to
+   # find the compiler
+   ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError,
+                 IOError)
+else:
+   ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError)
+
 class BuildFailed(Exception):
     pass
 
@@ -69,7 +77,7 @@ class ve_build_ext(build_ext):
     def build_extension(self, ext):
         try:
             build_ext.build_extension(self, ext)
-        except (CCompilerError, DistutilsExecError), x:
+        except ext_errors, x:
             raise BuildFailed()
 
 def run_setup(with_binary):
