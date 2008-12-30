@@ -168,14 +168,16 @@ will be used instead of the default <tt class="docutils literal"><span class="pr
 <p>To use a custom <a title="simplejson.JSONEncoder" class="reference internal" href="#simplejson.JSONEncoder"><tt class="xref docutils literal"><span class="pre">JSONEncoder</span></tt></a> subclass (e.g. one that overrides the
 <tt class="xref docutils literal"><span class="pre">default()</span></tt> method to serialize additional types), specify it with the
 <em>cls</em> kwarg.</p>
-</dd></dl>
-
+<blockquote>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">JSON is not a framed protocol so unlike <tt class="xref docutils literal"><span class="pre">pickle</span></tt> or <tt class="xref docutils literal"><span class="pre">marshal</span></tt> it
 does not make sense to serialize more than one JSON document without some
 container protocol to delimit them.</p>
 </div>
+</blockquote>
+</dd></dl>
+
 <dl class="function">
 <dt id="simplejson.dumps">
 <!--[simplejson.dumps]--><tt class="descclassname">simplejson.</tt><tt class="descname">dumps</tt><big>(</big><em>obj</em><span class="optional">[</span>, <em>skipkeys</em><span class="optional">[</span>, <em>ensure_ascii</em><span class="optional">[</span>, <em>check_circular</em><span class="optional">[</span>, <em>allow_nan</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>indent</em><span class="optional">[</span>, <em>separators</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>default</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.dumps" title="Permalink to this definition">¶</a></dt>
@@ -215,8 +217,7 @@ raise an exception if invalid JSON numbers are encountered.</p>
 <p>To use a custom <a title="simplejson.JSONDecoder" class="reference internal" href="#simplejson.JSONDecoder"><tt class="xref docutils literal"><span class="pre">JSONDecoder</span></tt></a> subclass, specify it with the <tt class="docutils literal"><span class="pre">cls</span></tt>
 kwarg.  Additional keyword arguments will be passed to the constructor of the
 class.</p>
-</dd></dl>
-
+<blockquote>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last"><a title="simplejson.load" class="reference internal" href="#simplejson.load"><tt class="xref docutils literal"><span class="pre">load()</span></tt></a> will read the rest of the file-like object as a string and
@@ -225,6 +226,9 @@ JSON document it finds and it will raise an error if there is anything
 other than whitespace after the document. Except for files containing
 only one JSON document, it is recommended to use <a title="simplejson.loads" class="reference internal" href="#simplejson.loads"><tt class="xref docutils literal"><span class="pre">loads()</span></tt></a>.</p>
 </div>
+</blockquote>
+</dd></dl>
+
 <dl class="function">
 <dt id="simplejson.loads">
 <!--[simplejson.loads]--><tt class="descclassname">simplejson.</tt><tt class="descname">loads</tt><big>(</big><em>s</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.loads" title="Permalink to this definition">¶</a></dt>
@@ -304,6 +308,10 @@ be used to use another datatype or parser for JSON integers
 <p><em>parse_constant</em>, if specified, will be called with one of the following
 strings: <tt class="docutils literal"><span class="pre">'-Infinity'</span></tt>, <tt class="docutils literal"><span class="pre">'Infinity'</span></tt>, <tt class="docutils literal"><span class="pre">'NaN'</span></tt>.  This can be used to
 raise an exception if invalid JSON numbers are encountered.</p>
+<p><em>strict</em> controls the parser&#8217;s behavior when it encounters an invalid
+control character in a string. The default setting of <tt class="xref docutils literal"><span class="pre">True</span></tt> means that
+unescaped control characters are parse errors, if <tt class="xref docutils literal"><span class="pre">False</span></tt> then control
+characters will be allowed in strings.</p>
 <dl class="method">
 <dt id="simplejson.JSONDecoder.decode">
 <!--[simplejson.JSONDecoder.decode]--><tt class="descname">decode</tt><big>(</big><em>s</em><big>)</big><a class="headerlink" href="#simplejson.JSONDecoder.decode" title="Permalink to this definition">¶</a></dt>

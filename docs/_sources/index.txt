@@ -160,11 +160,11 @@ Basic Usage
    :meth:`default` method to serialize additional types), specify it with the
    *cls* kwarg.
 
-.. note::
+    .. note::
 
-    JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
-    does not make sense to serialize more than one JSON document without some
-    container protocol to delimit them.
+        JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
+        does not make sense to serialize more than one JSON document without some
+        container protocol to delimit them.
 
 
 .. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, **kw]]]]]]]]]])
@@ -212,13 +212,13 @@ Basic Usage
    kwarg.  Additional keyword arguments will be passed to the constructor of the
    class.
 
-.. note::
+    .. note::
 
-    :func:`load` will read the rest of the file-like object as a string and
-    then call :func:`loads`. It does not stop at the end of the first valid
-    JSON document it finds and it will raise an error if there is anything
-    other than whitespace after the document. Except for files containing
-    only one JSON document, it is recommended to use :func:`loads`.
+        :func:`load` will read the rest of the file-like object as a string and
+        then call :func:`loads`. It does not stop at the end of the first valid
+        JSON document it finds and it will raise an error if there is anything
+        other than whitespace after the document. Except for files containing
+        only one JSON document, it is recommended to use :func:`loads`.
 
 
 .. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, **kw]]]]]]])
@@ -292,6 +292,10 @@ Encoders and decoders
    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
    raise an exception if invalid JSON numbers are encountered.
 
+   *strict* controls the parser's behavior when it encounters an invalid
+   control character in a string. The default setting of ``True`` means that
+   unescaped control characters are parse errors, if ``False`` then control
+   characters will be allowed in strings.
 
    .. method:: decode(s)
 

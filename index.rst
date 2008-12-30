@@ -292,6 +292,10 @@ Encoders and decoders
    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
    raise an exception if invalid JSON numbers are encountered.
 
+   *strict* controls the parser's behavior when it encounters an invalid
+   control character in a string. The default setting of ``True`` means that
+   unescaped control characters are parse errors, if ``False`` then control
+   characters will be allowed in strings.
 
    .. method:: decode(s)
 
