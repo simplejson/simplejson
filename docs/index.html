@@ -165,11 +165,17 @@ will be used instead of the default <tt class="docutils literal"><span class="pr
 <p><em>encoding</em> is the character encoding for str instances, default is UTF-8.</p>
 <p><em>default(obj)</em> is a function that should return a serializable version of
 <em>obj</em> or raise <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.  The default simply raises <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.</p>
-<p>To use a custom <tt class="xref docutils literal"><span class="pre">JSONEncoder`</span></tt> subclass (e.g. one that overrides the
+<p>To use a custom <a title="simplejson.JSONEncoder" class="reference internal" href="#simplejson.JSONEncoder"><tt class="xref docutils literal"><span class="pre">JSONEncoder</span></tt></a> subclass (e.g. one that overrides the
 <tt class="xref docutils literal"><span class="pre">default()</span></tt> method to serialize additional types), specify it with the
 <em>cls</em> kwarg.</p>
 </dd></dl>
 
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">JSON is not a framed protocol so unlike <tt class="xref docutils literal"><span class="pre">pickle</span></tt> or <tt class="xref docutils literal"><span class="pre">marshal</span></tt> it
+does not make sense to serialize more than one JSON document without some
+container protocol to delimit them.</p>
+</div>
 <dl class="function">
 <dt id="simplejson.dumps">
 <!--[simplejson.dumps]--><tt class="descclassname">simplejson.</tt><tt class="descname">dumps</tt><big>(</big><em>obj</em><span class="optional">[</span>, <em>skipkeys</em><span class="optional">[</span>, <em>ensure_ascii</em><span class="optional">[</span>, <em>check_circular</em><span class="optional">[</span>, <em>allow_nan</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>indent</em><span class="optional">[</span>, <em>separators</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>default</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.dumps" title="Permalink to this definition">¶</a></dt>
@@ -178,6 +184,57 @@ will be used instead of the default <tt class="docutils literal"><span class="pr
 <tt class="xref docutils literal"><span class="pre">unicode</span></tt> instance.  The other arguments have the same meaning as in
 <a title="simplejson.dump" class="reference internal" href="#simplejson.dump"><tt class="xref docutils literal"><span class="pre">dump()</span></tt></a>. Note that the default <em>ensure_ascii</em> setting has much
 better performance.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="simplejson.load">
+<!--[simplejson.load]--><tt class="descclassname">simplejson.</tt><tt class="descname">load</tt><big>(</big><em>fp</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.load" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deserialize <em>fp</em> (a <tt class="docutils literal"><span class="pre">.read()</span></tt>-supporting file-like object containing a JSON
+document) to a Python object.</p>
+<p>If the contents of <em>fp</em> are encoded with an ASCII based encoding other than
+UTF-8 (e.g. latin-1), then an appropriate <em>encoding</em> name must be specified.
+Encodings that are not ASCII based (such as UCS-2) are not allowed, and
+should be wrapped with <tt class="docutils literal"><span class="pre">codecs.getreader(fp)(encoding)</span></tt>, or simply decoded
+to a <tt class="xref docutils literal"><span class="pre">unicode</span></tt> object and passed to <a title="simplejson.loads" class="reference internal" href="#simplejson.loads"><tt class="xref docutils literal"><span class="pre">loads()</span></tt></a>. The default
+setting of <tt class="docutils literal"><span class="pre">'utf-8'</span></tt> is fastest and should be using whenever possible.</p>
+<p><em>object_hook</em> is an optional function that will be called with the result of
+any object literal decode (a <tt class="xref docutils literal"><span class="pre">dict</span></tt>).  The return value of
+<em>object_hook</em> will be used instead of the <tt class="xref docutils literal"><span class="pre">dict</span></tt>.  This feature can be used
+to implement custom decoders (e.g. JSON-RPC class hinting).</p>
+<p><em>parse_float</em>, if specified, will be called with the string of every JSON
+float to be decoded.  By default, this is equivalent to <tt class="docutils literal"><span class="pre">float(num_str)</span></tt>.
+This can be used to use another datatype or parser for JSON floats
+(e.g. <tt class="xref docutils literal"><span class="pre">decimal.Decimal</span></tt>).</p>
+<p><em>parse_int</em>, if specified, will be called with the string of every JSON int
+to be decoded.  By default, this is equivalent to <tt class="docutils literal"><span class="pre">int(num_str)</span></tt>.  This can
+be used to use another datatype or parser for JSON integers
+(e.g. <tt class="xref docutils literal"><span class="pre">float</span></tt>).</p>
+<p><em>parse_constant</em>, if specified, will be called with one of the following
+strings: <tt class="docutils literal"><span class="pre">'-Infinity'</span></tt>, <tt class="docutils literal"><span class="pre">'Infinity'</span></tt>, <tt class="docutils literal"><span class="pre">'NaN'</span></tt>.  This can be used to
+raise an exception if invalid JSON numbers are encountered.</p>
+<p>To use a custom <a title="simplejson.JSONDecoder" class="reference internal" href="#simplejson.JSONDecoder"><tt class="xref docutils literal"><span class="pre">JSONDecoder</span></tt></a> subclass, specify it with the <tt class="docutils literal"><span class="pre">cls</span></tt>
+kwarg.  Additional keyword arguments will be passed to the constructor of the
+class.</p>
+</dd></dl>
+
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last"><a title="simplejson.load" class="reference internal" href="#simplejson.load"><tt class="xref docutils literal"><span class="pre">load()</span></tt></a> will read the rest of the file-like object as a string and
+then call <a title="simplejson.loads" class="reference internal" href="#simplejson.loads"><tt class="xref docutils literal"><span class="pre">loads()</span></tt></a>. It does not stop at the end of the first valid
+JSON document it finds and it will raise an error if there is anything
+other than whitespace after the document. Except for files containing
+only one JSON document, it is recommended to use <a title="simplejson.loads" class="reference internal" href="#simplejson.loads"><tt class="xref docutils literal"><span class="pre">loads()</span></tt></a>.</p>
+</div>
+<dl class="function">
+<dt id="simplejson.loads">
+<!--[simplejson.loads]--><tt class="descclassname">simplejson.</tt><tt class="descname">loads</tt><big>(</big><em>s</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.loads" title="Permalink to this definition">¶</a></dt>
+<dd><p>Deserialize <em>s</em> (a <tt class="xref docutils literal"><span class="pre">str</span></tt> or <tt class="xref docutils literal"><span class="pre">unicode</span></tt> instance containing a JSON
+document) to a Python object.</p>
+<p>If <em>s</em> is a <tt class="xref docutils literal"><span class="pre">str</span></tt> instance and is encoded with an ASCII based encoding
+other than UTF-8 (e.g. latin-1), then an appropriate <em>encoding</em> name must be
+specified.  Encodings that are not ASCII based (such as UCS-2) are not
+allowed and should be decoded to <tt class="xref docutils literal"><span class="pre">unicode</span></tt> first.</p>
+<p>The other arguments have the same meaning as in <a title="simplejson.dump" class="reference internal" href="#simplejson.dump"><tt class="xref docutils literal"><span class="pre">dump()</span></tt></a>.</p>
 </dd></dl>
 
 </div>
@@ -426,7 +483,7 @@ available.  For example:</p>
     </div>
     <div class="footer">
       &copy; Copyright 2008, Bob Ippolito.
-      Last updated on Nov 07, 2008.
+      Last updated on Dec 30, 2008.
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
     </div>
   </body>

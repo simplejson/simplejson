@@ -1,91 +1,93 @@
-r"""A simple, fast, extensible JSON encoder and decoder
-
-JSON (JavaScript Object Notation) <http://json.org> is a subset of
+r"""JSON (JavaScript Object Notation) <http://json.org> is a subset of
 JavaScript syntax (ECMA-262 3rd edition) used as a lightweight data
 interchange format.
 
-simplejson exposes an API familiar to uses of the standard library
-marshal and pickle modules.
+:mod:`simplejson` exposes an API familiar to users of the standard library
+:mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
+version of the :mod:`json` library contained in Python 2.6, but maintains
+compatibility with Python 2.4 and Python 2.5 and (currently) has
+significant performance advantages, even without using the optional C
+extension for speedups.
 
 Encoding basic Python object hierarchies::
 
-    >>> import simplejson
-    >>> simplejson.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
+    >>> import simplejson as json
+    >>> json.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
     '["foo", {"bar": ["baz", null, 1.0, 2]}]'
-    >>> print simplejson.dumps("\"foo\bar")
+    >>> print json.dumps("\"foo\bar")
     "\"foo\bar"
-    >>> print simplejson.dumps(u'\u1234')
+    >>> print json.dumps(u'\u1234')
     "\u1234"
-    >>> print simplejson.dumps('\\')
+    >>> print json.dumps('\\')
     "\\"
-    >>> print simplejson.dumps({"c": 0, "b": 0, "a": 0}, sort_keys=True)
+    >>> print json.dumps({"c": 0, "b": 0, "a": 0}, sort_keys=True)
     {"a": 0, "b": 0, "c": 0}
     >>> from StringIO import StringIO
     >>> io = StringIO()
-    >>> simplejson.dump(['streaming API'], io)
+    >>> json.dump(['streaming API'], io)
     >>> io.getvalue()
     '["streaming API"]'
 
 Compact encoding::
 
-    >>> import simplejson
-    >>> compact = simplejson.dumps([1,2,3,{'4': 5, '6': 7}], separators=(',',':'))
-    >>> # Can't assume dict ordering
-    >>> compact in ('[1,2,3,{"4":5,"6":7}]', '[1,2,3,{"6":7,"4":5}]')
-    True
+    >>> import simplejson as json
+    >>> json.dumps([1,2,3,{'4': 5, '6': 7}], separators=(',',':'))
+    '[1,2,3,{"4":5,"6":7}]'
 
-Pretty printing (using repr() because of extraneous whitespace in the output)::
+Pretty printing::
 
-    >>> import simplejson
-    >>> print repr(simplejson.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4))
-    '{\n    "4": 5, \n    "6": 7\n}'
+    >>> import simplejson as json
+    >>> print json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4)
+    {
+        "4": 5,
+        "6": 7
+    }
 
 Decoding JSON::
 
-    >>> import simplejson
-    >>> simplejson.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == ["foo", {"bar":["baz", None, 1.0, 2]}]
+    >>> import simplejson as json
+    >>> obj = [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
+    >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == obj
     True
-    >>> simplejson.loads('"\\"foo\\bar"') == '"foo\x08ar'
+    >>> json.loads('"\\"foo\\bar"') == u'"foo\x08ar'
     True
     >>> from StringIO import StringIO
     >>> io = StringIO('["streaming API"]')
-    >>> simplejson.load(io) == ["streaming API"]
+    >>> json.load(io)[0] == 'streaming API'
     True
 
 Specializing JSON object decoding::
 
-    >>> import simplejson
+    >>> import simplejson as json
     >>> def as_complex(dct):
     ...     if '__complex__' in dct:
     ...         return complex(dct['real'], dct['imag'])
     ...     return dct
     ...
-    >>> simplejson.loads('{"__complex__": true, "real": 1, "imag": 2}',
+    >>> json.loads('{"__complex__": true, "real": 1, "imag": 2}',
     ...     object_hook=as_complex)
     (1+2j)
-    >>> from decimal import Decimal
-    >>> simplejson.loads('1.1', parse_float=Decimal) == Decimal("1.1")
+    >>> import decimal
+    >>> json.loads('1.1', parse_float=decimal.Decimal) == decimal.Decimal('1.1')
     True
 
-Extending JSONEncoder::
+Specializing JSON object encoding::
 
-    >>> import simplejson
-    >>> class ComplexEncoder(simplejson.JSONEncoder):
-    ...     def default(self, obj):
-    ...         if isinstance(obj, complex):
-    ...             return [obj.real, obj.imag]
-    ...         return simplejson.JSONEncoder.default(self, obj)
+    >>> import simplejson as json
+    >>> def encode_complex(obj):
+    ...     if isinstance(obj, complex):
+    ...         return [obj.real, obj.imag]
+    ...     raise TypeError("%r is not JSON serializable" % (o,))
     ...
-    >>> dumps(2 + 1j, cls=ComplexEncoder)
+    >>> json.dumps(2 + 1j, default=encode_complex)
     '[2.0, 1.0]'
-    >>> ComplexEncoder().encode(2 + 1j)
+    >>> json.JSONEncoder(default=encode_complex).encode(2 + 1j)
     '[2.0, 1.0]'
-    >>> ''.join(ComplexEncoder().iterencode(2 + 1j))
+    >>> ''.join(json.JSONEncoder(default=encode_complex).iterencode(2 + 1j))
     '[2.0, 1.0]'
 
 
-Using simplejson from the shell to validate and
-pretty-print::
+Using simplejson.tool from the shell to validate and pretty-print::
 
     $ echo '{"json":"obj"}' | python -msimplejson.tool
     {
@@ -94,7 +96,7 @@ pretty-print::
     $ echo '{ 1.2:3.4}' | python -msimplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
-__version__ = '2.0.6'
+__version__ = '2.0.7'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONEncoder',
