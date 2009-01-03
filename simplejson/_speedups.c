@@ -337,6 +337,23 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
 }
 
 static PyObject *
+join_list_unicode(PyObject *lst)
+{
+    static PyObject *joinfn = NULL;
+    if (joinfn == NULL) {
+        PyObject *ustr = PyUnicode_FromUnicode(NULL, 0);
+        if (ustr == NULL)
+            return NULL;
+        
+        joinfn = PyObject_GetAttrString(ustr, "join");
+        Py_DECREF(ustr);
+        if (joinfn == NULL)
+            return NULL;
+    }
+    return PyObject_CallFunctionObjArgs(joinfn, lst, NULL);
+}
+
+static PyObject *
 join_list_string(PyObject *lst)
 {
     static PyObject *joinfn = NULL;
@@ -733,7 +750,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
         Py_DECREF(chunk);
     }
 
-    rval = join_list_string(chunks);
+    rval = join_list_unicode(chunks);
     if (rval == NULL) {
         goto bail;
     }

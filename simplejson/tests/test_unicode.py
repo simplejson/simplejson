@@ -57,3 +57,8 @@ class TestUnicode(TestCase):
     def test_default_encoding(self):
         self.assertEquals(S.loads(u'{"a": "\xe9"}'.encode('utf-8')),
             {'a': u'\xe9'})
+
+    def test_unicode_preservation(self):
+        self.assertEquals(type(S.loads(u'""')), unicode)
+        self.assertEquals(type(S.loads(u'"a"')), unicode)
+        self.assertEquals(type(S.loads(u'["a"]')[0]), unicode)
