@@ -40,6 +40,9 @@ def encode_basestring(s):
 
 
 def py_encode_basestring_ascii(s):
+    """Return an ASCII-only JSON representation of a Python string
+
+    """
     if isinstance(s, str) and HAS_UTF8.search(s) is not None:
         s = s.decode('utf-8')
     def replace(match):
