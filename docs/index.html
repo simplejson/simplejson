@@ -72,7 +72,8 @@ extension for speedups.</p>
 </pre></div>
 <p>Pretty printing:</p>
 <div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">import</span> <span class="nn">simplejson</span> <span class="k">as</span> <span class="nn">json</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s">&#39;4&#39;</span><span class="p">:</span> <span class="mf">5</span><span class="p">,</span> <span class="s">&#39;6&#39;</span><span class="p">:</span> <span class="mf">7</span><span class="p">},</span> <span class="n">sort_keys</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mf">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s">&#39;4&#39;</span><span class="p">:</span> <span class="mf">5</span><span class="p">,</span> <span class="s">&#39;6&#39;</span><span class="p">:</span> <span class="mf">7</span><span class="p">},</span> <span class="n">sort_keys</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mf">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">l</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span>  <span class="n">s</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()])</span>
 <span class="go">{</span>
 <span class="go">    &quot;4&quot;: 5,</span>
 <span class="go">    &quot;6&quot;: 7</span>
@@ -491,7 +492,7 @@ available.  For example:</p>
     </div>
     <div class="footer">
       &copy; Copyright 2008, Bob Ippolito.
-      Last updated on Dec 30, 2008.
+      Last updated on Jan 04, 2009.
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
     </div>
   </body>
