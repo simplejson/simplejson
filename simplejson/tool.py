@@ -24,7 +24,7 @@ def main():
         infile = open(sys.argv[1], 'rb')
         outfile = open(sys.argv[2], 'wb')
     else:
-        raise SystemExit("%s [infile [outfile]]" % (sys.argv[0],))
+        raise SystemExit(sys.argv[0] + " [infile [outfile]]")
     try:
         obj = simplejson.load(infile)
     except ValueError, e:

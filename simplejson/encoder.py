@@ -171,7 +171,7 @@ class JSONEncoder(object):
                 return JSONEncoder.default(self, o)
 
         """
-        raise TypeError("%r is not JSON serializable" % (o,))
+        raise TypeError(repr(o) + " is not JSON serializable")
 
     def encode(self, o):
         """Return a JSON string representation of a Python data structure.
@@ -237,8 +237,9 @@ class JSONEncoder(object):
                 return _repr(o)
 
             if not allow_nan:
-                raise ValueError("Out of range float values are not JSON compliant: %r"
-                    % (o,))
+                raise ValueError(
+                    "Out of range float values are not JSON compliant: " +
+                    repr(o))
 
             return text
 
@@ -367,7 +368,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separ
             elif _skipkeys:
                 continue
             else:
-                raise TypeError("key %r is not a string" % (key,))
+                raise TypeError("key " + repr(key) + " is not a string")
             if first:
                 first = False
             else:
