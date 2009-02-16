@@ -97,7 +97,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     $ echo '{ 1.2:3.4}' | python -msimplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
-__version__ = '2.0.7'
+__version__ = '2.0.8'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONEncoder',
@@ -123,21 +123,21 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
-    If ``skipkeys`` is ``True`` then ``dict`` keys that are not basic types
+    If ``skipkeys`` is true then ``dict`` keys that are not basic types
     (``str``, ``unicode``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
 
-    If ``ensure_ascii`` is ``False``, then the some chunks written to ``fp``
+    If ``ensure_ascii`` is false, then the some chunks written to ``fp``
     may be ``unicode`` instances, subject to normal Python ``str`` to
     ``unicode`` coercion rules. Unless ``fp.write()`` explicitly
     understands ``unicode`` (as in ``codecs.getwriter()``) this is likely
     to cause an error.
 
-    If ``check_circular`` is ``False``, then the circular reference check
+    If ``check_circular`` is false, then the circular reference check
     for container types will be skipped and a circular reference will
     result in an ``OverflowError`` (or worse).
 
-    If ``allow_nan`` is ``False``, then it will be a ``ValueError`` to
+    If ``allow_nan`` is false, then it will be a ``ValueError`` to
     serialize out of range ``float`` values (``nan``, ``inf``, ``-inf``)
     in strict compliance of the JSON specification, instead of using the
     JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``).
@@ -161,8 +161,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
 
     """
     # cached encoder
-    if (skipkeys is False and ensure_ascii is True and
-        check_circular is True and allow_nan is True and
+    if (not skipkeys and ensure_ascii and
+        check_circular and allow_nan and
         cls is None and indent is None and separators is None and
         encoding == 'utf-8' and default is None and not kw):
         iterable = _default_encoder.iterencode(obj)
@@ -184,19 +184,19 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding='utf-8', default=None, **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
-    If ``skipkeys`` is ``True`` then ``dict`` keys that are not basic types
+    If ``skipkeys`` is false then ``dict`` keys that are not basic types
     (``str``, ``unicode``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
 
-    If ``ensure_ascii`` is ``False``, then the return value will be a
+    If ``ensure_ascii`` is false, then the return value will be a
     ``unicode`` instance subject to normal Python ``str`` to ``unicode``
     coercion rules instead of being escaped to an ASCII ``str``.
 
-    If ``check_circular`` is ``False``, then the circular reference check
+    If ``check_circular`` is false, then the circular reference check
     for container types will be skipped and a circular reference will
     result in an ``OverflowError`` (or worse).
 
-    If ``allow_nan`` is ``False``, then it will be a ``ValueError`` to
+    If ``allow_nan`` is false, then it will be a ``ValueError`` to
     serialize out of range ``float`` values (``nan``, ``inf``, ``-inf``) in
     strict compliance of the JSON specification, instead of using the
     JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``).
@@ -221,8 +221,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
 
     """
     # cached encoder
-    if (skipkeys is False and ensure_ascii is True and
-        check_circular is True and allow_nan is True and
+    if (not skipkeys and ensure_ascii and
+        check_circular and allow_nan and
         cls is None and indent is None and separators is None and
         encoding == 'utf-8' and default is None and not kw):
         return _default_encoder.encode(obj)

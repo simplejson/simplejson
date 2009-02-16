@@ -119,12 +119,12 @@ extension for speedups.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="s">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">encode_complex</span><span class="p">)</span><span class="o">.</span><span class="n">iterencode</span><span class="p">(</span><span class="mf">2</span> <span class="o">+</span> <span class="mf">1</span><span class="n">j</span><span class="p">))</span>
 <span class="go">&#39;[2.0, 1.0]&#39;</span>
 </pre></div>
-<p>Using simplejson.tool from the shell to validate and pretty-print:</p>
-<div class="highlight"><pre>$ echo &#39;{&quot;json&quot;:&quot;obj&quot;}&#39; | python -msimplejson.tool
+<p>Using <tt class="xref docutils literal"><span class="pre">simplejson.tool</span></tt> from the shell to validate and pretty-print:</p>
+<div class="highlight"><pre>$ echo &#39;{&quot;json&quot;:&quot;obj&quot;}&#39; | python -m simplejson.tool
 {
     &quot;json&quot;: &quot;obj&quot;
 }
-$ echo &#39;{ 1.2:3.4}&#39; | python -msimplejson.tool
+$ echo &#39;{ 1.2:3.4}&#39; | python -m simplejson.tool
 Expecting property name: line 1 column 2 (char 2)
 </pre></div>
 <div class="admonition note">
@@ -139,33 +139,37 @@ YAML, so it may be used as a serializer for that as well.</p>
 <!--[simplejson.dump]--><tt class="descclassname">simplejson.</tt><tt class="descname">dump</tt><big>(</big><em>obj</em>, <em>fp</em><span class="optional">[</span>, <em>skipkeys</em><span class="optional">[</span>, <em>ensure_ascii</em><span class="optional">[</span>, <em>check_circular</em><span class="optional">[</span>, <em>allow_nan</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>indent</em><span class="optional">[</span>, <em>separators</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>default</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.dump" title="Permalink to this definition">¶</a></dt>
 <dd><p>Serialize <em>obj</em> as a JSON formatted stream to <em>fp</em> (a <tt class="docutils literal"><span class="pre">.write()</span></tt>-supporting
 file-like object).</p>
-<p>If <em>skipkeys</em> is <tt class="xref docutils literal"><span class="pre">True</span></tt> (default: <tt class="xref docutils literal"><span class="pre">False</span></tt>), then dict keys that are not
+<p>If <em>skipkeys</em> is true (default: <tt class="xref docutils literal"><span class="pre">False</span></tt>), then dict keys that are not
 of a basic type (<tt class="xref docutils literal"><span class="pre">str</span></tt>, <tt class="xref docutils literal"><span class="pre">unicode</span></tt>, <tt class="xref docutils literal"><span class="pre">int</span></tt>, <tt class="xref docutils literal"><span class="pre">long</span></tt>,
 <tt class="xref docutils literal"><span class="pre">float</span></tt>, <tt class="xref docutils literal"><span class="pre">bool</span></tt>, <tt class="xref docutils literal"><span class="pre">None</span></tt>) will be skipped instead of raising a
 <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.</p>
-<p>If <em>ensure_ascii</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt> (default: <tt class="xref docutils literal"><span class="pre">True</span></tt>), then some chunks written
+<p>If <em>ensure_ascii</em> is false (default: <tt class="xref docutils literal"><span class="pre">True</span></tt>), then some chunks written
 to <em>fp</em> may be <tt class="xref docutils literal"><span class="pre">unicode</span></tt> instances, subject to normal Python
 <tt class="xref docutils literal"><span class="pre">str</span></tt> to <tt class="xref docutils literal"><span class="pre">unicode</span></tt> coercion rules.  Unless <tt class="docutils literal"><span class="pre">fp.write()</span></tt>
 explicitly understands <tt class="xref docutils literal"><span class="pre">unicode</span></tt> (as in <tt class="xref docutils literal"><span class="pre">codecs.getwriter()</span></tt>) this
 is likely to cause an error. It&#8217;s best to leave the default settings, because
 they are safe and it is highly optimized.</p>
-<p>If <em>check_circular</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt> (default: <tt class="xref docutils literal"><span class="pre">True</span></tt>), then the circular
+<p>If <em>check_circular</em> is false (default: <tt class="xref docutils literal"><span class="pre">True</span></tt>), then the circular
 reference check for container types will be skipped and a circular reference
 will result in an <tt class="xref docutils literal"><span class="pre">OverflowError</span></tt> (or worse).</p>
-<p>If <em>allow_nan</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt> (default: <tt class="xref docutils literal"><span class="pre">True</span></tt>), then it will be a
+<p>If <em>allow_nan</em> is false (default: <tt class="xref docutils literal"><span class="pre">True</span></tt>), then it will be a
 <tt class="xref docutils literal"><span class="pre">ValueError</span></tt> to serialize out of range <tt class="xref docutils literal"><span class="pre">float</span></tt> values (<tt class="docutils literal"><span class="pre">nan</span></tt>,
-<tt class="docutils literal"><span class="pre">inf</span></tt>, <tt class="docutils literal"><span class="pre">-inf</span></tt>) in strict compliance of the JSON specification, instead of
-using the JavaScript equivalents (<tt class="docutils literal"><span class="pre">NaN</span></tt>, <tt class="docutils literal"><span class="pre">Infinity</span></tt>, <tt class="docutils literal"><span class="pre">-Infinity</span></tt>).</p>
+<tt class="docutils literal"><span class="pre">inf</span></tt>, <tt class="docutils literal"><span class="pre">-inf</span></tt>) in strict compliance of the JSON specification.
+If <em>allow_nan</em> is true, their JavaScript equivalents will be used
+(<tt class="docutils literal"><span class="pre">NaN</span></tt>, <tt class="docutils literal"><span class="pre">Infinity</span></tt>, <tt class="docutils literal"><span class="pre">-Infinity</span></tt>).</p>
 <p>If <em>indent</em> is a non-negative integer, then JSON array elements and object
 members will be pretty-printed with that indent level.  An indent level of 0
 will only insert newlines.  <tt class="xref docutils literal"><span class="pre">None</span></tt> (the default) selects the most compact
 representation.</p>
-<p>If <em>separators</em> is an <tt class="docutils literal"><span class="pre">(item_separator,</span> <span class="pre">dict_separator)</span></tt> tuple, then it
-will be used instead of the default <tt class="docutils literal"><span class="pre">(',</span> <span class="pre">',</span> <span class="pre">':</span> <span class="pre">')</span></tt> separators.  <tt class="docutils literal"><span class="pre">(',',</span>
-<span class="pre">':')</span></tt> is the most compact JSON representation.</p>
-<p><em>encoding</em> is the character encoding for str instances, default is UTF-8.</p>
-<p><em>default(obj)</em> is a function that should return a serializable version of
-<em>obj</em> or raise <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.  The default simply raises <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.</p>
+<p>If specified, <em>separators</em> should be an <tt class="docutils literal"><span class="pre">(item_separator,</span> <span class="pre">dict_separator)</span></tt>
+tuple.  By default, <tt class="docutils literal"><span class="pre">(',</span> <span class="pre">',</span> <span class="pre">':</span> <span class="pre">')</span></tt> are used.  To get the most compact JSON
+representation, you should specify <tt class="docutils literal"><span class="pre">(',',</span> <span class="pre">':')</span></tt> to eliminate whitespace.</p>
+<p><em>encoding</em> is the character encoding for str instances, default is
+<tt class="docutils literal"><span class="pre">'utf-8'</span></tt>.</p>
+<p>If specified, <em>default</em> should be a function that gets called for objects
+that can&#8217;t otherwise be serialized.  It should return a JSON encodable
+version of the object or raise a <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.  If not specified,
+<tt class="xref docutils literal"><span class="pre">TypeError</span></tt> is always raised in those cases.</p>
 <p>To use a custom <a title="simplejson.JSONEncoder" class="reference internal" href="#simplejson.JSONEncoder"><tt class="xref docutils literal"><span class="pre">JSONEncoder</span></tt></a> subclass (e.g. one that overrides the
 <tt class="xref docutils literal"><span class="pre">default()</span></tt> method to serialize additional types), specify it with the
 <em>cls</em> kwarg.</p>
@@ -183,7 +187,7 @@ container protocol to delimit them.</p>
 <dt id="simplejson.dumps">
 <!--[simplejson.dumps]--><tt class="descclassname">simplejson.</tt><tt class="descname">dumps</tt><big>(</big><em>obj</em><span class="optional">[</span>, <em>skipkeys</em><span class="optional">[</span>, <em>ensure_ascii</em><span class="optional">[</span>, <em>check_circular</em><span class="optional">[</span>, <em>allow_nan</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>indent</em><span class="optional">[</span>, <em>separators</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>default</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.dumps" title="Permalink to this definition">¶</a></dt>
 <dd><p>Serialize <em>obj</em> to a JSON formatted <tt class="xref docutils literal"><span class="pre">str</span></tt>.</p>
-<p>If <em>ensure_ascii</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt>, then the return value will be a
+<p>If <em>ensure_ascii</em> is false, then the return value will be a
 <tt class="xref docutils literal"><span class="pre">unicode</span></tt> instance.  The other arguments have the same meaning as in
 <a title="simplejson.dump" class="reference internal" href="#simplejson.dump"><tt class="xref docutils literal"><span class="pre">dump()</span></tt></a>. Note that the default <em>ensure_ascii</em> setting has much
 better performance.</p>
@@ -239,7 +243,7 @@ document) to a Python object.</p>
 other than UTF-8 (e.g. latin-1), then an appropriate <em>encoding</em> name must be
 specified.  Encodings that are not ASCII based (such as UCS-2) are not
 allowed and should be decoded to <tt class="xref docutils literal"><span class="pre">unicode</span></tt> first.</p>
-<p>The other arguments have the same meaning as in <a title="simplejson.dump" class="reference internal" href="#simplejson.dump"><tt class="xref docutils literal"><span class="pre">dump()</span></tt></a>.</p>
+<p>The other arguments have the same meaning as in <a title="simplejson.load" class="reference internal" href="#simplejson.load"><tt class="xref docutils literal"><span class="pre">load()</span></tt></a>.</p>
 </dd></dl>
 
 </div>
@@ -374,22 +378,22 @@ extraneous data at the end.</p>
 <a title="simplejson.JSONEncoder.default" class="reference internal" href="#simplejson.JSONEncoder.default"><tt class="xref docutils literal"><span class="pre">default()</span></tt></a> method with another method that returns a serializable object
 for <tt class="docutils literal"><span class="pre">o</span></tt> if possible, otherwise it should call the superclass implementation
 (to raise <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>).</p>
-<p>If <em>skipkeys</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt> (the default), then it is a <tt class="xref docutils literal"><span class="pre">TypeError</span></tt> to
+<p>If <em>skipkeys</em> is false (the default), then it is a <tt class="xref docutils literal"><span class="pre">TypeError</span></tt> to
 attempt encoding of keys that are not str, int, long, float or None.  If
-<em>skipkeys</em> is <tt class="xref docutils literal"><span class="pre">True</span></tt>, such items are simply skipped.</p>
-<p>If <em>ensure_ascii</em> is <tt class="xref docutils literal"><span class="pre">True</span></tt> (the default), the output is guaranteed to be
+<em>skipkeys</em> is true, such items are simply skipped.</p>
+<p>If <em>ensure_ascii</em> is true (the default), the output is guaranteed to be
 <tt class="xref docutils literal"><span class="pre">str</span></tt> objects with all incoming unicode characters escaped.  If
-<em>ensure_ascii</em> is <tt class="xref docutils literal"><span class="pre">False</span></tt>, the output will be a unicode object.</p>
-<p>If <em>check_circular</em> is <tt class="xref docutils literal"><span class="pre">True</span></tt> (the default), then lists, dicts, and custom
+<em>ensure_ascii</em> is false, the output will be a unicode object.</p>
+<p>If <em>check_circular</em> is false (the default), then lists, dicts, and custom
 encoded objects will be checked for circular references during encoding to
 prevent an infinite recursion (which would cause an <tt class="xref docutils literal"><span class="pre">OverflowError</span></tt>).
 Otherwise, no such check takes place.</p>
-<p>If <em>allow_nan</em> is <tt class="xref docutils literal"><span class="pre">True</span></tt> (the default), then <tt class="docutils literal"><span class="pre">NaN</span></tt>, <tt class="docutils literal"><span class="pre">Infinity</span></tt>, and
+<p>If <em>allow_nan</em> is true (the default), then <tt class="docutils literal"><span class="pre">NaN</span></tt>, <tt class="docutils literal"><span class="pre">Infinity</span></tt>, and
 <tt class="docutils literal"><span class="pre">-Infinity</span></tt> will be encoded as such.  This behavior is not JSON
 specification compliant, but is consistent with most JavaScript based
 encoders and decoders.  Otherwise, it will be a <tt class="xref docutils literal"><span class="pre">ValueError</span></tt> to encode
 such floats.</p>
-<p>If <em>sort_keys</em> is <tt class="xref docutils literal"><span class="pre">True</span></tt> (the default), then the output of dictionaries
+<p>If <em>sort_keys</em> is true (the default), then the output of dictionaries
 will be sorted by key; this is useful for regression tests to ensure that
 JSON serializations can be compared on a day-to-day basis.</p>
 <p>If <em>indent</em> is a non-negative integer (it is <tt class="xref docutils literal"><span class="pre">None</span></tt> by default), then JSON
@@ -397,11 +401,11 @@ array elements and object members will be pretty-printed with that indent
 level.  An indent level of 0 will only insert newlines.  <tt class="xref docutils literal"><span class="pre">None</span></tt> is the most
 compact representation.</p>
 <p>If specified, <em>separators</em> should be an <tt class="docutils literal"><span class="pre">(item_separator,</span> <span class="pre">key_separator)</span></tt>
-tuple.  The default is <tt class="docutils literal"><span class="pre">(',</span> <span class="pre">',</span> <span class="pre">':</span> <span class="pre">')</span></tt>.  To get the most compact JSON
+tuple.  By default, <tt class="docutils literal"><span class="pre">(',</span> <span class="pre">',</span> <span class="pre">':</span> <span class="pre">')</span></tt> are used.  To get the most compact JSON
 representation, you should specify <tt class="docutils literal"><span class="pre">(',',</span> <span class="pre">':')</span></tt> to eliminate whitespace.</p>
-<p>If specified, <em>default</em> is a function that gets called for objects that can&#8217;t
-otherwise be serialized.  It should return a JSON encodable version of the
-object or raise a <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.</p>
+<p>If specified, <em>default</em> should be a function that gets called for objects
+that can&#8217;t otherwise be serialized.  It should return a JSON encodable
+version of the object or raise a <tt class="xref docutils literal"><span class="pre">TypeError</span></tt>.</p>
 <p>If <em>encoding</em> is not <tt class="xref docutils literal"><span class="pre">None</span></tt>, then all input strings will be transformed
 into unicode using that encoding prior to JSON-encoding.  The default is
 <tt class="docutils literal"><span class="pre">'utf-8'</span></tt>.</p>
@@ -492,7 +496,7 @@ available.  For example:</p>
     </div>
     <div class="footer">
       &copy; Copyright 2008, Bob Ippolito.
-      Last updated on Jan 04, 2009.
+      Last updated on Feb 15, 2009.
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
     </div>
   </body>
