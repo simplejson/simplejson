@@ -1,5 +1,6 @@
-r"""Using simplejson from the shell to validate and
-pretty-print::
+r"""Command-line tool to validate and pretty-print JSON
+
+Usage::
 
     $ echo '{"json":"obj"}' | python -m simplejson.tool
     {
@@ -7,11 +8,12 @@ pretty-print::
     }
     $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 2 (char 2)
+
 """
+import sys
 import simplejson
 
 def main():
-    import sys
     if len(sys.argv) == 1:
         infile = sys.stdin
         outfile = sys.stdout
