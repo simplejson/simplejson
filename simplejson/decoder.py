@@ -37,10 +37,15 @@ def errmsg(msg, doc, pos, end=None):
     # Note that this function is called from _speedups
     lineno, colno = linecol(doc, pos)
     if end is None:
-        return '%s: line %d column %d (char %d)' % (msg, lineno, colno, pos)
+        #fmt = '{0}: line {1} column {2} (char {3})'
+        #return fmt.format(msg, lineno, colno, pos)
+        fmt = '%s: line %d column %d (char %d)'
+        return fmt % (msg, lineno, colno, pos)
     endlineno, endcolno = linecol(doc, end)
-    return '%s: line %d column %d - line %d column %d (char %d - %d)' % (
-        msg, lineno, colno, endlineno, endcolno, pos, end)
+    #fmt = '{0}: line {1} column {2} - line {3} column {4} (char {5} - {6})'
+    #return fmt.format(msg, lineno, colno, endlineno, endcolno, pos, end)
+    fmt = '%s: line %d column %d - line %d column %d (char %d - %d)'
+    return fmt % (msg, lineno, colno, endlineno, endcolno, pos, end)
 
 
 _CONSTANTS = {
@@ -90,7 +95,8 @@ def py_scanstring(s, end, encoding=None, strict=True, _b=BACKSLASH, _m=STRINGCHU
         elif terminator != '\\':
             if strict:
                 msg = "Invalid control character %r at" % (terminator,)
-                raise ValueError(msg, s, end)
+                #msg = "Invalid control character {0!r} at".format(terminator)
+                raise ValueError(errmsg(msg, s, end))
             else:
                 _append(terminator)
                 continue
@@ -104,8 +110,8 @@ def py_scanstring(s, end, encoding=None, strict=True, _b=BACKSLASH, _m=STRINGCHU
             try:
                 char = _b[esc]
             except KeyError:
-                raise ValueError(
-                    errmsg("Invalid \\escape: %r" % (esc,), s, end))
+                msg = "Invalid \\escape: " + repr(esc)
+                raise ValueError(errmsg(msg, s, end))
             end += 1
         else:
             # Unicode escape sequence
