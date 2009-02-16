@@ -1,9 +1,9 @@
 from unittest import TestCase
 
-import simplejson as S
+import simplejson as json
 
 class TestDefault(TestCase):
     def test_default(self):
         self.assertEquals(
-            S.dumps(type, default=repr),
-            S.dumps(repr(type)))
+            json.dumps(type, default=repr),
+            json.dumps(repr(type)))

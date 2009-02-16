@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-import simplejson as S
+import simplejson as json
 
 # Fri Dec 30 18:57:26 2005
 JSONDOCS = [
@@ -66,10 +66,10 @@ class TestFail(TestCase):
         for idx, doc in enumerate(JSONDOCS):
             idx = idx + 1
             if idx in SKIPS:
-                S.loads(doc)
+                json.loads(doc)
                 continue
             try:
-                S.loads(doc)
+                json.loads(doc)
             except ValueError:
                 pass
             else:

@@ -1,11 +1,11 @@
 r"""Using simplejson from the shell to validate and
 pretty-print::
 
-    $ echo '{"json":"obj"}' | python -msimplejson.tool
+    $ echo '{"json":"obj"}' | python -m simplejson.tool
     {
         "json": "obj"
     }
-    $ echo '{ 1.2:3.4}' | python -msimplejson.tool
+    $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
 import simplejson

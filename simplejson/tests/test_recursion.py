@@ -1,11 +1,11 @@
 from unittest import TestCase
 
-import simplejson as S
+import simplejson as json
 
 class JSONTestObject:
     pass
 
-class RecursiveJSONEncoder(S.JSONEncoder):
+class RecursiveJSONEncoder(json.JSONEncoder):
     recurse = False
     def default(self, o):
         if o is JSONTestObject:
@@ -13,14 +13,14 @@ class RecursiveJSONEncoder(S.JSONEncoder):
                 return [JSONTestObject]
             else:
                 return 'JSONTestObject'
-        return S.JSONEncoder.default(o)
+        return json.JSONEncoder.default(o)
 
 class TestRecursion(TestCase):
     def test_listrecursion(self):
         x = []
         x.append(x)
         try:
-            S.dumps(x)
+            json.dumps(x)
         except ValueError:
             pass
         else:
@@ -29,7 +29,7 @@ class TestRecursion(TestCase):
         y = [x]
         x.append(y)
         try:
-            S.dumps(x)
+            json.dumps(x)
         except ValueError:
             pass
         else:
@@ -37,13 +37,13 @@ class TestRecursion(TestCase):
         y = []
         x = [y, y]
         # ensure that the marker is cleared
-        S.dumps(x)
+        json.dumps(x)
 
     def test_dictrecursion(self):
         x = {}
         x["test"] = x
         try:
-            S.dumps(x)
+            json.dumps(x)
         except ValueError:
             pass
         else:
@@ -51,7 +51,7 @@ class TestRecursion(TestCase):
         x = {}
         y = {"a": x, "b": x}
         # ensure that the marker is cleared
-        S.dumps(x)
+        json.dumps(x)
 
     def test_defaultrecursion(self):
         enc = RecursiveJSONEncoder()

@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-import simplejson as S
+import simplejson as json
 
 # from http://json.org/JSON_checker/test/pass3.json
 JSON = r'''
@@ -15,6 +15,6 @@ JSON = r'''
 class TestPass3(TestCase):
     def test_parse(self):
         # test in/out equivalence and parsing
-        res = S.loads(JSON)
-        out = S.dumps(res)
-        self.assertEquals(res, S.loads(out))
+        res = json.loads(JSON)
+        out = json.dumps(res)
+        self.assertEquals(res, json.loads(out))

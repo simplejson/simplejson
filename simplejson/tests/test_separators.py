@@ -1,7 +1,7 @@
 import textwrap
 from unittest import TestCase
 
-import simplejson as S
+import simplejson as json
 
 
 class TestSeparators(TestCase):
@@ -31,11 +31,11 @@ class TestSeparators(TestCase):
         ]""")
 
 
-        d1 = S.dumps(h)
-        d2 = S.dumps(h, indent=2, sort_keys=True, separators=(' ,', ' : '))
+        d1 = json.dumps(h)
+        d2 = json.dumps(h, indent=2, sort_keys=True, separators=(' ,', ' : '))
 
-        h1 = S.loads(d1)
-        h2 = S.loads(d2)
+        h1 = json.loads(d1)
+        h2 = json.loads(d2)
 
         self.assertEquals(h1, h)
         self.assertEquals(h2, h)
