@@ -91,14 +91,22 @@ static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
+static PyObject *
+scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 static int
 scanner_init(PyObject *self, PyObject *args, PyObject *kwds);
 static void
 scanner_dealloc(PyObject *self);
 static int
+scanner_clear(PyObject *self);
+static PyObject *
+encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
+static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds);
 static void
 encoder_dealloc(PyObject *self);
+static int
+encoder_clear(PyObject *self);
 static int
 encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ssize_t indent_level);
 static int
@@ -295,7 +303,7 @@ ascii_escape_str(PyObject *pystr)
     }
     output = PyString_AS_STRING(rval);
     output[0] = '"';
-    
+
     /* We know that everything up to i is ASCII already */
     chars = i + 1;
     memcpy(&output[1], input_str, i);
@@ -360,7 +368,7 @@ join_list_unicode(PyObject *lst)
         PyObject *ustr = PyUnicode_FromUnicode(NULL, 0);
         if (ustr == NULL)
             return NULL;
-        
+
         joinfn = PyObject_GetAttrString(ustr, "join");
         Py_DECREF(ustr);
         if (joinfn == NULL)
@@ -378,7 +386,7 @@ join_list_string(PyObject *lst)
         PyObject *ustr = PyString_FromStringAndSize(NULL, 0);
         if (ustr == NULL)
             return NULL;
-        
+
         joinfn = PyObject_GetAttrString(ustr, "join");
         Py_DECREF(ustr);
         if (joinfn == NULL)
@@ -423,7 +431,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
     if strict is zero then literal control characters are allowed
     *next_end_ptr is a return-by-reference index of the character
         after the end quote
-        
+
     Return value is a new PyString (if ASCII-only) or PyUnicode
     */
     PyObject *rval;
@@ -625,11 +633,10 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
 {
     /* Read the JSON string from PyUnicode pystr.
     end is the index of the first character after the quote.
-    encoding is the encoding of pystr (must be an ASCII superset)
     if strict is zero then literal control characters are allowed
     *next_end_ptr is a return-by-reference index of the character
         after the end quote
-        
+
     Return value is a new PyUnicode
     */
     PyObject *rval;
@@ -871,6 +878,28 @@ static void
 scanner_dealloc(PyObject *self)
 {
     /* Deallocate scanner object */
+    scanner_clear(self);
+    Py_TYPE(self)->tp_free(self);
+}
+
+static int
+scanner_traverse(PyObject *self, visitproc visit, void *arg)
+{
+    PyScannerObject *s;
+    assert(PyScanner_Check(self));
+    s = (PyScannerObject *)self;
+    Py_VISIT(s->encoding);
+    Py_VISIT(s->strict);
+    Py_VISIT(s->object_hook);
+    Py_VISIT(s->parse_float);
+    Py_VISIT(s->parse_int);
+    Py_VISIT(s->parse_constant);
+    return 0;
+}
+
+static int
+scanner_clear(PyObject *self)
+{
     PyScannerObject *s;
     assert(PyScanner_Check(self));
     s = (PyScannerObject *)self;
@@ -880,7 +909,7 @@ scanner_dealloc(PyObject *self)
     Py_CLEAR(s->parse_float);
     Py_CLEAR(s->parse_int);
     Py_CLEAR(s->parse_constant);
-    self->ob_type->tp_free(self);
+    return 0;
 }
 
 static PyObject *
@@ -889,7 +918,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     idx is the index of the first character after the opening curly brace.
     *next_idx_ptr is a return-by-reference index to the first character after
         the closing curly brace.
-    
+
     Returns a new PyObject (usually a dict, but object_hook can change that)
     */
     char *str = PyString_AS_STRING(pystr);
@@ -918,7 +947,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             if (key == NULL)
                 goto bail;
             idx = next_idx;
-            
+
             /* skip whitespace between key and : delimiter, read :, skip whitespace */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             if (idx > end_idx || str[idx] != ':') {
@@ -927,7 +956,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             }
             idx++;
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-            
+
             /* read any JSON data type */
             val = scan_once_str(s, pystr, idx, &next_idx);
             if (val == NULL)
@@ -939,7 +968,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             Py_CLEAR(key);
             Py_CLEAR(val);
             idx = next_idx;
-            
+
             /* skip whitespace before } or , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
@@ -978,7 +1007,7 @@ bail:
     Py_XDECREF(key);
     Py_XDECREF(val);
     Py_DECREF(rval);
-    return NULL;    
+    return NULL;
 }
 
 static PyObject *
@@ -987,7 +1016,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
     idx is the index of the first character after the opening curly brace.
     *next_idx_ptr is a return-by-reference index to the first character after
         the closing curly brace.
-    
+
     Returns a new PyObject (usually a dict, but object_hook can change that)
     */
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
@@ -999,7 +1028,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
     Py_ssize_t next_idx;
     if (rval == NULL)
         return NULL;
-    
+
     /* skip whitespace after { */
     while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
@@ -1024,7 +1053,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
             }
             idx++;
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-            
+
             /* read any JSON term */
             val = scan_once_unicode(s, pystr, idx, &next_idx);
             if (val == NULL)
@@ -1086,7 +1115,7 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
     idx is the index of the first character after the opening brace.
     *next_idx_ptr is a return-by-reference index to the first character after
         the closing brace.
-    
+
     Returns a new PyList
     */
     char *str = PyString_AS_STRING(pystr);
@@ -1114,7 +1143,7 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
 
             Py_CLEAR(val);
             idx = next_idx;
-            
+
             /* skip whitespace between term and , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
@@ -1128,7 +1157,7 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
                 goto bail;
             }
             idx++;
-            
+
             /* skip whitespace after , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
         }
@@ -1153,7 +1182,7 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
     idx is the index of the first character after the opening brace.
     *next_idx_ptr is a return-by-reference index to the first character after
         the closing brace.
-    
+
     Returns a new PyList
     */
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
@@ -1222,7 +1251,7 @@ _parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx, Py_ssize_t *
     idx is the index of the first character of the constant
     *next_idx_ptr is a return-by-reference index to the first character after
         the constant.
-    
+
     Returns the result of parse_constant
     */
     PyObject *cstr;
@@ -1246,7 +1275,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     idx is the index of the first character of the number
     *next_idx_ptr is a return-by-reference index to the first character after
         the number.
-    
+
     Returns a new PyObject representation of that number:
         PyInt, PyLong, or PyFloat.
         May return other types if parse_int or parse_float are set
@@ -1257,7 +1286,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     int is_float = 0;
     PyObject *rval;
     PyObject *numstr;
-    
+
     /* read a sign if it's there, make sure it's not the end of the string */
     if (str[idx] == '-') {
         idx++;
@@ -1281,7 +1310,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
-    
+
     /* if the next char is '.' followed by a digit then read all float digits */
     if (idx < end_idx && str[idx] == '.' && str[idx + 1] >= '0' && str[idx + 1] <= '9') {
         is_float = 1;
@@ -1310,7 +1339,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
             idx = e_start;
         }
     }
-    
+
     /* copy the section we determined to be a number */
     numstr = PyString_FromStringAndSize(&str[start], idx - start);
     if (numstr == NULL)
@@ -1344,7 +1373,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     idx is the index of the first character of the number
     *next_idx_ptr is a return-by-reference index to the first character after
         the number.
-    
+
     Returns a new PyObject representation of that number:
         PyInt, PyLong, or PyFloat.
         May return other types if parse_int or parse_float are set
@@ -1436,7 +1465,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     idx is the index of the first character of the term
     *next_idx_ptr is a return-by-reference index to the first character after
         the number.
-    
+
     Returns a new PyObject representation of the term.
     */
     char *str = PyString_AS_STRING(pystr);
@@ -1512,7 +1541,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     idx is the index of the first character of the term
     *next_idx_ptr is a return-by-reference index to the first character after
         the number.
-    
+
     Returns a new PyObject representation of the term.
     */
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
@@ -1610,6 +1639,22 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     return _build_rval_index_tuple(rval, next_idx);
 }
 
+static PyObject *
+scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    PyScannerObject *s;
+    s = (PyScannerObject *)type->tp_alloc(type, 0);
+    if (s != NULL) {
+        s->encoding = NULL;
+        s->strict = NULL;
+        s->object_hook = NULL;
+        s->parse_float = NULL;
+        s->parse_int = NULL;
+        s->parse_constant = NULL;
+    }
+    return (PyObject *)s;
+}
+
 static int
 scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -1624,13 +1669,6 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:make_scanner", kwlist, &ctx))
         return -1;
 
-    s->encoding = NULL;
-    s->strict = NULL;
-    s->object_hook = NULL;
-    s->parse_float = NULL;
-    s->parse_int = NULL;
-    s->parse_constant = NULL;
-
     /* PyString_AS_STRING is used on encoding */
     s->encoding = PyObject_GetAttrString(ctx, "encoding");
     if (s->encoding == Py_None) {
@@ -1644,7 +1682,7 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     }
     if (s->encoding == NULL || !PyString_Check(s->encoding))
         goto bail;
-    
+
     /* All of these will fail "gracefully" so we don't need to verify them */
     s->strict = PyObject_GetAttrString(ctx, "strict");
     if (s->strict == NULL)
@@ -1661,7 +1699,7 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->parse_constant = PyObject_GetAttrString(ctx, "parse_constant");
     if (s->parse_constant == NULL)
         goto bail;
-    
+
     return 0;
 
 bail:
@@ -1678,9 +1716,9 @@ PyDoc_STRVAR(scanner_doc, "JSON scanner object");
 
 static
 PyTypeObject PyScannerType = {
-    PyObject_HEAD_INIT(0)
+    PyObject_HEAD_INIT(NULL)
     0,                    /* tp_internal */
-    "Scanner",       /* tp_name */
+    "simplejson._speedups.Scanner",       /* tp_name */
     sizeof(PyScannerObject), /* tp_basicsize */
     0,                    /* tp_itemsize */
     scanner_dealloc, /* tp_dealloc */
@@ -1698,10 +1736,10 @@ PyTypeObject PyScannerType = {
     0,/* PyObject_GenericGetAttr, */                    /* tp_getattro */
     0,/* PyObject_GenericSetAttr, */                    /* tp_setattro */
     0,                    /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,   /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,   /* tp_flags */
     scanner_doc,          /* tp_doc */
-    0,                    /* tp_traverse */
-    0,                    /* tp_clear */
+    scanner_traverse,                    /* tp_traverse */
+    scanner_clear,                    /* tp_clear */
     0,                    /* tp_richcompare */
     0,                    /* tp_weaklistoffset */
     0,                    /* tp_iter */
@@ -1716,9 +1754,27 @@ PyTypeObject PyScannerType = {
     0,                    /* tp_dictoffset */
     scanner_init,                    /* tp_init */
     0,/* PyType_GenericAlloc, */        /* tp_alloc */
-    0,/* PyType_GenericNew, */          /* tp_new */
-    0,/* _PyObject_Del, */              /* tp_free */
+    scanner_new,          /* tp_new */
+    0,/* PyObject_GC_Del, */              /* tp_free */
 };
+
+static PyObject *
+encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    PyEncoderObject *s;
+    s = (PyEncoderObject *)type->tp_alloc(type, 0);
+    if (s != NULL) {
+        s->markers = NULL;
+        s->defaultfn = NULL;
+        s->encoder = NULL;
+        s->indent = NULL;
+        s->key_separator = NULL;
+        s->item_separator = NULL;
+        s->sort_keys = NULL;
+        s->skipkeys = NULL;
+    }
+    return (PyObject *)s;
+}
 
 static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
@@ -1732,19 +1788,10 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    s->markers = NULL;
-    s->defaultfn = NULL;
-    s->encoder = NULL;
-    s->indent = NULL;
-    s->key_separator = NULL;
-    s->item_separator = NULL;
-    s->sort_keys = NULL;
-    s->skipkeys = NULL;
-    
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOO:make_encoder", kwlist,
         &s->markers, &s->defaultfn, &s->encoder, &s->indent, &s->key_separator, &s->item_separator, &s->sort_keys, &s->skipkeys, &allow_nan))
         return -1;
-    
+
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
     Py_INCREF(s->encoder);
@@ -1865,7 +1912,7 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
     /* Encode Python object obj to a JSON term, rval is a PyList */
     PyObject *newobj;
     int rv;
-    
+
     if (obj == Py_None || obj == Py_True || obj == Py_False) {
         PyObject *cstr = _encoded_const(obj);
         if (cstr == NULL)
@@ -1951,7 +1998,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     Py_ssize_t pos;
     int skipkeys;
     Py_ssize_t idx;
-    
+
     if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
         open_dict = PyString_InternFromString("{");
         close_dict = PyString_InternFromString("}");
@@ -1961,7 +2008,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     }
     if (PyDict_Size(dct) == 0)
         return PyList_Append(rval, empty_dict);
-    
+
     if (s->markers != Py_None) {
         int has_key;
         ident = PyLong_FromVoidPtr(dct);
@@ -2026,12 +2073,12 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             PyErr_SetString(PyExc_ValueError, "keys must be a string");
             goto bail;
         }
-        
+
         if (idx) {
             if (PyList_Append(rval, s->item_separator))
                 goto bail;
         }
-        
+
         encoded = encoder_encode_string(s, kstr);
         Py_CLEAR(kstr);
         if (encoded == NULL)
@@ -2062,7 +2109,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     if (PyList_Append(rval, close_dict))
         goto bail;
     return 0;
-    
+
 bail:
     Py_XDECREF(kstr);
     Py_XDECREF(ident);
@@ -2082,7 +2129,7 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
     Py_ssize_t num_items;
     PyObject **seq_items;
     Py_ssize_t i;
-    
+
     if (open_array == NULL || close_array == NULL || empty_array == NULL) {
         open_array = PyString_InternFromString("[");
         close_array = PyString_InternFromString("]");
@@ -2099,7 +2146,7 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
         Py_DECREF(s_fast);
         return PyList_Append(rval, empty_array);
     }
-    
+
     if (s->markers != Py_None) {
         int has_key;
         ident = PyLong_FromVoidPtr(seq);
@@ -2115,7 +2162,7 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
             goto bail;
         }
     }
-    
+
     seq_items = PySequence_Fast_ITEMS(s_fast);
     if (PyList_Append(rval, open_array))
         goto bail;
@@ -2153,7 +2200,7 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
         goto bail;
     Py_DECREF(s_fast);
     return 0;
-    
+
 bail:
     Py_XDECREF(ident);
     Py_DECREF(s_fast);
@@ -2162,6 +2209,31 @@ bail:
 
 static void
 encoder_dealloc(PyObject *self)
+{
+    /* Deallocate Encoder */
+    encoder_clear(self);
+    Py_TYPE(self)->tp_free(self);
+}
+
+static int
+encoder_traverse(PyObject *self, visitproc visit, void *arg)
+{
+    PyEncoderObject *s;
+    assert(PyEncoder_Check(self));
+    s = (PyEncoderObject *)self;
+    Py_VISIT(s->markers);
+    Py_VISIT(s->defaultfn);
+    Py_VISIT(s->encoder);
+    Py_VISIT(s->indent);
+    Py_VISIT(s->key_separator);
+    Py_VISIT(s->item_separator);
+    Py_VISIT(s->sort_keys);
+    Py_VISIT(s->skipkeys);
+    return 0;
+}
+
+static int
+encoder_clear(PyObject *self)
 {
     /* Deallocate Encoder */
     PyEncoderObject *s;
@@ -2175,16 +2247,16 @@ encoder_dealloc(PyObject *self)
     Py_CLEAR(s->item_separator);
     Py_CLEAR(s->sort_keys);
     Py_CLEAR(s->skipkeys);
-    self->ob_type->tp_free(self);
+    return 0;
 }
 
 PyDoc_STRVAR(encoder_doc, "_iterencode(obj, _current_indent_level) -> iterable");
 
 static
 PyTypeObject PyEncoderType = {
-    PyObject_HEAD_INIT(0)
+    PyObject_HEAD_INIT(NULL)
     0,                    /* tp_internal */
-    "Encoder",       /* tp_name */
+    "simplejson._speedups.Encoder",       /* tp_name */
     sizeof(PyEncoderObject), /* tp_basicsize */
     0,                    /* tp_itemsize */
     encoder_dealloc, /* tp_dealloc */
@@ -2197,31 +2269,31 @@ PyTypeObject PyEncoderType = {
     0,                    /* tp_as_sequence */
     0,                    /* tp_as_mapping */
     0,                    /* tp_hash */
-    encoder_call,                    /* tp_call */
+    encoder_call,         /* tp_call */
     0,                    /* tp_str */
-    0,/* PyObject_GenericGetAttr, */                    /* tp_getattro */
-    0,/* PyObject_GenericSetAttr, */                    /* tp_setattro */
+    0,                    /* tp_getattro */
+    0,                    /* tp_setattro */
     0,                    /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,   /* tp_flags */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,   /* tp_flags */
     encoder_doc,          /* tp_doc */
-    0,                    /* tp_traverse */
-    0,                    /* tp_clear */
+    encoder_traverse,     /* tp_traverse */
+    encoder_clear,        /* tp_clear */
     0,                    /* tp_richcompare */
     0,                    /* tp_weaklistoffset */
     0,                    /* tp_iter */
     0,                    /* tp_iternext */
     0,                    /* tp_methods */
-    encoder_members,                    /* tp_members */
+    encoder_members,      /* tp_members */
     0,                    /* tp_getset */
     0,                    /* tp_base */
     0,                    /* tp_dict */
     0,                    /* tp_descr_get */
     0,                    /* tp_descr_set */
     0,                    /* tp_dictoffset */
-    encoder_init,                    /* tp_init */
-    0,/* PyType_GenericAlloc, */       /* tp_alloc */
-    0,/* PyType_GenericNew, */         /* tp_new */
-    0,/* _PyObject_Del, */             /* tp_free */
+    encoder_init,         /* tp_init */
+    0,                    /* tp_alloc */
+    encoder_new,          /* tp_new */
+    0,                    /* tp_free */
 };
 
 static PyMethodDef speedups_methods[] = {
@@ -2243,18 +2315,10 @@ void
 init_speedups(void)
 {
     PyObject *m;
-    PyScannerType.tp_getattro = PyObject_GenericGetAttr;
-    PyScannerType.tp_setattro = PyObject_GenericSetAttr;
-    PyScannerType.tp_alloc  = PyType_GenericAlloc;
     PyScannerType.tp_new = PyType_GenericNew;
-    PyScannerType.tp_free = _PyObject_Del;
     if (PyType_Ready(&PyScannerType) < 0)
         return;
-    PyEncoderType.tp_getattro = PyObject_GenericGetAttr;
-    PyEncoderType.tp_setattro = PyObject_GenericSetAttr;
-    PyEncoderType.tp_alloc  = PyType_GenericAlloc;
     PyEncoderType.tp_new = PyType_GenericNew;
-    PyEncoderType.tp_free = _PyObject_Del;
     if (PyType_Ready(&PyEncoderType) < 0)
         return;
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
