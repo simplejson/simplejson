@@ -110,7 +110,7 @@ extension for speedups.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">def</span> <span class="nf">encode_complex</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
 <span class="gp">... </span>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">complex</span><span class="p">):</span>
 <span class="gp">... </span>        <span class="k">return</span> <span class="p">[</span><span class="n">obj</span><span class="o">.</span><span class="n">real</span><span class="p">,</span> <span class="n">obj</span><span class="o">.</span><span class="n">imag</span><span class="p">]</span>
-<span class="gp">... </span>    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s">&quot;</span><span class="si">%r</span><span class="s"> is not JSON serializable&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">o</span><span class="p">,))</span>
+<span class="gp">... </span>    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="o">+</span> <span class="s">&quot; is not JSON serializable&quot;</span><span class="p">)</span>
 <span class="gp">...</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="mf">2</span> <span class="o">+</span> <span class="mf">1</span><span class="n">j</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">encode_complex</span><span class="p">)</span>
 <span class="go">&#39;[2.0, 1.0]&#39;</span>
@@ -496,7 +496,7 @@ available.  For example:</p>
     </div>
     <div class="footer">
       &copy; Copyright 2008, Bob Ippolito.
-      Last updated on Feb 15, 2009.
+      Last updated on Feb 18, 2009.
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
     </div>
   </body>
