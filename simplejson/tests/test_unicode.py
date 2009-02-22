@@ -31,12 +31,12 @@ class TestUnicode(TestCase):
     def test_encoding5(self):
         u = u'\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}'
         j = json.dumps(u, ensure_ascii=False)
-        self.assertEquals(j, u'"%s"' % (u,))
+        self.assertEquals(j, u'"' + u + u'"')
 
     def test_encoding6(self):
         u = u'\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}'
         j = json.dumps([u], ensure_ascii=False)
-        self.assertEquals(j, u'["%s"]' % (u,))
+        self.assertEquals(j, u'["' + u + u'"]')
 
     def test_big_unicode_encode(self):
         u = u'\U0001d120'
@@ -51,6 +51,7 @@ class TestUnicode(TestCase):
     def test_unicode_decode(self):
         for i in range(0, 0xd7ff):
             u = unichr(i)
+            #s = '"\\u{0:04x}"'.format(i)
             s = '"\\u%04x"' % (i,)
             self.assertEquals(json.loads(s), u)
 

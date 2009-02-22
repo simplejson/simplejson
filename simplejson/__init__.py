@@ -68,8 +68,8 @@ Specializing JSON object decoding::
     >>> json.loads('{"__complex__": true, "real": 1, "imag": 2}',
     ...     object_hook=as_complex)
     (1+2j)
-    >>> import decimal
-    >>> json.loads('1.1', parse_float=decimal.Decimal) == decimal.Decimal('1.1')
+    >>> from decimal import Decimal
+    >>> json.loads('1.1', parse_float=Decimal) == Decimal('1.1')
     True
 
 Specializing JSON object encoding::
@@ -144,9 +144,10 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     in strict compliance of the JSON specification, instead of using the
     JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``).
 
-    If ``indent`` is a non-negative integer, then JSON array elements and object
-    members will be pretty-printed with that indent level. An indent level
-    of 0 will only insert newlines. ``None`` is the most compact representation.
+    If ``indent`` is a non-negative integer, then JSON array elements and
+    object members will be pretty-printed with that indent level. An indent
+    level of 0 will only insert newlines. ``None`` is the most compact
+    representation.
 
     If ``separators`` is an ``(item_separator, dict_separator)`` tuple
     then it will be used instead of the default ``(', ', ': ')`` separators.

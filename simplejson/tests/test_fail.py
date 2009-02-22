@@ -73,4 +73,5 @@ class TestFail(TestCase):
             except ValueError:
                 pass
             else:
+                #self.fail("Expected failure for fail{0}.json: {1!r}".format(idx, doc))
                 self.fail("Expected failure for fail%d.json: %r" % (idx, doc))

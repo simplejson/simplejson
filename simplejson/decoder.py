@@ -62,7 +62,8 @@ BACKSLASH = {
 
 DEFAULT_ENCODING = "utf-8"
 
-def py_scanstring(s, end, encoding=None, strict=True, _b=BACKSLASH, _m=STRINGCHUNK.match):
+def py_scanstring(s, end, encoding=None, strict=True,
+        _b=BACKSLASH, _m=STRINGCHUNK.match):
     """Scan the string s for a JSON string. End is the index of the
     character in s after the quote that started the JSON string.
     Unescapes all valid JSON string escape sequences and raises ValueError
@@ -145,7 +146,8 @@ scanstring = c_scanstring or py_scanstring
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 WHITESPACE_STR = ' \t\n\r'
 
-def JSONObject((s, end), encoding, strict, scan_once, object_hook, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+def JSONObject((s, end), encoding, strict, scan_once, object_hook,
+        _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     pairs = {}
     # Use a slice to prevent IndexError from being raised, the following
     # check will raise a more specific ValueError if the string is empty
@@ -339,8 +341,8 @@ class JSONDecoder(object):
         return obj
 
     def raw_decode(self, s, idx=0):
-        """Decode a JSON document from ``s`` (a ``str`` or ``unicode`` beginning
-        with a JSON document) and return a 2-tuple of the Python
+        """Decode a JSON document from ``s`` (a ``str`` or ``unicode``
+        beginning with a JSON document) and return a 2-tuple of the Python
         representation and the index in ``s`` where the document ended.
 
         This can be used to decode a JSON document from a string that may

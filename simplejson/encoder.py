@@ -3,7 +3,8 @@
 import re
 
 try:
-    from simplejson._speedups import encode_basestring_ascii as c_encode_basestring_ascii
+    from simplejson._speedups import encode_basestring_ascii as \
+        c_encode_basestring_ascii
 except ImportError:
     c_encode_basestring_ascii = None
 try:
@@ -65,7 +66,8 @@ def py_encode_basestring_ascii(s):
     return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
 
 
-encode_basestring_ascii = c_encode_basestring_ascii or py_encode_basestring_ascii
+encode_basestring_ascii = (
+    c_encode_basestring_ascii or py_encode_basestring_ascii)
 
 class JSONEncoder(object):
     """Extensible JSON <http://json.org> encoder for Python data structures.
@@ -226,9 +228,11 @@ class JSONEncoder(object):
                     o = o.decode(_encoding)
                 return _orig_encoder(o)
 
-        def floatstr(o, allow_nan=self.allow_nan, _repr=FLOAT_REPR, _inf=INFINITY, _neginf=-INFINITY):
-            # Check for specials.  Note that this type of test is processor- and/or
-            # platform-specific, so do tests which don't depend on the internals.
+        def floatstr(o, allow_nan=self.allow_nan,
+                _repr=FLOAT_REPR, _inf=INFINITY, _neginf=-INFINITY):
+            # Check for specials. Note that this type of test is processor
+            # and/or platform-specific, so do tests which don't depend on
+            # the internals.
 
             if o != o:
                 text = 'NaN'
@@ -247,7 +251,8 @@ class JSONEncoder(object):
             return text
 
 
-        if _one_shot and c_make_encoder is not None and not self.indent and not self.sort_keys:
+        if (_one_shot and c_make_encoder is not None
+                and not self.indent and not self.sort_keys):
             _iterencode = c_make_encoder(
                 markers, self.default, _encoder, self.indent,
                 self.key_separator, self.item_separator, self.sort_keys,
@@ -259,7 +264,8 @@ class JSONEncoder(object):
                 self.skipkeys, _one_shot)
         return _iterencode(o, 0)
 
-def _make_iterencode(markers, _default, _encoder, _indent, _floatstr, _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
+def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
+        _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
         ## HACK: hand-optimized bytecode; turn globals into locals
         False=False,
         True=True,

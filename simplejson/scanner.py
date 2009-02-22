@@ -33,7 +33,8 @@ def py_make_scanner(context):
         if nextchar == '"':
             return parse_string(string, idx + 1, encoding, strict)
         elif nextchar == '{':
-            return parse_object((string, idx + 1), encoding, strict, _scan_once, object_hook)
+            return parse_object((string, idx + 1), encoding, strict,
+                _scan_once, object_hook)
         elif nextchar == '[':
             return parse_array((string, idx + 1), _scan_once)
         elif nextchar == 'n' and string[idx:idx + 4] == 'null':
