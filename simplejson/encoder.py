@@ -12,6 +12,8 @@ try:
 except ImportError:
     c_make_encoder = None
 
+from simplejson.decoder import PosInf
+
 ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
@@ -28,8 +30,6 @@ for i in range(0x20):
     #ESCAPE_DCT.setdefault(chr(i), '\\u{0:04x}'.format(i))
     ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
 
-# Assume this produces an infinity on all machines (probably not guaranteed)
-INFINITY = float('1e66666')
 FLOAT_REPR = repr
 
 def encode_basestring(s):
@@ -229,7 +229,7 @@ class JSONEncoder(object):
                 return _orig_encoder(o)
 
         def floatstr(o, allow_nan=self.allow_nan,
-                _repr=FLOAT_REPR, _inf=INFINITY, _neginf=-INFINITY):
+                _repr=FLOAT_REPR, _inf=PosInf, _neginf=-PosInf):
             # Check for specials. Note that this type of test is processor
             # and/or platform-specific, so do tests which don't depend on
             # the internals.
