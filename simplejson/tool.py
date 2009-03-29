@@ -11,7 +11,7 @@ Usage::
 
 """
 import sys
-import simplejson
+import simplejson as json
 
 def main():
     if len(sys.argv) == 1:
@@ -26,10 +26,10 @@ def main():
     else:
         raise SystemExit(sys.argv[0] + " [infile [outfile]]")
     try:
-        obj = simplejson.load(infile)
+        obj = json.load(infile, object_pairs_hook=json.OrderedDict)
     except ValueError, e:
         raise SystemExit(e)
-    simplejson.dump(obj, outfile, sort_keys=True, indent=4)
+    json.dump(obj, outfile, sort_keys=True, indent=4)
     outfile.write('\n')
 
 

@@ -195,7 +195,7 @@ better performance.</p>
 
 <dl class="function">
 <dt id="simplejson.load">
-<!--[simplejson.load]--><tt class="descclassname">simplejson.</tt><tt class="descname">load</tt><big>(</big><em>fp</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.load" title="Permalink to this definition">¶</a></dt>
+<!--[simplejson.load]--><tt class="descclassname">simplejson.</tt><tt class="descname">load</tt><big>(</big><em>fp</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>object_pairs_hook</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.load" title="Permalink to this definition">¶</a></dt>
 <dd><p>Deserialize <em>fp</em> (a <tt class="docutils literal"><span class="pre">.read()</span></tt>-supporting file-like object containing a JSON
 document) to a Python object.</p>
 <p>If the contents of <em>fp</em> are encoded with an ASCII based encoding other than
@@ -208,6 +208,15 @@ setting of <tt class="docutils literal"><span class="pre">'utf-8'</span></tt> is
 any object literal decode (a <tt class="xref docutils literal"><span class="pre">dict</span></tt>).  The return value of
 <em>object_hook</em> will be used instead of the <tt class="xref docutils literal"><span class="pre">dict</span></tt>.  This feature can be used
 to implement custom decoders (e.g. JSON-RPC class hinting).</p>
+<p><em>object_pairs_hook</em> is an optional function that will be called with the
+result of any object literal decode with an ordered list of pairs.  The
+return value of <em>object_pairs_hook</em> will be used instead of the
+<tt class="xref docutils literal"><span class="pre">dict</span></tt>.  This feature can be used to implement custom decoders that
+rely on the order that the key and value pairs are decoded (for example,
+<tt class="xref docutils literal"><span class="pre">collections.OrderedDict()</span></tt> will remember the order of insertion). If
+<em>object_hook</em> is also defined, the <em>object_pairs_hook</em> takes priority.</p>
+<p>
+<span class="versionmodified">Changed in version 2.1.0: </span>Added support for <em>object_pairs_hook</em>.</p>
 <p><em>parse_float</em>, if specified, will be called with the string of every JSON
 float to be decoded.  By default, this is equivalent to <tt class="docutils literal"><span class="pre">float(num_str)</span></tt>.
 This can be used to use another datatype or parser for JSON floats
@@ -236,7 +245,7 @@ only one JSON document, it is recommended to use <a title="simplejson.loads" cla
 
 <dl class="function">
 <dt id="simplejson.loads">
-<!--[simplejson.loads]--><tt class="descclassname">simplejson.</tt><tt class="descname">loads</tt><big>(</big><em>s</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.loads" title="Permalink to this definition">¶</a></dt>
+<!--[simplejson.loads]--><tt class="descclassname">simplejson.</tt><tt class="descname">loads</tt><big>(</big><em>s</em><span class="optional">[</span>, <em>encoding</em><span class="optional">[</span>, <em>cls</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>object_pairs_hook</em><span class="optional">[</span>, <em>**kw</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.loads" title="Permalink to this definition">¶</a></dt>
 <dd><p>Deserialize <em>s</em> (a <tt class="xref docutils literal"><span class="pre">str</span></tt> or <tt class="xref docutils literal"><span class="pre">unicode</span></tt> instance containing a JSON
 document) to a Python object.</p>
 <p>If <em>s</em> is a <tt class="xref docutils literal"><span class="pre">str</span></tt> instance and is encoded with an ASCII based encoding
@@ -251,7 +260,7 @@ allowed and should be decoded to <tt class="xref docutils literal"><span class="
 <h2 id="encoders-and-decoders">Encoders and decoders<a class="headerlink" href="#encoders-and-decoders" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="simplejson.JSONDecoder">
-<!--[simplejson.JSONDecoder]-->class <tt class="descclassname">simplejson.</tt><tt class="descname">JSONDecoder</tt><big>(</big><span class="optional">[</span><em>encoding</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>strict</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.JSONDecoder" title="Permalink to this definition">¶</a></dt>
+<!--[simplejson.JSONDecoder]-->class <tt class="descclassname">simplejson.</tt><tt class="descname">JSONDecoder</tt><big>(</big><span class="optional">[</span><em>encoding</em><span class="optional">[</span>, <em>object_hook</em><span class="optional">[</span>, <em>parse_float</em><span class="optional">[</span>, <em>parse_int</em><span class="optional">[</span>, <em>parse_constant</em><span class="optional">[</span>, <em>object_pairs_hook</em><span class="optional">[</span>, <em>strict</em><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><span class="optional">]</span><big>)</big><a class="headerlink" href="#simplejson.JSONDecoder" title="Permalink to this definition">¶</a></dt>
 <dd><p>Simple JSON decoder.</p>
 <p>Performs the following translations in decoding by default:</p>
 <table border="1" class="docutils">
@@ -302,6 +311,15 @@ of other encodings should be passed in as <tt class="xref docutils literal"><spa
 object decoded and its return value will be used in place of the given
 <tt class="xref docutils literal"><span class="pre">dict</span></tt>.  This can be used to provide custom deserializations (e.g. to
 support JSON-RPC class hinting).</p>
+<p><em>object_pairs_hook</em> is an optional function that will be called with the
+result of any object literal decode with an ordered list of pairs.  The
+return value of <em>object_pairs_hook</em> will be used instead of the
+<tt class="xref docutils literal"><span class="pre">dict</span></tt>.  This feature can be used to implement custom decoders that
+rely on the order that the key and value pairs are decoded (for example,
+<tt class="xref docutils literal"><span class="pre">collections.OrderedDict()</span></tt> will remember the order of insertion). If
+<em>object_hook</em> is also defined, the <em>object_pairs_hook</em> takes priority.</p>
+<p>
+<span class="versionmodified">Changed in version 2.1.0: </span>Added support for <em>object_pairs_hook</em>.</p>
 <p><em>parse_float</em>, if specified, will be called with the string of every JSON
 float to be decoded.  By default, this is equivalent to <tt class="docutils literal"><span class="pre">float(num_str)</span></tt>.
 This can be used to use another datatype or parser for JSON floats
@@ -496,7 +514,7 @@ available.  For example:</p>
     </div>
     <div class="footer">
       &copy; Copyright 2008, Bob Ippolito.
-      Last updated on Feb 18, 2009.
+      Last updated on Mar 29, 2009.
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
     </div>
   </body>
