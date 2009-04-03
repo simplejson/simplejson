@@ -343,21 +343,21 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
 {
     /* Use the Python function simplejson.decoder.errmsg to raise a nice
     looking ValueError exception */
-    static PyObject *errmsg_fn = NULL;
-    PyObject *pymsg;
-    if (errmsg_fn == NULL) {
+    static PyObject *JSONDecodeError = NULL;
+    PyObject *exc;
+    if (JSONDecodeError == NULL) {
         PyObject *decoder = PyImport_ImportModule("simplejson.decoder");
         if (decoder == NULL)
             return;
-        errmsg_fn = PyObject_GetAttrString(decoder, "errmsg");
+        JSONDecodeError = PyObject_GetAttrString(decoder, "JSONDecodeError");
         Py_DECREF(decoder);
-        if (errmsg_fn == NULL)
+        if (JSONDecodeError == NULL)
             return;
     }
-    pymsg = PyObject_CallFunction(errmsg_fn, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
-    if (pymsg) {
-        PyErr_SetObject(PyExc_ValueError, pymsg);
-        Py_DECREF(pymsg);
+    exc = PyObject_CallFunction(JSONDecodeError, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
+    if (exc) {
+        PyErr_SetObject(JSONDecodeError, exc);
+        Py_DECREF(exc);
     }
 }
 

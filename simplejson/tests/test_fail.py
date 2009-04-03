@@ -70,7 +70,7 @@ class TestFail(TestCase):
                 continue
             try:
                 json.loads(doc)
-            except ValueError:
+            except json.JSONDecodeError:
                 pass
             else:
                 #self.fail("Expected failure for fail{0}.json: {1!r}".format(idx, doc))

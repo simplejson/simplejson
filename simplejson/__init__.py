@@ -100,13 +100,13 @@ Using simplejson.tool from the shell to validate and pretty-print::
 __version__ = '2.1.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
-    'JSONDecoder', 'JSONEncoder',
+    'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
     'OrderedDict',
 ]
 
 __author__ = 'Bob Ippolito <bob@redivi.com>'
 
-from decoder import JSONDecoder
+from decoder import JSONDecoder, JSONDecodeError
 from encoder import JSONEncoder
 try:
     from collections import OrderedDict
