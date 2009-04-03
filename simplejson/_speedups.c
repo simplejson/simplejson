@@ -1190,8 +1190,13 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
 
             /* read any JSON term and de-tuplefy the (rval, idx) */
             val = scan_once_str(s, pystr, idx, &next_idx);
-            if (val == NULL)
+            if (val == NULL) {
+                if (PyErr_ExceptionMatches(PyExc_StopIteration)) {
+                    PyErr_Clear();
+                    raise_errmsg("Expecting object", pystr, idx);
+                }
                 goto bail;
+            }
 
             if (PyList_Append(rval, val) == -1)
                 goto bail;
@@ -1257,8 +1262,13 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
 
             /* read any JSON term  */
             val = scan_once_unicode(s, pystr, idx, &next_idx);
-            if (val == NULL)
+            if (val == NULL) {
+                if (PyErr_ExceptionMatches(PyExc_StopIteration)) {
+                    PyErr_Clear();
+                    raise_errmsg("Expecting object", pystr, idx);
+                }
                 goto bail;
+            }
 
             if (PyList_Append(rval, val) == -1)
                 goto bail;
