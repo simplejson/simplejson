@@ -36,9 +36,11 @@ def encode_basestring(s):
     """Return a JSON representation of a Python string
 
     """
+    if isinstance(s, str) and HAS_UTF8.search(s) is not None:
+        s = s.decode('utf-8')
     def replace(match):
         return ESCAPE_DCT[match.group(0)]
-    return '"' + ESCAPE.sub(replace, s) + '"'
+    return u'"' + ESCAPE.sub(replace, s) + u'"'
 
 
 def py_encode_basestring_ascii(s):
@@ -202,7 +204,10 @@ class JSONEncoder(object):
         chunks = self.iterencode(o, _one_shot=True)
         if not isinstance(chunks, (list, tuple)):
             chunks = list(chunks)
-        return ''.join(chunks)
+        if self.ensure_ascii:
+            return ''.join(chunks)
+        else:
+            return u''.join(chunks)
 
     def iterencode(self, o, _one_shot=False):
         """Encode the given object and yield each string

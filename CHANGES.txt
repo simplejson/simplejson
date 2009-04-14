@@ -1,5 +1,7 @@
 Version 2.1.0 released XXXX-XX-XX
 
+* Fixed str/unicode mismatches when using ensure_ascii=False
+  http://code.google.com/p/simplejson/issues/detail?id=48
 * Fixed error message when parsing an array with trailing comma with speedups
   http://code.google.com/p/simplejson/issues/detail?id=46
 * Refactor decoder errors to raise JSONDecodeError instead of ValueError
