@@ -29,7 +29,7 @@ The decoder can handle incoming JSON strings of any specified encoding
 """
 
 CLASSIFIERS = filter(None, map(str.strip,
-"""                 
+"""
 Intended Audience :: Developers
 License :: OSI Approved :: MIT License
 Programming Language :: Python
@@ -89,7 +89,7 @@ def run_setup(with_binary):
         license="MIT License",
         packages=find_packages(exclude=['ez_setup']),
         platforms=['any'],
-        test_suite="simplejson.tests",
+        test_suite="simplejson.tests.all_tests_suite",
         zip_safe=True,
         features=features,
         cmdclass={'build_ext': ve_build_ext},

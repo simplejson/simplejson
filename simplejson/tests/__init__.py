@@ -25,7 +25,7 @@ def additional_tests(suite=None):
     return suite
 
 
-def main():
+def all_tests_suite():
     suite = unittest.TestLoader().loadTestsFromNames([
         'simplejson.tests.test_check_circular',
         'simplejson.tests.test_decode',
@@ -44,9 +44,14 @@ def main():
         'simplejson.tests.test_unicode',
     ])
     suite = additional_tests(suite)
+    return OptionalExtensionTestSuite([suite])
+
+
+def main():
     runner = unittest.TextTestRunner()
-    runner.run(OptionalExtensionTestSuite([suite]))
-    
+    suite = all_tests_suite()
+    runner.run(suite)
+
 
 if __name__ == '__main__':
     import os
