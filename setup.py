@@ -1,17 +1,7 @@
 #!/usr/bin/env python
 
 from ez_setup import use_setuptools
-import sys
-if 'cygwin' in sys.platform.lower():
-   min_version='0.6c6'
-else:
-   min_version='0.6a9'
-try:
-    use_setuptools(min_version=min_version)
-except TypeError:
-    # If a non-local ez_setup is already imported, it won't be able to
-    # use the min_version kwarg and will bail with TypeError
-    use_setuptools()
+use_setuptools()
 
 from setuptools import setup, find_packages, Extension, Feature
 from distutils.command.build_ext import build_ext
