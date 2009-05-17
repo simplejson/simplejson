@@ -1,5 +1,9 @@
 Version 2.1.0 released XXXX-XX-XX
 
+* Test suite (python setup.py test) now automatically runs with and without speedups
+  http://code.google.com/p/simplejson/issues/detail?id=55
+* Fixed support for older versions of easy_install (e.g. stock Mac OS X config)
+  http://code.google.com/p/simplejson/issues/detail?id=54
 * Fixed str/unicode mismatches when using ensure_ascii=False
   http://code.google.com/p/simplejson/issues/detail?id=48
 * Fixed error message when parsing an array with trailing comma with speedups
