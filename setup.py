@@ -2,7 +2,7 @@
 
 import sys
 from ez_setup import use_setuptools
-use_setuptools()
+use_setuptools(version='0.6c6')
 
 from setuptools import setup, find_packages, Extension, Feature
 from distutils.command.build_ext import build_ext
