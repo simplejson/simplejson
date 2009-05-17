@@ -151,7 +151,10 @@ Basic Usage
    versions of simplejson earlier than 2.1.0, an integer is also accepted
    and is converted to a string with that many spaces.
 
-   If specified, *separators* should be an ``(item_separator, dict_separator)`` 
+   .. versionchanged:: 2.1.0
+      Changed *indent* from an integer number of spaces to a string.
+
+   If specified, *separators* should be an ``(item_separator, dict_separator)``
    tuple.  By default, ``(', ', ': ')`` are used.  To get the most compact JSON
    representation, you should specify ``(',', ':')`` to eliminate whitespace.
 
@@ -399,6 +402,9 @@ Encoders and decoders
    representation without any newlines. For backwards compatibility with
    versions of simplejson earlier than 2.1.0, an integer is also accepted
    and is converted to a string with that many spaces.
+
+   .. versionchanged:: 2.1.0
+      Changed *indent* from an integer number of spaces to a string.
 
    If specified, *separators* should be an ``(item_separator, key_separator)``
    tuple.  By default, ``(', ', ': ')`` are used.  To get the most compact JSON
