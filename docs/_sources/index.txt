@@ -44,7 +44,7 @@ Compact encoding::
 Pretty printing::
 
     >>> import simplejson as json
-    >>> s = json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4)
+    >>> s = json.dumps({'4': 5, '6': 7}, sort_keys=True, indent='    ')
     >>> print '\n'.join([l.rstrip() for l in  s.splitlines()])
     {
         "4": 5,
@@ -144,10 +144,12 @@ Basic Usage
    If *allow_nan* is true, their JavaScript equivalents will be used
    (``NaN``, ``Infinity``, ``-Infinity``).
 
-   If *indent* is a non-negative integer, then JSON array elements and object
-   members will be pretty-printed with that indent level.  An indent level of 0
-   will only insert newlines.  ``None`` (the default) selects the most compact
-   representation.
+   If *indent* is a string, then JSON array elements and object members
+   will be pretty-printed with a newline followed by that string repeated
+   for each level of nesting. ``None`` (the default) selects the most compact
+   representation without any newlines. For backwards compatibility with
+   versions of simplejson earlier than 2.1.0, an integer is also accepted
+   and is converted to a string with that many spaces.
 
    If specified, *separators* should be an ``(item_separator, dict_separator)`` 
    tuple.  By default, ``(', ', ': ')`` are used.  To get the most compact JSON
@@ -391,10 +393,12 @@ Encoders and decoders
    will be sorted by key; this is useful for regression tests to ensure that
    JSON serializations can be compared on a day-to-day basis.
 
-   If *indent* is a non-negative integer (it is ``None`` by default), then JSON
-   array elements and object members will be pretty-printed with that indent
-   level.  An indent level of 0 will only insert newlines.  ``None`` is the most
-   compact representation.
+   If *indent* is a string, then JSON array elements and object members
+   will be pretty-printed with a newline followed by that string repeated
+   for each level of nesting. ``None`` (the default) selects the most compact
+   representation without any newlines. For backwards compatibility with
+   versions of simplejson earlier than 2.1.0, an integer is also accepted
+   and is converted to a string with that many spaces.
 
    If specified, *separators* should be an ``(item_separator, key_separator)``
    tuple.  By default, ``(', ', ': ')`` are used.  To get the most compact JSON

@@ -1,6 +1,10 @@
 Version 2.1.0 released XXXX-XX-XX
 
-* Test suite (python setup.py test) now automatically runs with and without speedups
+* indent encoding parameter changed to be a string rather than an integer
+  (integer use still supported for backwards compatibility)
+  http://code.google.com/p/simplejson/issues/detail?id=56
+* Test suite (python setup.py test) now automatically runs with and without
+  speedups
   http://code.google.com/p/simplejson/issues/detail?id=55
 * Fixed support for older versions of easy_install (e.g. stock Mac OS X config)
   http://code.google.com/p/simplejson/issues/detail?id=54

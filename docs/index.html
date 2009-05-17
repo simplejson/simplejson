@@ -72,7 +72,7 @@ extension for speedups.</p>
 </pre></div>
 <p>Pretty printing:</p>
 <div class="highlight"><pre><span class="gp">&gt;&gt;&gt; </span><span class="k">import</span> <span class="nn">simplejson</span> <span class="k">as</span> <span class="nn">json</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s">&#39;4&#39;</span><span class="p">:</span> <span class="mf">5</span><span class="p">,</span> <span class="s">&#39;6&#39;</span><span class="p">:</span> <span class="mf">7</span><span class="p">},</span> <span class="n">sort_keys</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mf">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s">&#39;4&#39;</span><span class="p">:</span> <span class="mf">5</span><span class="p">,</span> <span class="s">&#39;6&#39;</span><span class="p">:</span> <span class="mf">7</span><span class="p">},</span> <span class="n">sort_keys</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="s">&#39;    &#39;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">print</span> <span class="s">&#39;</span><span class="se">\n</span><span class="s">&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">l</span><span class="o">.</span><span class="n">rstrip</span><span class="p">()</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span>  <span class="n">s</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()])</span>
 <span class="go">{</span>
 <span class="go">    &quot;4&quot;: 5,</span>
@@ -157,10 +157,12 @@ will result in an <tt class="xref docutils literal"><span class="pre">OverflowEr
 <tt class="docutils literal"><span class="pre">inf</span></tt>, <tt class="docutils literal"><span class="pre">-inf</span></tt>) in strict compliance of the JSON specification.
 If <em>allow_nan</em> is true, their JavaScript equivalents will be used
 (<tt class="docutils literal"><span class="pre">NaN</span></tt>, <tt class="docutils literal"><span class="pre">Infinity</span></tt>, <tt class="docutils literal"><span class="pre">-Infinity</span></tt>).</p>
-<p>If <em>indent</em> is a non-negative integer, then JSON array elements and object
-members will be pretty-printed with that indent level.  An indent level of 0
-will only insert newlines.  <tt class="xref docutils literal"><span class="pre">None</span></tt> (the default) selects the most compact
-representation.</p>
+<p>If <em>indent</em> is a string, then JSON array elements and object members
+will be pretty-printed with a newline followed by that string repeated
+for each level of nesting. <tt class="xref docutils literal"><span class="pre">None</span></tt> (the default) selects the most compact
+representation without any newlines. For backwards compatibility with
+versions of simplejson earlier than 2.1.0, an integer is also accepted
+and is converted to a string with that many spaces.</p>
 <p>If specified, <em>separators</em> should be an <tt class="docutils literal"><span class="pre">(item_separator,</span> <span class="pre">dict_separator)</span></tt>
 tuple.  By default, <tt class="docutils literal"><span class="pre">(',</span> <span class="pre">',</span> <span class="pre">':</span> <span class="pre">')</span></tt> are used.  To get the most compact JSON
 representation, you should specify <tt class="docutils literal"><span class="pre">(',',</span> <span class="pre">':')</span></tt> to eliminate whitespace.</p>
@@ -414,10 +416,12 @@ such floats.</p>
 <p>If <em>sort_keys</em> is true (the default), then the output of dictionaries
 will be sorted by key; this is useful for regression tests to ensure that
 JSON serializations can be compared on a day-to-day basis.</p>
-<p>If <em>indent</em> is a non-negative integer (it is <tt class="xref docutils literal"><span class="pre">None</span></tt> by default), then JSON
-array elements and object members will be pretty-printed with that indent
-level.  An indent level of 0 will only insert newlines.  <tt class="xref docutils literal"><span class="pre">None</span></tt> is the most
-compact representation.</p>
+<p>If <em>indent</em> is a string, then JSON array elements and object members
+will be pretty-printed with a newline followed by that string repeated
+for each level of nesting. <tt class="xref docutils literal"><span class="pre">None</span></tt> (the default) selects the most compact
+representation without any newlines. For backwards compatibility with
+versions of simplejson earlier than 2.1.0, an integer is also accepted
+and is converted to a string with that many spaces.</p>
 <p>If specified, <em>separators</em> should be an <tt class="docutils literal"><span class="pre">(item_separator,</span> <span class="pre">key_separator)</span></tt>
 tuple.  By default, <tt class="docutils literal"><span class="pre">(',</span> <span class="pre">',</span> <span class="pre">':</span> <span class="pre">')</span></tt> are used.  To get the most compact JSON
 representation, you should specify <tt class="docutils literal"><span class="pre">(',',</span> <span class="pre">':')</span></tt> to eliminate whitespace.</p>
@@ -514,7 +518,7 @@ available.  For example:</p>
     </div>
     <div class="footer">
       &copy; Copyright 2008, Bob Ippolito.
-      Last updated on Mar 29, 2009.
+      Last updated on May 17, 2009.
       Created using <a href="http://sphinx.pocoo.org/">Sphinx</a>.
     </div>
   </body>

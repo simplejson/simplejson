@@ -2102,7 +2102,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         /* TODO: DOES NOT RUN */
         indent_level += 1;
         /*
-            newline_indent = '\n' + (' ' * (_indent * _current_indent_level))
+            newline_indent = '\n' + (_indent * _current_indent_level)
             separator = _item_separator + newline_indent
             buf += newline_indent
         */
@@ -2173,7 +2173,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         /* TODO: DOES NOT RUN */
         indent_level -= 1;
         /*
-            yield '\n' + (' ' * (_indent * _current_indent_level))
+            yield '\n' + (_indent * _current_indent_level)
         */
     }
     if (PyList_Append(rval, close_dict))
@@ -2240,7 +2240,7 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
         /* TODO: DOES NOT RUN */
         indent_level += 1;
         /*
-            newline_indent = '\n' + (' ' * (_indent * _current_indent_level))
+            newline_indent = '\n' + (_indent * _current_indent_level)
             separator = _item_separator + newline_indent
             buf += newline_indent
         */
@@ -2263,7 +2263,7 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
         /* TODO: DOES NOT RUN */
         indent_level -= 1;
         /*
-            yield '\n' + (' ' * (_indent * _current_indent_level))
+            yield '\n' + (_indent * _current_indent_level)
         */
     }
     if (PyList_Append(rval, close_array))
