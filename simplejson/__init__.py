@@ -361,3 +361,42 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
     if parse_constant is not None:
         kw['parse_constant'] = parse_constant
     return cls(encoding=encoding, **kw).decode(s)
+
+
+def _toggle_speedups(enabled):
+    import simplejson.decoder as dec
+    import simplejson.encoder as enc
+    import simplejson.scanner as scan
+    try:
+        from simplejson._speedups import make_encoder as c_make_encoder
+    except ImportError:
+        c_make_encoder = None
+    if enabled:
+        dec.scanstring = dec.c_scanstring or dec.py_scanstring
+        enc.c_make_encoder = c_make_encoder
+        enc.encode_basestring_ascii = (enc.c_encode_basestring_ascii or 
+            enc.py_encode_basestring_ascii)
+        scan.make_scanner = scan.c_make_scanner or scan.py_make_scanner
+    else:
+        dec.scanstring = dec.py_scanstring
+        enc.c_make_encoder = None
+        enc.encode_basestring_ascii = enc.py_encode_basestring_ascii
+        scan.make_scanner = scan.py_make_scanner
+    dec.make_scanner = scan.make_scanner
+    global _default_decoder
+    _default_decoder = JSONDecoder(
+        encoding=None,
+        object_hook=None,
+        object_pairs_hook=None,
+    )
+    global _default_encoder
+    _default_encoder = JSONEncoder(
+       skipkeys=False,
+       ensure_ascii=True,
+       check_circular=True,
+       allow_nan=True,
+       indent=None,
+       separators=None,
+       encoding='utf-8',
+       default=None,
+   )
