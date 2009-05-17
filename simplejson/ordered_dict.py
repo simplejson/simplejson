@@ -52,7 +52,12 @@ class OrderedDict(dict, DictMixin):
     def popitem(self, last=True):
         if not self:
             raise KeyError('dictionary is empty')
-        key = reversed(self).next() if last else iter(self).next()
+        # Modified from original to support Python 2.4, see
+        # http://code.google.com/p/simplejson/issues/detail?id=53
+        if last:
+            key = reversed(self).next()
+        else:
+            key = iter(self).next()
         value = self.pop(key)
         return key, value
 
