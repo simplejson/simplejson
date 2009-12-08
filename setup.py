@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
 import sys
-from ez_setup import use_setuptools
-use_setuptools(version='0.6c6')
+try:
+    from ez_setup import use_setuptools
+    use_setuptools(version='0.6c6')
+except ImportError:
+    pass
 
 from setuptools import setup, find_packages, Extension, Feature
 from distutils.command.build_ext import build_ext
