@@ -2212,6 +2212,8 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         idx += 1;
     }
     Py_CLEAR(iter);
+    if (PyErr_Occurred())
+        goto bail;
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
@@ -2245,10 +2247,10 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
     static PyObject *close_array = NULL;
     static PyObject *empty_array = NULL;
     PyObject *ident = NULL;
-    PyObject *s_fast = NULL;
-    Py_ssize_t num_items;
-    PyObject **seq_items;
-    Py_ssize_t i;
+    PyObject *iter = NULL;
+    PyObject *obj = NULL;
+    int is_true;
+    int i = 0;
 
     if (open_array == NULL || close_array == NULL || empty_array == NULL) {
         open_array = PyString_InternFromString("[");
@@ -2258,14 +2260,11 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
             return -1;
     }
     ident = NULL;
-    s_fast = PySequence_Fast(seq, "_iterencode_list needs a sequence");
-    if (s_fast == NULL)
+    is_true = PyObject_IsTrue(seq);
+    if (is_true == -1)
         return -1;
-    num_items = PySequence_Fast_GET_SIZE(s_fast);
-    if (num_items == 0) {
-        Py_DECREF(s_fast);
+    else if (is_true == 0)
         return PyList_Append(rval, empty_array);
-    }
 
     if (s->markers != Py_None) {
         int has_key;
@@ -2283,7 +2282,10 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
         }
     }
 
-    seq_items = PySequence_Fast_ITEMS(s_fast);
+    iter = PyObject_GetIter(seq);
+    if (iter == NULL)
+        goto bail;
+
     if (PyList_Append(rval, open_array))
         goto bail;
     if (s->indent != Py_None) {
@@ -2295,15 +2297,19 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
             buf += newline_indent
         */
     }
-    for (i = 0; i < num_items; i++) {
-        PyObject *obj = seq_items[i];
+    while ((obj = PyIter_Next(iter))) {
         if (i) {
             if (PyList_Append(rval, s->item_separator))
                 goto bail;
         }
         if (encoder_listencode_obj(s, rval, obj, indent_level))
             goto bail;
+        i++;
+        Py_CLEAR(obj);
     }
+    Py_CLEAR(iter);
+    if (PyErr_Occurred())
+        goto bail;
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
@@ -2318,12 +2324,12 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
     }
     if (PyList_Append(rval, close_array))
         goto bail;
-    Py_DECREF(s_fast);
     return 0;
 
 bail:
+    Py_XDECREF(obj);
+    Py_XDECREF(iter);
     Py_XDECREF(ident);
-    Py_DECREF(s_fast);
     return -1;
 }
 
