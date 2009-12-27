@@ -12,7 +12,7 @@ syntax (ECMA-262 3rd edition) used as a lightweight data interchange format.
 :mod:`simplejson` exposes an API familiar to users of the standard library
 :mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
 version of the :mod:`json` library contained in Python 2.6, but maintains
-compatibility with Python 2.4 and Python 2.5 and (currently) has
+compatibility with Python 2.5 and (currently) has
 significant performance advantages, even without using the optional C
 extension for speedups.
 
@@ -44,7 +44,7 @@ Compact encoding::
 Pretty printing::
 
     >>> import simplejson as json
-    >>> s = json.dumps({'4': 5, '6': 7}, sort_keys=True, indent='    ')
+    >>> s = json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4 * ' ')
     >>> print '\n'.join([l.rstrip() for l in  s.splitlines()])
     {
         "4": 5,
@@ -161,10 +161,8 @@ Basic Usage
    *encoding* is the character encoding for str instances, default is
    ``'utf-8'``.
 
-   If specified, *default* should be a function that gets called for objects
-   that can't otherwise be serialized.  It should return a JSON encodable
-   version of the object or raise a :exc:`TypeError`.  If not specified,
-   :exc:`TypeError` is always raised in those cases.
+   *default(obj)* is a function that should return a serializable version of
+   *obj* or raise :exc:`TypeError`.  The default simply raises :exc:`TypeError`.
 
    To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
@@ -304,10 +302,10 @@ Encoders and decoders
    Note that currently only encodings that are a superset of ASCII work, strings
    of other encodings should be passed in as :class:`unicode`.
 
-   *object_hook*, if specified, will be called with the result of every JSON
-   object decoded and its return value will be used in place of the given
-   :class:`dict`.  This can be used to provide custom deserializations (e.g. to
-   support JSON-RPC class hinting).
+   *object_hook* is an optional function that will be called with the result of
+   every JSON object decoded and its return value will be used in place of the
+   given :class:`dict`.  This can be used to provide custom deserializations
+   (e.g. to support JSON-RPC class hinting).
 
    *object_pairs_hook* is an optional function that will be called with the
    result of any object literal decode with an ordered list of pairs.  The

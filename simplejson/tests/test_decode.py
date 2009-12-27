@@ -34,7 +34,7 @@ class TestDecode(TestCase):
         self.assertEqual(json.loads(s), eval(s))
         s = '""'
         self.assertEqual(json.loads(s), eval(s))
-        
+
     def test_object_pairs_hook(self):
         s = '{"xkd":1, "kcw":2, "art":3, "hxm":4, "qrt":5, "pad":6, "hoy":7}'
         p = [("xkd", 1), ("kcw", 2), ("art", 3), ("hxm", 4),
@@ -66,3 +66,8 @@ class TestDecode(TestCase):
         s = u'[{"a_key": 1, "b_\xe9": 2}, {"a_key": 3, "b_\xe9": 4}]'
         self.check_keys_reuse(s, json.loads)
 
+    def test_empty_strings(self):
+        self.assertEqual(json.loads('""'), "")
+        self.assertEqual(json.loads(u'""'), u"")
+        self.assertEqual(json.loads('[""]'), [""])
+        self.assertEqual(json.loads(u'[""]'), [u""])

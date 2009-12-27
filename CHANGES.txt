@@ -1,5 +1,6 @@
 Version 2.1.0 released XXXX-XX-XX
 
+* Python 2.4 no longer supported (may still work, but no longer tested)
 * Decoding performance and memory utilization enhancements
   http://bugs.python.org/issue7451
 * JSONEncoderForHTML class for escaping &, <, >

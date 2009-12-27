@@ -822,7 +822,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
         if (chunk != NULL)
             rval = chunk;
         else
-            rval = PyUnicode_FromStringAndSize("", 0);
+            rval = PyUnicode_FromUnicode(NULL, 0);
     }
     else {
         APPEND_OLD_CHUNK
