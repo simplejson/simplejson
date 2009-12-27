@@ -2062,18 +2062,21 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     static PyObject *open_dict = NULL;
     static PyObject *close_dict = NULL;
     static PyObject *empty_dict = NULL;
+    static PyObject *iteritems = NULL;
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
     PyObject *key, *value;
-    Py_ssize_t pos;
+    PyObject *iter = NULL;
+    PyObject *item = NULL;
     int skipkeys;
     Py_ssize_t idx;
 
-    if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
+    if (open_dict == NULL || close_dict == NULL || empty_dict == NULL || iteritems == NULL) {
         open_dict = PyString_InternFromString("{");
         close_dict = PyString_InternFromString("}");
         empty_dict = PyString_InternFromString("{}");
-        if (open_dict == NULL || close_dict == NULL || empty_dict == NULL)
+        iteritems = PyString_InternFromString("iteritems");
+        if (open_dict == NULL || close_dict == NULL || empty_dict == NULL || iteritems == NULL)
             return -1;
     }
     if (PyDict_Size(dct) == 0)
@@ -2110,11 +2113,20 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
 
     /* TODO: C speedup not implemented for sort_keys */
 
-    pos = 0;
     skipkeys = PyObject_IsTrue(s->skipkeys);
     idx = 0;
-    while (PyDict_Next(dct, &pos, &key, &value)) {
+    iter = PyObject_CallMethodObjArgs(dct, iteritems, NULL);
+    if (iter == NULL)
+        goto bail;
+    while ((item = PyIter_Next(iter))) {
         PyObject *encoded;
+
+        key = PyTuple_GetItem(item, 0);
+        if (key == NULL)
+            goto bail;
+        value = PyTuple_GetItem(item, 1);
+        if (value == NULL)
+            goto bail;
 
         if (PyString_Check(key) || PyUnicode_Check(key)) {
             Py_INCREF(key);
@@ -2136,6 +2148,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
                 goto bail;
         }
         else if (skipkeys) {
+            Py_DECREF(item);
             continue;
         }
         else {
@@ -2162,8 +2175,10 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             goto bail;
         if (encoder_listencode_obj(s, rval, value, indent_level))
             goto bail;
+        Py_CLEAR(item);
         idx += 1;
     }
+    Py_CLEAR(iter);
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
@@ -2181,6 +2196,8 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     return 0;
 
 bail:
+    Py_XDECREF(item);
+    Py_XDECREF(iter);
     Py_XDECREF(kstr);
     Py_XDECREF(ident);
     return -1;

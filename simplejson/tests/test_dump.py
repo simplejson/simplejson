@@ -19,3 +19,9 @@ class TestDump(TestCase):
         self.assertEquals(json.dumps(
                 {2: 3.0, 4.0: 5L, False: 1, 6L: True, "7": 0}, sort_keys=True),
                 '{"false": 1, "2": 3.0, "4.0": 5, "6": true, "7": 0}')
+
+    def test_ordered_dict(self):
+        # http://bugs.python.org/issue6105
+        items = [('one', 1), ('two', 2), ('three', 3), ('four', 4), ('five', 5)]
+        s = json.dumps(json.OrderedDict(items))
+        self.assertEqual(s, '{"one": 1, "two": 2, "three": 3, "four": 4, "five": 5}')
