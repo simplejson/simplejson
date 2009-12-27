@@ -458,3 +458,10 @@ Encoders and decoders
 
       Note that :meth:`encode` has much better performance than
       :meth:`iterencode`.
+
+.. class:: JSONEncoderForHTML([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default]]]]]]]]])
+
+   Subclass of :class:`JSONEncoder` that escapes &, <, and > for embedding in HTML.
+
+   .. versionchanged:: 2.1.0
+      New in 2.1.0

@@ -1,5 +1,7 @@
 Version 2.1.0 released XXXX-XX-XX
 
+* JSONEncoderForHTML class for escaping &, <, >
+  http://code.google.com/p/simplejson/issues/detail?id=66
 * Memoization of object keys during encoding (when using speedups)
 * Encoder changed to use PyIter_Next for list iteration to avoid
   potential threading issues
