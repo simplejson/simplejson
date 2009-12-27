@@ -5,7 +5,8 @@ import textwrap
 
 class TestIndent(TestCase):
     def test_indent(self):
-        h = [['blorpie'], ['whoops'], [], 'd-shtaeou', 'd-nthiouh', 'i-vhbjkhnth',
+        h = [['blorpie'], ['whoops'], [], 'd-shtaeou', 'd-nthiouh',
+             'i-vhbjkhnth',
              {'nifty': 87}, {'field': 'yes', 'morefield': False} ]
 
         expect = textwrap.dedent("""\
@@ -44,6 +45,9 @@ class TestIndent(TestCase):
         self.assertEquals(h2, h)
         self.assertEquals(h3, h)
         self.assertEquals(h4, h)
-        self.assertEquals(d2, expect)
         self.assertEquals(d3, expect.replace('\t', '  '))
         self.assertEquals(d4, expect.replace('\t', '  '))
+        # NOTE: Python 2.4 textwrap.dedent converts tabs to spaces,
+        #       so the following is expected to fail. Python 2.4 is not a
+        #       supported platform in simplejson 2.1.0+.
+        self.assertEquals(d2, expect)

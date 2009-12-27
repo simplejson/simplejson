@@ -161,9 +161,9 @@ _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr)
 {
     /* PyObject to Py_ssize_t converter */
     *size_ptr = PyInt_AsSsize_t(o);
-    if (*size_ptr == -1 && PyErr_Occurred());
-        return 1;
-    return 0;
+    if (*size_ptr == -1 && PyErr_Occurred())
+        return 0;
+    return 1;
 }
 
 static PyObject *
@@ -476,6 +476,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
     char *buf = PyString_AS_STRING(pystr);
     PyObject *chunks = NULL;
     PyObject *chunk = NULL;
+
     if (end < 0 || len <= end) {
         PyErr_SetString(PyExc_ValueError, "end is out of bounds");
         goto bail;

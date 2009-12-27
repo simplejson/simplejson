@@ -42,6 +42,7 @@ def all_tests_suite():
         'simplejson.tests.test_recursion',
         'simplejson.tests.test_scanstring',
         'simplejson.tests.test_separators',
+        'simplejson.tests.test_speedups',
         'simplejson.tests.test_unicode',
     ])
     suite = additional_tests(suite)
