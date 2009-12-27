@@ -1,5 +1,8 @@
 Version 2.1.0 released XXXX-XX-XX
 
+* Encoder changed to use iteritems rather than PyDict_Next in order to
+  support dict subclasses that have a well defined ordering
+  http://bugs.python.org/issue6105
 * indent encoding parameter changed to be a string rather than an integer
   (integer use still supported for backwards compatibility)
   http://code.google.com/p/simplejson/issues/detail?id=56
