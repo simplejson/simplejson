@@ -1,5 +1,8 @@
 Version 2.1.0 released XXXX-XX-XX
 
+* Memoization of object keys during encoding (when using speedups)
+* Encoder changed to use PyIter_Next for list iteration to avoid
+  potential threading issues
 * Encoder changed to use iteritems rather than PyDict_Next in order to
   support dict subclasses that have a well defined ordering
   http://bugs.python.org/issue6105

@@ -261,18 +261,22 @@ class JSONEncoder(object):
             return text
 
 
+        key_memo = {}
         if (_one_shot and c_make_encoder is not None
                 and not self.indent and not self.sort_keys):
             _iterencode = c_make_encoder(
                 markers, self.default, _encoder, self.indent,
                 self.key_separator, self.item_separator, self.sort_keys,
-                self.skipkeys, self.allow_nan)
+                self.skipkeys, self.allow_nan, key_memo)
         else:
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
                 self.key_separator, self.item_separator, self.sort_keys,
                 self.skipkeys, _one_shot)
-        return _iterencode(o, 0)
+        try:
+            return _iterencode(o, 0)
+        finally:
+            key_memo.clear()
 
 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,

@@ -77,6 +77,7 @@ typedef struct _PyEncoderObject {
     PyObject *item_separator;
     PyObject *sort_keys;
     PyObject *skipkeys;
+    PyObject *key_memo;
     int fast_encode;
     int allow_nan;
 } PyEncoderObject;
@@ -90,6 +91,7 @@ static PyMemberDef encoder_members[] = {
     {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
     {"sort_keys", T_OBJECT, offsetof(PyEncoderObject, sort_keys), READONLY, "sort_keys"},
     {"skipkeys", T_OBJECT, offsetof(PyEncoderObject, skipkeys), READONLY, "skipkeys"},
+    {"key_memo", T_OBJECT, offsetof(PyEncoderObject, key_memo), READONLY, "key_memo"},
     {NULL}
 };
 
@@ -1864,6 +1866,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         s->item_separator = NULL;
         s->sort_keys = NULL;
         s->skipkeys = NULL;
+        s->key_memo = NULL;
     }
     return (PyObject *)s;
 }
@@ -1872,18 +1875,18 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
-    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan;
+    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
-        &sort_keys, &skipkeys, &allow_nan))
+        &sort_keys, &skipkeys, &allow_nan, &key_memo))
         return -1;
 
     s->markers = markers;
@@ -1894,6 +1897,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->item_separator = item_separator;
     s->sort_keys = sort_keys;
     s->skipkeys = skipkeys;
+    s->key_memo = key_memo;
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
     s->allow_nan = PyObject_IsTrue(allow_nan);
 
@@ -1905,6 +1909,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(s->item_separator);
     Py_INCREF(s->sort_keys);
     Py_INCREF(s->skipkeys);
+    Py_INCREF(s->key_memo);
     return 0;
 }
 
@@ -2101,6 +2106,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     PyObject *key, *value;
     PyObject *iter = NULL;
     PyObject *item = NULL;
+    PyObject *encoded = NULL;
     int skipkeys;
     Py_ssize_t idx;
 
@@ -2152,7 +2158,6 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     if (iter == NULL)
         goto bail;
     while ((item = PyIter_Next(iter))) {
-        PyObject *encoded;
 
         key = PyTuple_GetItem(item, 0);
         if (key == NULL)
@@ -2160,8 +2165,12 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         value = PyTuple_GetItem(item, 1);
         if (value == NULL)
             goto bail;
-
-        if (PyString_Check(key) || PyUnicode_Check(key)) {
+        
+        encoded = PyDict_GetItem(s->key_memo, key);
+        if (encoded != NULL) {
+            Py_INCREF(encoded);
+        }
+        else if (PyString_Check(key) || PyUnicode_Check(key)) {
             Py_INCREF(key);
             kstr = key;
         }
@@ -2195,15 +2204,18 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
                 goto bail;
         }
 
-        encoded = encoder_encode_string(s, kstr);
-        Py_CLEAR(kstr);
-        if (encoded == NULL)
-            goto bail;
+        if (encoded == NULL) {
+            encoded = encoder_encode_string(s, kstr);
+            Py_CLEAR(kstr);
+            if (encoded == NULL)
+                goto bail;
+            if (PyDict_SetItem(s->key_memo, key, encoded))
+                goto bail;
+        }
         if (PyList_Append(rval, encoded)) {
-            Py_DECREF(encoded);
             goto bail;
         }
-        Py_DECREF(encoded);
+        Py_CLEAR(encoded);
         if (PyList_Append(rval, s->key_separator))
             goto bail;
         if (encoder_listencode_obj(s, rval, value, indent_level))
@@ -2231,6 +2243,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     return 0;
 
 bail:
+    Py_XDECREF(encoded);
     Py_XDECREF(item);
     Py_XDECREF(iter);
     Py_XDECREF(kstr);
@@ -2355,6 +2368,7 @@ encoder_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(s->item_separator);
     Py_VISIT(s->sort_keys);
     Py_VISIT(s->skipkeys);
+    Py_VISIT(s->key_memo);
     return 0;
 }
 
@@ -2373,6 +2387,7 @@ encoder_clear(PyObject *self)
     Py_CLEAR(s->item_separator);
     Py_CLEAR(s->sort_keys);
     Py_CLEAR(s->skipkeys);
+    Py_CLEAR(s->key_memo);
     return 0;
 }
 
