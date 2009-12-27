@@ -3,7 +3,7 @@
 import sys
 try:
     from ez_setup import use_setuptools
-    use_setuptools(version='0.6c6')
+    use_setuptools(version='0.6c11')
 except ImportError:
     pass
 
