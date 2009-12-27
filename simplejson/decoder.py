@@ -175,7 +175,12 @@ WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 WHITESPACE_STR = ' \t\n\r'
 
 def JSONObject((s, end), encoding, strict, scan_once, object_hook,
-        object_pairs_hook, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+        object_pairs_hook, memo=None,
+        _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+    # Backwards compatibility
+    if memo is None:
+        memo = {}
+    memo_get = memo.setdefault
     pairs = []
     # Use a slice to prevent IndexError from being raised, the following
     # check will raise a more specific ValueError if the string is empty
@@ -199,6 +204,7 @@ def JSONObject((s, end), encoding, strict, scan_once, object_hook,
     end += 1
     while True:
         key, end = scanstring(s, end, encoding, strict)
+        key = memo_get(key, key)
 
         # To skip some function call overhead we optimize the fast paths where
         # the JSON key separator is ": " or just ":".
@@ -382,6 +388,7 @@ class JSONDecoder(object):
         self.parse_object = JSONObject
         self.parse_array = JSONArray
         self.parse_string = scanstring
+        self.memo = {}
         self.scan_once = make_scanner(self)
 
     def decode(self, s, _w=WHITESPACE.match):

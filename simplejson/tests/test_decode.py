@@ -6,6 +6,10 @@ import simplejson as json
 from simplejson import OrderedDict
 
 class TestDecode(TestCase):
+    if not hasattr(TestCase, 'assertIs'):
+        def assertIs(self, a, b):
+            self.assert_(a is b, '%r is %r' % (a, b))
+
     def test_decimal(self):
         rval = json.loads('1.1', parse_float=decimal.Decimal)
         self.assert_(isinstance(rval, decimal.Decimal))
@@ -47,3 +51,18 @@ class TestDecode(TestCase):
                                     object_pairs_hook=OrderedDict,
                                     object_hook=lambda x: None),
                          OrderedDict(p))
+
+    def check_keys_reuse(self, source, loads):
+        rval = loads(source)
+        (a, b), (c, d) = sorted(rval[0]), sorted(rval[1])
+        self.assertIs(a, c)
+        self.assertIs(b, d)
+
+    def test_keys_reuse_str(self):
+        s = u'[{"a_key": 1, "b_\xe9": 2}, {"a_key": 3, "b_\xe9": 4}]'.encode('utf8')
+        self.check_keys_reuse(s, json.loads)
+
+    def test_keys_reuse_unicode(self):
+        s = u'[{"a_key": 1, "b_\xe9": 2}, {"a_key": 3, "b_\xe9": 4}]'
+        self.check_keys_reuse(s, json.loads)
+

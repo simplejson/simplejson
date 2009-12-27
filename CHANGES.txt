@@ -1,5 +1,7 @@
 Version 2.1.0 released XXXX-XX-XX
 
+* Decoding performance and memory utilization enhancements
+  http://bugs.python.org/issue7451
 * JSONEncoderForHTML class for escaping &, <, >
   http://code.google.com/p/simplejson/issues/detail?id=66
 * Memoization of object keys during encoding (when using speedups)
