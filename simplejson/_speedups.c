@@ -451,7 +451,6 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
             } \
         } \
         if (PyList_Append(chunks, chunk)) { \
-            Py_DECREF(chunk); \
             goto bail; \
         } \
         Py_CLEAR(chunk); \
