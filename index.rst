@@ -199,6 +199,11 @@ Basic Usage
    to a :class:`unicode` object and passed to :func:`loads`. The default
    setting of ``'utf-8'`` is fastest and should be using whenever possible.
 
+   If *fp.read()* returns :class:`str` then decoded JSON strings that contain
+   only ASCII characters may be parsed as :class:`str` for performance and
+   memory reasons. If your code expects only :class:`unicode` the appropriate
+   solution is to wrap fp with a reader as demonstrated above.
+
    *object_hook* is an optional function that will be called with the result of
    any object literal decode (a :class:`dict`).  The return value of
    *object_hook* will be used instead of the :class:`dict`.  This feature can be used
@@ -251,6 +256,11 @@ Basic Usage
    other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
    specified.  Encodings that are not ASCII based (such as UCS-2) are not
    allowed and should be decoded to :class:`unicode` first.
+
+   If *s* is a :class:`str` then decoded JSON strings that contain
+   only ASCII characters may be parsed as :class:`str` for performance and
+   memory reasons. If your code expects only :class:`unicode` the appropriate
+   solution is decode *s* to :class:`unicode` prior to calling loads.
 
    The other arguments have the same meaning as in :func:`load`.
 
@@ -333,6 +343,12 @@ Encoders and decoders
 
       Return the Python representation of *s* (a :class:`str` or
       :class:`unicode` instance containing a JSON document)
+
+      If *s* is a :class:`str` then decoded JSON strings that contain
+      only ASCII characters may be parsed as :class:`str` for performance and
+      memory reasons. If your code expects only :class:`unicode` the
+      appropriate solution is decode *s* to :class:`unicode` prior to calling
+      decode.
 
    .. method:: raw_decode(s)
 

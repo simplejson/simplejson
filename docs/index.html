@@ -215,6 +215,10 @@ Encodings that are not ASCII based (such as UCS-2) are not allowed, and
 should be wrapped with <tt class="docutils literal"><span class="pre">codecs.getreader(fp)(encoding)</span></tt>, or simply decoded
 to a <tt class="xref docutils literal"><span class="pre">unicode</span></tt> object and passed to <a title="simplejson.loads" class="reference internal" href="#simplejson.loads"><tt class="xref docutils literal"><span class="pre">loads()</span></tt></a>. The default
 setting of <tt class="docutils literal"><span class="pre">'utf-8'</span></tt> is fastest and should be using whenever possible.</p>
+<p>If <em>fp.read()</em> returns <tt class="xref docutils literal"><span class="pre">str</span></tt> then decoded JSON strings that contain
+only ASCII characters may be parsed as <tt class="xref docutils literal"><span class="pre">str</span></tt> for performance and
+memory reasons. If your code expects only <tt class="xref docutils literal"><span class="pre">unicode</span></tt> the appropriate
+solution is to wrap fp with a reader as demonstrated above.</p>
 <p><em>object_hook</em> is an optional function that will be called with the result of
 any object literal decode (a <tt class="xref docutils literal"><span class="pre">dict</span></tt>).  The return value of
 <em>object_hook</em> will be used instead of the <tt class="xref docutils literal"><span class="pre">dict</span></tt>.  This feature can be used
@@ -263,6 +267,10 @@ document) to a Python object.</p>
 other than UTF-8 (e.g. latin-1), then an appropriate <em>encoding</em> name must be
 specified.  Encodings that are not ASCII based (such as UCS-2) are not
 allowed and should be decoded to <tt class="xref docutils literal"><span class="pre">unicode</span></tt> first.</p>
+<p>If <em>s</em> is a <tt class="xref docutils literal"><span class="pre">str</span></tt> then decoded JSON strings that contain
+only ASCII characters may be parsed as <tt class="xref docutils literal"><span class="pre">str</span></tt> for performance and
+memory reasons. If your code expects only <tt class="xref docutils literal"><span class="pre">unicode</span></tt> the appropriate
+solution is decode <em>s</em> to <tt class="xref docutils literal"><span class="pre">unicode</span></tt> prior to calling loads.</p>
 <p>The other arguments have the same meaning as in <a title="simplejson.load" class="reference internal" href="#simplejson.load"><tt class="xref docutils literal"><span class="pre">load()</span></tt></a>.</p>
 </dd></dl>
 
@@ -349,8 +357,14 @@ characters will be allowed in strings.</p>
 <dl class="method">
 <dt id="simplejson.JSONDecoder.decode">
 <!--[simplejson.JSONDecoder.decode]--><tt class="descname">decode</tt><big>(</big><em>s</em><big>)</big><a class="headerlink" href="#simplejson.JSONDecoder.decode" title="Permalink to this definition">¶</a></dt>
-<dd>Return the Python representation of <em>s</em> (a <tt class="xref docutils literal"><span class="pre">str</span></tt> or
-<tt class="xref docutils literal"><span class="pre">unicode</span></tt> instance containing a JSON document)</dd></dl>
+<dd><p>Return the Python representation of <em>s</em> (a <tt class="xref docutils literal"><span class="pre">str</span></tt> or
+<tt class="xref docutils literal"><span class="pre">unicode</span></tt> instance containing a JSON document)</p>
+<p>If <em>s</em> is a <tt class="xref docutils literal"><span class="pre">str</span></tt> then decoded JSON strings that contain
+only ASCII characters may be parsed as <tt class="xref docutils literal"><span class="pre">str</span></tt> for performance and
+memory reasons. If your code expects only <tt class="xref docutils literal"><span class="pre">unicode</span></tt> the
+appropriate solution is decode <em>s</em> to <tt class="xref docutils literal"><span class="pre">unicode</span></tt> prior to calling
+decode.</p>
+</dd></dl>
 
 <dl class="method">
 <dt id="simplejson.JSONDecoder.raw_decode">
