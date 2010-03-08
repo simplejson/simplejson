@@ -26,10 +26,12 @@ def main():
     else:
         raise SystemExit(sys.argv[0] + " [infile [outfile]]")
     try:
-        obj = json.load(infile, object_pairs_hook=json.OrderedDict)
+        obj = json.load(infile,
+                        object_pairs_hook=json.OrderedDict,
+                        use_decimal=True)
     except ValueError, e:
         raise SystemExit(e)
-    json.dump(obj, outfile, sort_keys=True, indent='    ')
+    json.dump(obj, outfile, sort_keys=True, indent='    ', use_decimal=True)
     outfile.write('\n')
 
 

@@ -97,7 +97,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
-__version__ = '2.1.0rc2'
+__version__ = '2.1.0rc3'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -106,12 +106,25 @@ __all__ = [
 
 __author__ = 'Bob Ippolito <bob@redivi.com>'
 
+from decimal import Decimal
+
 from decoder import JSONDecoder, JSONDecodeError
 from encoder import JSONEncoder
-try:
-    from collections import OrderedDict
-except ImportError:
-    from ordered_dict import OrderedDict
+def _import_OrderedDict():
+    import collections
+    try:
+        return collections.OrderedDict
+    except AttributeError:
+        import ordered_dict
+        return ordered_dict.OrderedDict
+OrderedDict = _import_OrderedDict()
+
+def _import_c_make_encoder():
+    try:
+        from simplejson._speedups import make_encoder
+        return make_encoder
+    except ImportError:
+        return None
 
 _default_encoder = JSONEncoder(
     skipkeys=False,
@@ -122,11 +135,12 @@ _default_encoder = JSONEncoder(
     separators=None,
     encoding='utf-8',
     default=None,
+    use_decimal=False,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
-        encoding='utf-8', default=None, **kw):
+        encoding='utf-8', default=None, use_decimal=False, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
@@ -165,6 +179,9 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     ``default(obj)`` is a function that should return a serializable version
     of obj or raise TypeError. The default simply raises TypeError.
 
+    If *use_decimal* is true (default: ``False``) then decimal.Decimal
+    will be natively serialized to JSON with full precision.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -182,7 +199,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         iterable = cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
             check_circular=check_circular, allow_nan=allow_nan, indent=indent,
             separators=separators, encoding=encoding,
-            default=default, **kw).iterencode(obj)
+            default=default, use_decimal=use_decimal, **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
     for chunk in iterable:
@@ -191,7 +208,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
 
 def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
-        encoding='utf-8', default=None, **kw):
+        encoding='utf-8', default=None, use_decimal=False, **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
     If ``skipkeys`` is false then ``dict`` keys that are not basic types
@@ -227,6 +244,9 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     ``default(obj)`` is a function that should return a serializable version
     of obj or raise TypeError. The default simply raises TypeError.
 
+    If *use_decimal* is true (default: ``False``) then decimal.Decimal
+    will be natively serialized to JSON with full precision.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -236,7 +256,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     if (not skipkeys and ensure_ascii and
         check_circular and allow_nan and
         cls is None and indent is None and separators is None and
-        encoding == 'utf-8' and default is None and not kw):
+        encoding == 'utf-8' and default is None and not use_decimal
+        and not kw):
         return _default_encoder.encode(obj)
     if cls is None:
         cls = JSONEncoder
@@ -244,7 +265,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         skipkeys=skipkeys, ensure_ascii=ensure_ascii,
         check_circular=check_circular, allow_nan=allow_nan, indent=indent,
         separators=separators, encoding=encoding, default=default,
-        **kw).encode(obj)
+        use_decimal=use_decimal, **kw).encode(obj)
 
 
 _default_decoder = JSONDecoder(encoding=None, object_hook=None,
@@ -252,7 +273,8 @@ _default_decoder = JSONDecoder(encoding=None, object_hook=None,
 
 
 def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
-        parse_int=None, parse_constant=None, object_pairs_hook=None, **kw):
+        parse_int=None, parse_constant=None, object_pairs_hook=None,
+        use_decimal=False, **kw):
     """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
     a JSON document) to a Python object.
 
@@ -292,6 +314,9 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
     can be used to raise an exception if invalid JSON numbers are
     encountered.
 
+    If *use_decimal* is true (default: ``False``) then it implies
+    parse_float=decimal.Decimal for parity with ``dump``.
+
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
 
@@ -300,11 +325,12 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
         encoding=encoding, cls=cls, object_hook=object_hook,
         parse_float=parse_float, parse_int=parse_int,
         parse_constant=parse_constant, object_pairs_hook=object_pairs_hook,
-        **kw)
+        use_decimal=use_decimal, **kw)
 
 
 def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
-        parse_int=None, parse_constant=None, object_pairs_hook=None, **kw):
+        parse_int=None, parse_constant=None, object_pairs_hook=None,
+        use_decimal=False, **kw):
     """Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
     document) to a Python object.
 
@@ -344,13 +370,17 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
     can be used to raise an exception if invalid JSON numbers are
     encountered.
 
+    If *use_decimal* is true (default: ``False``) then it implies
+    parse_float=decimal.Decimal for parity with ``dump``.
+
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
     kwarg.
 
     """
     if (cls is None and encoding is None and object_hook is None and
             parse_int is None and parse_float is None and
-            parse_constant is None and object_pairs_hook is None and not kw):
+            parse_constant is None and object_pairs_hook is None
+            and not use_decimal and not kw):
         return _default_decoder.decode(s)
     if cls is None:
         cls = JSONDecoder
@@ -364,6 +394,10 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
         kw['parse_int'] = parse_int
     if parse_constant is not None:
         kw['parse_constant'] = parse_constant
+    if use_decimal:
+        if parse_float is not None:
+            raise TypeError("use_decimal=True implies parse_float=Decimal")
+        kw['parse_float'] = Decimal
     return cls(encoding=encoding, **kw).decode(s)
 
 
@@ -371,10 +405,7 @@ def _toggle_speedups(enabled):
     import simplejson.decoder as dec
     import simplejson.encoder as enc
     import simplejson.scanner as scan
-    try:
-        from simplejson._speedups import make_encoder as c_make_encoder
-    except ImportError:
-        c_make_encoder = None
+    c_make_encoder = _import_c_make_encoder()
     if enabled:
         dec.scanstring = dec.c_scanstring or dec.py_scanstring
         enc.c_make_encoder = c_make_encoder

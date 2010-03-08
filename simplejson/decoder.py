@@ -5,10 +5,13 @@ import sys
 import struct
 
 from simplejson.scanner import make_scanner
-try:
-    from simplejson._speedups import scanstring as c_scanstring
-except ImportError:
-    c_scanstring = None
+def _import_c_scanstring():
+    try:
+        from simplejson._speedups import scanstring
+        return scanstring
+    except ImportError:
+        return None
+c_scanstring = _import_c_scanstring()
 
 __all__ = ['JSONDecoder']
 

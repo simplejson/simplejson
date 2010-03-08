@@ -1,10 +1,13 @@
 """JSON token scanner
 """
 import re
-try:
-    from simplejson._speedups import make_scanner as c_make_scanner
-except ImportError:
-    c_make_scanner = None
+def _import_c_make_scanner():
+    try:
+        from simplejson._speedups import make_scanner
+        return make_scanner
+    except ImportError:
+        return None
+c_make_scanner = _import_c_make_scanner()
 
 __all__ = ['make_scanner']
 

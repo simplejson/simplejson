@@ -238,6 +238,10 @@ div.sphinxsidebar h4, div.sphinxsidebar h3 {
     background-color: #AFC1C4;
 }
 
+div.sphinxsidebar h3 a {
+    color: white;
+}
+
 div.sphinxsidebar ul {
     padding-left: 1.5em;
     margin-top: 7px;
@@ -259,6 +263,39 @@ p.rubric {
     font-weight: bold;
 }
 
+div.sidebar {
+    margin: 0 0 0.5em 1em;
+    border: 1px solid #ddb;
+    padding: 7px 7px 0 7px;
+    background-color: #ffe;
+    width: 40%;
+    float: right;
+}
+
+div.quotebar {
+    background-color: #f8f8f8;
+    max-width: 250px;
+    float: right;
+    padding: 2px 7px;
+    border: 1px solid #ccc;
+}
+
+p.sidebar-title {
+    font-weight: bold;
+}
+
+div.topic {
+    background-color: #f8f8f8;
+    border: 1px solid #ccc;
+    padding: 7px 7px 0 7px;
+    margin: 10px 0 10px 0;
+}
+
+p.topic-title {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
 h1 {
     margin: 0;
     padding: 0.7em 0 0.3em 0;
@@ -277,7 +314,7 @@ h3 {
     font-size: 1.2em;
 }
 
-h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+div.body h1 a, div.body h2 a, div.body h3 a, div.body h4 a, div.body h5 a, div.body h6 a {
     color: black!important;
 }
 
@@ -501,4 +538,20 @@ ul.search li div.context {
 
 ul.keywordmatches li.goodmatch a {
     font-weight: bold;
+}
+
+img.math {
+    vertical-align: center;
+}
+
+div.math {
+    text-align: center;
+}
+
+span.eqno {
+    float: right;
+}
+
+img.logo {
+    border: 0;
 }

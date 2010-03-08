@@ -64,6 +64,15 @@ Decoding JSON::
     >>> json.load(io)[0] == 'streaming API'
     True
 
+Using Decimal instead of float::
+
+    >>> import simplejson as json
+    >>> from decimal import Decimal
+    >>> json.loads('1.1', use_decimal=True) == Decimal('1.1')
+    True
+    >>> json.dumps(Decimal('1.1'), use_decimal=True) == '1.1'
+    True
+
 Specializing JSON object decoding::
 
     >>> import simplejson as json
@@ -117,7 +126,7 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 Basic Usage
 -----------
 
-.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, **kw]]]]]]]]]])
+.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, **kw]]]]]]]]]]])
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
    file-like object).
@@ -167,6 +176,12 @@ Basic Usage
    To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
    *cls* kwarg.
+   
+   If *use_decimal* is true (default: ``False``) then :class:`decimal.Decimal`
+   will be natively serialized to JSON with full precision.
+   
+   .. versionchanged:: 2.1.0
+      *use_decimal* is new in 2.1.0.
 
     .. note::
 
@@ -175,7 +190,7 @@ Basic Usage
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, **kw]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, **kw]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -185,7 +200,7 @@ Basic Usage
    better performance.
 
 
-.. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, **kw]]]]]]]])
+.. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, **kw]]]]]]]]])
 
    Deserialize *fp* (a ``.read()``-supporting file-like object containing a JSON
    document) to a Python object.
@@ -212,7 +227,7 @@ Basic Usage
    return value of *object_pairs_hook* will be used instead of the
    :class:`dict`.  This feature can be used to implement custom decoders that
    rely on the order that the key and value pairs are decoded (for example,
-   :func:`collections.OrderedDict` will remember the order of insertion). If
+   :class:`collections.OrderedDict` will remember the order of insertion). If
    *object_hook* is also defined, the *object_pairs_hook* takes priority.
 
    .. versionchanged:: 2.1.0
@@ -232,6 +247,13 @@ Basic Usage
    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
    raise an exception if invalid JSON numbers are encountered.
 
+   If *use_decimal* is true (default: ``False``) then *parse_float* is set to
+   :class:`decimal.Decimal`. This is a convenience for parity with the
+   :func:`dump` parameter.
+   
+   .. versionchanged:: 2.1.0
+      *use_decimal* is new in 2.1.0.
+
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
    kwarg.  Additional keyword arguments will be passed to the constructor of the
    class.
@@ -245,7 +267,7 @@ Basic Usage
         only one JSON document, it is recommended to use :func:`loads`.
 
 
-.. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, **kw]]]]]]]])
+.. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, **kw]]]]]]]]])
 
    Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
    document) to a Python object.
@@ -312,7 +334,7 @@ Encoders and decoders
    return value of *object_pairs_hook* will be used instead of the
    :class:`dict`.  This feature can be used to implement custom decoders that
    rely on the order that the key and value pairs are decoded (for example,
-   :func:`collections.OrderedDict` will remember the order of insertion). If
+   :class:`collections.OrderedDict` will remember the order of insertion). If
    *object_hook* is also defined, the *object_pairs_hook* takes priority.
 
    .. versionchanged:: 2.1.0
