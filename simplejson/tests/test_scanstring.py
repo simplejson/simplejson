@@ -110,6 +110,8 @@ class TestScanString(TestCase):
                           json.encoder.encode_basestring_ascii, "xx\xff")
 
     def test_overflow(self):
+        # Python 2.5 does not have maxsize
+        maxsize = getattr(sys, 'maxsize', sys.maxint)
         self.assertRaises(OverflowError, json.decoder.scanstring, "xxx",
-                          sys.maxsize + 1)
+                          maxsize + 1)
 
