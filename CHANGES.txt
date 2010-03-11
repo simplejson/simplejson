@@ -1,4 +1,4 @@
-Version 2.1.0 released XXXX-XX-XX
+Version 2.1.0 released 2010-03-10
 
 * Decimal serialization officially supported for encoding with
   use_decimal=True. For encoding this encodes Decimal objects and
