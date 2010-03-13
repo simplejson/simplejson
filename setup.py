@@ -42,7 +42,7 @@ Topic :: Software Development :: Libraries :: Python Modules
 
 
 speedups = Feature(
-    "options C speed-enhancement modules",
+    "optional C speed-enhancement module",
     standard=True,
     ext_modules = [
         Extension("simplejson._speedups", ["simplejson/_speedups.c"]),
