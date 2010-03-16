@@ -506,8 +506,9 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         }
         /* Pick up this chunk if it's not zero length */
         if (next != end) {
+            PyObject *strchunk;
             APPEND_OLD_CHUNK
-            PyObject *strchunk = PyString_FromStringAndSize(&buf[end], next - end);
+            strchunk = PyString_FromStringAndSize(&buf[end], next - end);
             if (strchunk == NULL) {
                 goto bail;
             }
