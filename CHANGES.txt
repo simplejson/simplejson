@@ -1,5 +1,7 @@
 Version 2.1.1 released 2010-03-11
 
+* Fix compilation on Windows platform (and other platforms with very
+  picky compilers)
 * Corrected simplejson.__version__ and other minor doc changes.
 * Do not fail speedups tests if speedups could not be built.
   http://code.google.com/p/simplejson/issues/detail?id=73
