@@ -2,10 +2,10 @@
 
 import sys
 try:
-    from ez_setup import use_setuptools
-    use_setuptools(version='0.6c11')
+    import setuptools
 except ImportError:
-    pass
+    from ez_setup import use_setuptools
+    use_setuptools()
 
 from setuptools import setup, find_packages, Extension, Feature
 from distutils.command.build_ext import build_ext
