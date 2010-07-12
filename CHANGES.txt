@@ -1,3 +1,8 @@
+Version 2.1.2 released XXXX-XX-XX
+
+* Fix the endlineno, endcolno attributes of the JSONDecodeError exception.
+  http://code.google.com/p/simplejson/issues/detail?id=81
+
 Version 2.1.1 released 2010-03-31
 
 * Change how setup.py imports ez_setup.py to try and workaround old versions

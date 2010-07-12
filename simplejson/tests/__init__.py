@@ -33,6 +33,7 @@ def all_tests_suite():
         'simplejson.tests.test_dump',
         'simplejson.tests.test_encode_basestring_ascii',
         'simplejson.tests.test_encode_for_html',
+        'simplejson.tests.test_errors',
         'simplejson.tests.test_fail',
         'simplejson.tests.test_float',
         'simplejson.tests.test_indent',

@@ -50,7 +50,7 @@ class JSONDecodeError(ValueError):
         self.end = end
         self.lineno, self.colno = linecol(doc, pos)
         if end is not None:
-            self.endlineno, self.endcolno = linecol(doc, pos)
+            self.endlineno, self.endcolno = linecol(doc, end)
         else:
             self.endlineno, self.endcolno = None, None
 
