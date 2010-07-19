@@ -3,6 +3,10 @@ from unittest import TestCase
 import simplejson as json
 
 class TestErrors(TestCase):
+    def test_string_keys_error(self):
+        data = [{'a': 'A', 'b': (2, 4), 'c': 3.0, ('d',): 'D tuple'}]
+        self.assertRaises(TypeError, json.dumps, data)
+
     def test_decode_error(self):
         err = None
         try:

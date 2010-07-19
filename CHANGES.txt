@@ -1,5 +1,7 @@
 Version 2.1.2 released XXXX-XX-XX
 
+* Correctly raise TypeError when non-string keys are used with speedups
+  http://code.google.com/p/simplejson/issues/detail?id=82
 * Fix the endlineno, endcolno attributes of the JSONDecodeError exception.
   http://code.google.com/p/simplejson/issues/detail?id=81
 
