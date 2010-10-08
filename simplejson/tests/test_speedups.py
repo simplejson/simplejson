@@ -1,7 +1,6 @@
-import decimal
 from unittest import TestCase
 
-from simplejson import decoder, encoder, scanner
+from simplejson import encoder, scanner
 
 def has_speedups():
     return encoder.c_make_encoder is not None

@@ -53,7 +53,7 @@ class TestRecursion(TestCase):
         x = {}
         y = {"a": x, "b": x}
         # ensure that the marker is cleared
-        json.dumps(x)
+        json.dumps(y)
 
     def test_defaultrecursion(self):
         enc = RecursiveJSONEncoder()
