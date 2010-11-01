@@ -71,3 +71,13 @@ class TestDecode(TestCase):
         self.assertEqual(json.loads(u'""'), u"")
         self.assertEqual(json.loads('[""]'), [""])
         self.assertEqual(json.loads(u'[""]'), [u""])
+
+    def test_raw_decode(self):
+        cls = json.decoder.JSONDecoder
+        self.assertEqual(
+            ({'a': {}}, 9),
+            cls().raw_decode("{\"a\": {}}"))
+        # http://code.google.com/p/simplejson/issues/detail?id=85
+        self.assertEqual(
+            ({'a': {}}, 9),
+            cls(object_pairs_hook=dict).raw_decode("{\"a\": {}}"))

@@ -1,5 +1,7 @@
 Version 2.1.2 released XXXX-XX-XX
 
+* Correct wrong end when object_pairs_hook is used
+  http://code.google.com/p/simplejson/issues/detail?id=85
 * Correct output for indent=0
   http://bugs.python.org/issue10019
 * Correctly raise TypeError when non-string keys are used with speedups
