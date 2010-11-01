@@ -1,4 +1,4 @@
-Version 2.1.2 released XXXX-XX-XX
+Version 2.1.2 released 2010-11-01
 
 * Correct wrong end when object_pairs_hook is used
   http://code.google.com/p/simplejson/issues/detail?id=85
