@@ -2185,9 +2185,9 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     static PyObject *iteritems = NULL;
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
-    PyObject *key, *value;
     PyObject *iter = NULL;
     PyObject *item = NULL;
+    PyObject *items = NULL;
     PyObject *encoded = NULL;
     int skipkeys;
     Py_ssize_t idx;
@@ -2232,22 +2232,61 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         */
     }
 
-    /* TODO: C speedup not implemented for sort_keys */
+    if (PyObject_IsTrue(s->sort_keys)) {
+        /* First sort the keys then replace them with (key, value) tuples. */
+        Py_ssize_t i, nitems;
+        if (PyDict_CheckExact(dct))
+            items = PyDict_Keys(dct);
+        else
+            items = PyMapping_Keys(dct);
+        if (items == NULL)
+            goto bail;
+        if (!PyList_Check(items)) {
+            PyErr_SetString(PyExc_ValueError, "keys must return list");
+            goto bail;
+        }
+        if (PyList_Sort(items) < 0)
+            goto bail;
+        nitems = PyList_GET_SIZE(items);
+        for (i = 0; i < nitems; i++) {
+            PyObject *key, *value;
+            key = PyList_GET_ITEM(items, i);
+            value = PyDict_GetItem(dct, key);
+            item = PyTuple_Pack(2, key, value);
+            if (item == NULL)
+                goto bail;
+            PyList_SET_ITEM(items, i, item);
+            Py_DECREF(key);
+        }
+    }
+    else {
+        if (PyDict_CheckExact(dct))
+            items = PyDict_Items(dct);
+        else
+            items = PyMapping_Items(dct);
+    }
+    if (items == NULL)
+        goto bail;
+    iter = PyObject_GetIter(items);
+    Py_DECREF(items);
+    if (iter == NULL)
+        goto bail;
 
     skipkeys = PyObject_IsTrue(s->skipkeys);
     idx = 0;
-    iter = PyObject_CallMethodObjArgs(dct, iteritems, NULL);
-    if (iter == NULL)
-        goto bail;
     while ((item = PyIter_Next(iter))) {
-
-        key = PyTuple_GetItem(item, 0);
+        PyObject *encoded, *key, *value;
+        if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
+            PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
+            goto bail;
+        }
+        key = PyTuple_GET_ITEM(item, 0);
         if (key == NULL)
             goto bail;
-        value = PyTuple_GetItem(item, 1);
+        value = PyTuple_GET_ITEM(item, 1);
         if (value == NULL)
             goto bail;
-        
+
         encoded = PyDict_GetItem(s->key_memo, key);
         if (encoded != NULL) {
             Py_INCREF(encoded);
@@ -2261,13 +2300,15 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             if (kstr == NULL)
                 goto bail;
         }
-        else if (PyInt_Check(key) || PyLong_Check(key)) {
-            kstr = PyObject_Str(key);
+        else if (key == Py_True || key == Py_False || key == Py_None) {
+            /* This must come before the PyInt_Check because
+               True and False are also 1 and 0.*/
+            kstr = _encoded_const(key);
             if (kstr == NULL)
                 goto bail;
         }
-        else if (key == Py_True || key == Py_False || key == Py_None) {
-            kstr = _encoded_const(key);
+        else if (PyInt_Check(key) || PyLong_Check(key)) {
+            kstr = PyObject_Str(key);
             if (kstr == NULL)
                 goto bail;
         }
@@ -2326,7 +2367,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
 
 bail:
     Py_XDECREF(encoded);
-    Py_XDECREF(item);
+    Py_XDECREF(items);
     Py_XDECREF(iter);
     Py_XDECREF(kstr);
     Py_XDECREF(ident);

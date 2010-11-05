@@ -1,3 +1,8 @@
+Version 2.1.3 released XXXX-XX-XX
+
+* Support the sort_keys option in C encoding speedups
+  http://code.google.com/p/simplejson/issues/detail?id=86
+
 Version 2.1.2 released 2010-11-01
 
 * Correct wrong end when object_pairs_hook is used
