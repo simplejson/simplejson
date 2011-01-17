@@ -1,7 +1,9 @@
-Version 2.1.3 released XXXX-XX-XX
+Version 2.1.3 released 2011-01-17
 
 * Support the sort_keys option in C encoding speedups
   http://code.google.com/p/simplejson/issues/detail?id=86
+* Allow use_decimal to work with dump()
+  http://code.google.com/p/simplejson/issues/detail?id=87
 
 Version 2.1.2 released 2010-11-01
 
