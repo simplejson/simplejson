@@ -89,7 +89,7 @@ def run_setup(with_binary):
         classifiers=CLASSIFIERS,
         author="Bob Ippolito",
         author_email="bob@redivi.com",
-        url="http://undefined.org/python/#simplejson",
+        url="http://github.com/simplejson/simplejson",
         license="MIT License",
         packages=find_packages(exclude=['ez_setup']),
         platforms=['any'],
