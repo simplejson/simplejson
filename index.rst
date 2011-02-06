@@ -16,6 +16,9 @@ compatibility with Python 2.5 and (currently) has
 significant performance advantages, even without using the optional C
 extension for speedups.
 
+Development of simplejson happens on Github:
+http://github.com/simplejson/simplejson
+
 Encoding basic Python object hierarchies::
 
     >>> import simplejson as json
