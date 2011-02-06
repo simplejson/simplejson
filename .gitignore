@@ -3,3 +3,4 @@
 *.so
 /build
 /dist
+/docs
