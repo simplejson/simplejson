@@ -1,16 +1,31 @@
-/// XXX: make it cross browser
+/*
+ * doctools.js
+ * ~~~~~~~~~~~
+ *
+ * Sphinx JavaScript utilties for all documentation.
+ *
+ * :copyright: Copyright 2007-2010 by the Sphinx team, see AUTHORS.
+ * :license: BSD, see LICENSE for details.
+ *
+ */
+
+/**
+ * select a different prefix for underscore
+ */
+$u = _.noConflict();
 
 /**
  * make the code below compatible with browsers without
  * an installed firebug like debugger
- */
 if (!window.console || !console.firebug) {
-  var names = ["log", "debug", "info", "warn", "error", "assert", "dir", "dirxml",
-      "group", "groupEnd", "time", "timeEnd", "count", "trace", "profile", "profileEnd"];
+  var names = ["log", "debug", "info", "warn", "error", "assert", "dir",
+    "dirxml", "group", "groupEnd", "time", "timeEnd", "count", "trace",
+    "profile", "profileEnd"];
   window.console = {};
   for (var i = 0; i < names.length; ++i)
-    window.console[names[i]] = function() {}
+    window.console[names[i]] = function() {};
 }
+ */
 
 /**
  * small helper function to urldecode strings
@@ -44,7 +59,7 @@ jQuery.getQueryParameters = function(s) {
       result[key] = [value];
   }
   return result;
-}
+};
 
 /**
  * small function to check if an array contains
@@ -56,7 +71,7 @@ jQuery.contains = function(arr, item) {
       return true;
   }
   return false;
-}
+};
 
 /**
  * highlight a given string on a jquery object by wrapping it in
@@ -67,7 +82,7 @@ jQuery.fn.highlightText = function(text, className) {
     if (node.nodeType == 3) {
       var val = node.nodeValue;
       var pos = val.toLowerCase().indexOf(text);
-      if (pos >= 0 && !jQuery.className.has(node.parentNode, className)) {
+      if (pos >= 0 && !jQuery(node.parentNode).hasClass(className)) {
         var span = document.createElement("span");
         span.className = className;
         span.appendChild(document.createTextNode(val.substr(pos, text.length)));
@@ -79,14 +94,14 @@ jQuery.fn.highlightText = function(text, className) {
     }
     else if (!jQuery(node).is("button, select, textarea")) {
       jQuery.each(node.childNodes, function() {
-        highlight(this)
+        highlight(this);
       });
     }
   }
   return this.each(function() {
     highlight(this);
   });
-}
+};
 
 /**
  * Small JavaScript module for the documentation.
@@ -94,29 +109,55 @@ jQuery.fn.highlightText = function(text, className) {
 var Documentation = {
 
   init : function() {
-    /* this.addContextElements(); -- now done statically */
     this.fixFirefoxAnchorBug();
     this.highlightSearchWords();
-    this.initModIndex();
-    this.initComments();
+    this.initIndexTable();
+  },
+
+  /**
+   * i18n support
+   */
+  TRANSLATIONS : {},
+  PLURAL_EXPR : function(n) { return n == 1 ? 0 : 1; },
+  LOCALE : 'unknown',
+
+  // gettext and ngettext don't access this so that the functions
+  // can safely bound to a different name (_ = Documentation.gettext)
+  gettext : function(string) {
+    var translated = Documentation.TRANSLATIONS[string];
+    if (typeof translated == 'undefined')
+      return string;
+    return (typeof translated == 'string') ? translated : translated[0];
+  },
+
+  ngettext : function(singular, plural, n) {
+    var translated = Documentation.TRANSLATIONS[singular];
+    if (typeof translated == 'undefined')
+      return (n == 1) ? singular : plural;
+    return translated[Documentation.PLURALEXPR(n)];
+  },
+
+  addTranslations : function(catalog) {
+    for (var key in catalog.messages)
+      this.TRANSLATIONS[key] = catalog.messages[key];
+    this.PLURAL_EXPR = new Function('n', 'return +(' + catalog.plural_expr + ')');
+    this.LOCALE = catalog.locale;
   },
 
   /**
    * add context elements like header anchor links
    */
   addContextElements : function() {
-    for (var i = 1; i <= 6; i++) {
-      $('h' + i + '[@id]').each(function() {
-        $('<a class="headerlink">\u00B6</a>').
-        attr('href', '#' + this.id).
-        attr('title', 'Permalink to this headline').
-        appendTo(this);
-      });
-    }
-    $('dt[@id]').each(function() {
+    $('div[id] > :header:first').each(function() {
       $('<a class="headerlink">\u00B6</a>').
       attr('href', '#' + this.id).
-      attr('title', 'Permalink to this definition').
+      attr('title', _('Permalink to this headline')).
+      appendTo(this);
+    });
+    $('dt[id]').each(function() {
+      $('<a class="headerlink">\u00B6</a>').
+      attr('href', '#' + this.id).
+      attr('title', _('Permalink to this definition')).
       appendTo(this);
     });
   },
@@ -141,62 +182,31 @@ var Documentation = {
       var body = $('div.body');
       window.setTimeout(function() {
         $.each(terms, function() {
-          body.highlightText(this.toLowerCase(), 'highlight');
+          body.highlightText(this.toLowerCase(), 'highlighted');
         });
       }, 10);
       $('<li class="highlight-link"><a href="javascript:Documentation.' +
-        'hideSearchWords()">Hide Search Matches</a></li>')
+        'hideSearchWords()">' + _('Hide Search Matches') + '</a></li>')
           .appendTo($('.sidebar .this-page-menu'));
     }
   },
 
   /**
-   * init the modindex toggle buttons
+   * init the domain index toggle buttons
    */
-  initModIndex : function() {
+  initIndexTable : function() {
     var togglers = $('img.toggler').click(function() {
       var src = $(this).attr('src');
       var idnum = $(this).attr('id').substr(7);
-      console.log($('tr.cg-' + idnum).toggle());
+      $('tr.cg-' + idnum).toggle();
       if (src.substr(-9) == 'minus.png')
         $(this).attr('src', src.substr(0, src.length-9) + 'plus.png');
       else
         $(this).attr('src', src.substr(0, src.length-8) + 'minus.png');
     }).css('display', '');
-    if (DOCUMENTATION_OPTIONS.COLLAPSE_MODINDEX) {
+    if (DOCUMENTATION_OPTIONS.COLLAPSE_INDEX) {
         togglers.click();
     }
-  },
-
-  /**
-   * init the inline comments
-   */
-  initComments : function() {
-    $('.inlinecomments div.actions').each(function() {
-      this.innerHTML += ' | ';
-      $(this).append($('<a href="#">hide comments</a>').click(function() {
-        $(this).parent().parent().toggle();
-        return false;
-      }));
-    });
-    $('.inlinecomments .comments').hide();
-    $('.inlinecomments a.bubble').each(function() {
-      $(this).click($(this).is('.emptybubble') ? function() {
-          var params = $.getQueryParameters(this.href);
-          Documentation.newComment(params.target[0]);
-          return false;
-        } : function() {
-          $('.comments', $(this).parent().parent()[0]).toggle();
-          return false;
-      });
-    });
-    $('#comments div.actions a.newcomment').click(function() {
-      Documentation.newComment();
-      return false;
-    });
-    if (document.location.hash.match(/^#comment-/))
-      $('.inlinecomments .comments ' + document.location.hash)
-        .parent().toggle();
   },
 
   /**
@@ -204,23 +214,7 @@ var Documentation = {
    */
   hideSearchWords : function() {
     $('.sidebar .this-page-menu li.highlight-link').fadeOut(300);
-    $('span.highlight').removeClass('highlight');
-  },
-
-  /**
-   * show the comment window for a certain id or the whole page.
-   */
-  newComment : function(id) {
-    Documentation.CommentWindow.openFor(id || '');
-  },
-
-  /**
-   * write a new comment from within a comment view box
-   */
-  newCommentFromBox : function(link) {
-    var params = $.getQueryParameters(link.href);
-    $(link).parent().parent().fadeOut('slow');
-    this.newComment(params.target);
+    $('span.highlighted').removeClass('highlighted');
   },
 
   /**
@@ -242,110 +236,11 @@ var Documentation = {
     });
     var url = parts.join('/');
     return path.substring(url.lastIndexOf('/') + 1, path.length - 1);
-  },
-
-  /**
-   * class that represents the comment window
-   */
-  CommentWindow : (function() {
-    var openWindows = {};
-
-    var Window = function(sectionID) {
-      this.url = Documentation.makeURL('@comments/' + Documentation.getCurrentURL()
-        + '/?target=' + $.urlencode(sectionID) + '&mode=ajax');
-      this.sectionID = sectionID;
-
-      this.root = $('<div class="commentwindow"></div>');
-      this.root.appendTo($('body'));
-      this.title = $('<h3>New Comment</h3>').appendTo(this.root);
-      this.body = $('<div class="form">please wait...</div>').appendTo(this.root);
-      this.resizeHandle = $('<div class="resizehandle"></div>').appendTo(this.root);
-
-      this.root.Draggable({
-        handle:       this.title[0]
-      });
-
-      this.root.css({
-        left:         window.innerWidth / 2 - $(this.root).width() / 2,
-        top:          window.scrollY + (window.innerHeight / 2 - 150)
-      });
-      this.root.fadeIn('slow');
-      this.updateView();
-    };
-
-    Window.prototype.updateView = function(data) {
-      var self = this;
-      function update(data) {
-        if (data.posted) {
-          document.location.hash = '#comment-' + data.commentID;
-          document.location.reload();
-        }
-        else {
-          self.body.html(data.body);
-          $('div.actions', self.body).append($('<input>')
-            .attr('type', 'button')
-            .attr('value', 'Close')
-            .click(function() { self.close(); })
-          );
-          $('div.actions input[@name="preview"]')
-            .attr('type', 'button')
-            .click(function() { self.submitForm($('form', self.body)[0], true); });
-          $('form', self.body).bind("submit", function() {
-            self.submitForm(this);
-            return false;
-          });
-
-          if (data.error) {
-            self.root.Highlight(1000, '#aadee1');
-            $('div.error', self.root).slideDown(500);
-          }
-        }
-      }
-
-      if (typeof data == 'undefined')
-        $.getJSON(this.url, function(json) { update(json); });
-      else
-        $.ajax({
-          url:      this.url,
-          type:     'POST',
-          dataType: 'json',
-          data:     data,
-          success:  function(json) { update(json); }
-        });
-    }
-
-    Window.prototype.getFormValue = function(name) {
-      return $('*[@name="' + name + '"]', this.body)[0].value;
-    }
-
-    Window.prototype.submitForm = function(form, previewMode) {
-      this.updateView({
-        author:         form.author.value,
-        author_mail:    form.author_mail.value,
-        title:          form.title.value,
-        comment_body:   form.comment_body.value,
-        preview:        previewMode ? 'yes' : ''
-      });
-    }
-
-    Window.prototype.close = function() {
-      var self = this;
-      delete openWindows[this.sectionID];
-      this.root.fadeOut('slow', function() {
-        self.root.remove();
-      });
-    }
-
-    Window.openFor = function(sectionID) {
-      if (sectionID in openWindows)
-        return openWindows[sectionID];
-      return new Window(sectionID);
-    }
-
-    return Window;
-  })()
+  }
 };
 
+// quick alias for translations
+_ = Documentation.gettext;
 
 $(document).ready(function() {
   Documentation.init();
