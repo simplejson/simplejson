@@ -1,7 +1,0 @@
-syntax: regexp
-\.svn/
-build/
-dist/
-\.so$
-\.pyc$
-\.egg-info$
