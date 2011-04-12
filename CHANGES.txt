@@ -1,5 +1,6 @@
 Version 2.1.4 released XXXX-XX-XX
 
+* Trailing whitespace after commas no longer emitted when indent is used
 * Migrated to github http://github.com/simplejson/simplejson
 
 Version 2.1.3 released 2011-01-17

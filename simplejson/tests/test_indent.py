@@ -67,3 +67,20 @@ class TestIndent(TestCase):
         check(0, '{\n"3": 1\n}')
         # indent=None is more compact
         check(None, '{"3": 1}')
+
+    def test_separators(self):
+        lst = [1,2,3,4]
+        expect = '[\n1,\n2,\n3,\n4\n]'
+        expect_spaces = '[\n1, \n2, \n3, \n4\n]'
+        # Ensure that separators still works
+        self.assertEquals(
+            expect_spaces,
+            json.dumps(lst, indent=0, separators=(', ', ': ')))
+        # Force the new defaults
+        self.assertEquals(
+            expect,
+            json.dumps(lst, indent=0, separators=(',', ': ')))
+        # Added in 2.1.4
+        self.assertEquals(
+            expect,
+            json.dumps(lst, indent=0))
