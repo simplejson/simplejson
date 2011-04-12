@@ -12,6 +12,7 @@ from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
+IS_PYPY = hasattr(sys, 'pypy_translation_info')
 VERSION = '2.1.4'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = open('README.rst', 'r').read()
@@ -84,7 +85,7 @@ def run_setup(with_binary):
     )
 
 try:
-    run_setup(True)
+    run_setup(not IS_PYPY)
 except BuildFailed:
     BUILD_EXT_WARNING = "WARNING: The C extension could not be compiled, speedups are not enabled."
     print '*' * 75
