@@ -4,10 +4,7 @@ if sys.version_info[0] < 3:
     def b(s):
         return s
     def u(s):
-        try:
-            return unicode(s, "unicode_escape")
-        except UnicodeDecodeError:
-            return unicode(s, "latin-1")
+        return unicode(s, "unicode_escape")
     import cStringIO as StringIO
     StringIO = BytesIO = StringIO.StringIO
     text_type = unicode

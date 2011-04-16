@@ -37,7 +37,7 @@ def encode_basestring(s):
     """Return a JSON representation of a Python string
 
     """
-    if isinstance(s, binary_type) and HAS_UTF8.search(s) is not None:
+    if isinstance(s, binary_type) and HAS_UTF8.search(s.decode('latin-1')) is not None:
         s = s.decode('utf-8')
     def replace(match):
         return ESCAPE_DCT[match.group(0)]
@@ -48,7 +48,7 @@ def py_encode_basestring_ascii(s):
     """Return an ASCII-only JSON representation of a Python string
 
     """
-    if isinstance(s, binary_type) and HAS_UTF8.search(s) is not None:
+    if isinstance(s, binary_type) and HAS_UTF8.search(s.decode('latin-1')) is not None:
         s = s.decode('utf-8')
     def replace(match):
         s = match.group(0)
@@ -322,7 +322,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         #False=False,
         #True=True,
         ValueError=ValueError,
-        basestring=string_types,
+        basestring=string_types + (binary_type,),
         Decimal=Decimal,
         dict=dict,
         float=float,
@@ -410,7 +410,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             item_separator = _item_separator
         first = True
         if _sort_keys:
-            items = sorted(dct.items(), key=lambda kv: kv[0])
+            items = sorted(dct.items(), key=lambda kv: str(kv[0]))
         elif hasattr(dct, 'iteritems'):
             items = dct.iteritems()
         else:

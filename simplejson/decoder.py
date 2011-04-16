@@ -4,7 +4,7 @@ import re
 import sys
 import struct
 
-from simplejson.compat import text_type, u, b, unichr, hexify
+from simplejson.compat import text_type, binary_type, u, b, unichr, hexify
 from simplejson.scanner import make_scanner
 def _import_c_scanstring():
     try:
@@ -88,7 +88,7 @@ _CONSTANTS = {
 
 STRINGCHUNK = re.compile(r'(.*?)(["\\\x00-\x1f])', FLAGS)
 BACKSLASH = {
-    '"': u('"'), '\\': u('\\'), '/': u('/'),
+    '"': u('"'), '\\': u('\u005c'), '/': u('/'),
     'b': u('\b'), 'f': u('\f'), 'n': u('\n'), 'r': u('\r'), 't': u('\t'),
 }
 
@@ -402,6 +402,8 @@ class JSONDecoder(object):
         instance containing a JSON document)
 
         """
+        if isinstance(s, binary_type):
+            s = s.decode('utf-8')
         obj, end = self.raw_decode(s, idx=_w(s, 0).end())
         end = _w(s, end).end()
         if end != len(s):

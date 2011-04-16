@@ -94,6 +94,7 @@ class TestUnicode(TestCase):
         doc2 = {u('quux'): u('Arr\xeat sur images')}
         doc_ascii = '{"quux": "Arr\\u00eat sur images"}'
         doc_unicode = u('{"quux": "Arr\xeat sur images"}')
+        #import pdb; pdb.set_trace()
         self.assertEquals(json.dumps(doc1), doc_ascii)
         self.assertEquals(json.dumps(doc2), doc_ascii)
         self.assertEquals(json.dumps(doc1, ensure_ascii=False), doc_unicode)

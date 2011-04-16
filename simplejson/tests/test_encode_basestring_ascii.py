@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from simplejson.compat import u
+from simplejson.compat import u, b
 import simplejson.encoder
 
 CASES = [
@@ -12,9 +12,9 @@ CASES = [
     (u(' s p a c e d '), '" s p a c e d "'),
     (u('\U0001d120'), '"\\ud834\\udd20"'),
     (u('\u03b1\u03a9'), '"\\u03b1\\u03a9"'),
-    ('\xce\xb1\xce\xa9', '"\\u03b1\\u03a9"'),
+    (b('\xce\xb1\xce\xa9'), '"\\u03b1\\u03a9"'),
     (u('\u03b1\u03a9'), '"\\u03b1\\u03a9"'),
-    ('\xce\xb1\xce\xa9', '"\\u03b1\\u03a9"'),
+    (b('\xce\xb1\xce\xa9'), '"\\u03b1\\u03a9"'),
     (u('\u03b1\u03a9'), '"\\u03b1\\u03a9"'),
     (u('\u03b1\u03a9'), '"\\u03b1\\u03a9"'),
     (u("`1~!@#$%^&*()_+-={':[,]}|;.</>?"), '"`1~!@#$%^&*()_+-={\':[,]}|;.</>?"'),

@@ -16,9 +16,12 @@ class TestDump(TestCase):
         self.assertEquals(json.dumps(
                  {True: False, False: True}, sort_keys=True),
                  '{"false": true, "true": false}')
+        # strs and floats can't be compared, so the sorting converts keys to str for comparison
+        # purposes.
         self.assertEquals(json.dumps(
                 {2: 3.0, 4.0: long_type(5), False: 1, long_type(6): True, "7": 0}, sort_keys=True),
-                '{"false": 1, "2": 3.0, "4.0": 5, "6": true, "7": 0}')
+                '{"2": 3.0, "4.0": 5, "6": true, "7": 0, "false": 1}' #'{"false": 1, "2": 3.0, "4.0": 5, "6": true, "7": 0}'
+                )
 
     def test_ordered_dict(self):
         # http://bugs.python.org/issue6105
