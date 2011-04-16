@@ -1,6 +1,6 @@
 from decimal import Decimal
 from unittest import TestCase
-from StringIO import StringIO
+from simplejson.compat import StringIO
 
 import simplejson as json
 

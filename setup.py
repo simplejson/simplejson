@@ -4,7 +4,7 @@ import sys
 try:
     import setuptools
 except ImportError:
-    from ez_setup import use_setuptools
+    from distribute_setup import use_setuptools
     use_setuptools()
 
 from setuptools import setup, find_packages, Extension, Feature
@@ -17,13 +17,13 @@ VERSION = '2.1.4'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = open('README.rst', 'r').read()
 
-CLASSIFIERS = filter(None, map(str.strip,
+CLASSIFIERS = [_f for _f in map(str.strip,
 """
 Intended Audience :: Developers
 License :: OSI Approved :: MIT License
 Programming Language :: Python
 Topic :: Software Development :: Libraries :: Python Modules
-""".splitlines()))
+""".splitlines()) if _f]
 
 
 speedups = Feature(
@@ -51,13 +51,13 @@ class ve_build_ext(build_ext):
     def run(self):
         try:
             build_ext.run(self)
-        except DistutilsPlatformError, x:
+        except DistutilsPlatformError:
             raise BuildFailed()
 
     def build_extension(self, ext):
         try:
             build_ext.build_extension(self, ext)
-        except ext_errors, x:
+        except ext_errors:
             raise BuildFailed()
 
 def run_setup(with_binary):
@@ -88,15 +88,16 @@ try:
     run_setup(not IS_PYPY)
 except BuildFailed:
     BUILD_EXT_WARNING = "WARNING: The C extension could not be compiled, speedups are not enabled."
-    print '*' * 75
-    print BUILD_EXT_WARNING
-    print "Failure information, if any, is above."
-    print "I'm retrying the build without the C extension now."
-    print '*' * 75
+    print('*' * 75)
+    print(BUILD_EXT_WARNING)
+    print("Failure information, if any, is above.")
+    print("I'm retrying the build without the C extension now.")
+    print('*' * 75)
 
     run_setup(False)
 
-    print '*' * 75
-    print BUILD_EXT_WARNING
-    print "Plain-Python installation succeeded."
-    print '*' * 75
+    print('*' * 75)
+    print(BUILD_EXT_WARNING)
+    print("Plain-Python installation succeeded.")
+    print('*' * 75)
+

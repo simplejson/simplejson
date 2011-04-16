@@ -1,5 +1,5 @@
 from unittest import TestCase
-from cStringIO import StringIO
+from simplejson.compat import StringIO, long_type
 
 import simplejson as json
 
@@ -17,7 +17,7 @@ class TestDump(TestCase):
                  {True: False, False: True}, sort_keys=True),
                  '{"false": true, "true": false}')
         self.assertEquals(json.dumps(
-                {2: 3.0, 4.0: 5L, False: 1, 6L: True, "7": 0}, sort_keys=True),
+                {2: 3.0, 4.0: long_type(5), False: 1, long_type(6): True, "7": 0}, sort_keys=True),
                 '{"false": 1, "2": 3.0, "4.0": 5, "6": true, "7": 0}')
 
     def test_ordered_dict(self):

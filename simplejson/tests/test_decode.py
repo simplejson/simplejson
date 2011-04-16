@@ -1,6 +1,6 @@
 import decimal
 from unittest import TestCase
-from StringIO import StringIO
+from simplejson.compat import StringIO, u
 
 import simplejson as json
 from simplejson import OrderedDict
@@ -59,18 +59,18 @@ class TestDecode(TestCase):
         self.assertIs(b, d)
 
     def test_keys_reuse_str(self):
-        s = u'[{"a_key": 1, "b_\xe9": 2}, {"a_key": 3, "b_\xe9": 4}]'.encode('utf8')
+        s = u('[{"a_key": 1, "b_\xe9": 2}, {"a_key": 3, "b_\xe9": 4}]').encode('utf8')
         self.check_keys_reuse(s, json.loads)
 
     def test_keys_reuse_unicode(self):
-        s = u'[{"a_key": 1, "b_\xe9": 2}, {"a_key": 3, "b_\xe9": 4}]'
+        s = u('[{"a_key": 1, "b_\xe9": 2}, {"a_key": 3, "b_\xe9": 4}]')
         self.check_keys_reuse(s, json.loads)
 
     def test_empty_strings(self):
         self.assertEqual(json.loads('""'), "")
-        self.assertEqual(json.loads(u'""'), u"")
+        self.assertEqual(json.loads(u('""')), u(""))
         self.assertEqual(json.loads('[""]'), [""])
-        self.assertEqual(json.loads(u'[""]'), [u""])
+        self.assertEqual(json.loads(u('[""]')), [u("")])
 
     def test_raw_decode(self):
         cls = json.decoder.JSONDecoder

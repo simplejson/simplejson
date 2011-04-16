@@ -1,3 +1,4 @@
+import sys
 from unittest import TestCase
 
 import simplejson as json
@@ -11,8 +12,8 @@ class TestErrors(TestCase):
         err = None
         try:
             json.loads('{}\na\nb')
-        except json.JSONDecodeError, e:
-            err = e
+        except json.JSONDecodeError:
+            err = sys.exc_info()[1]
         else:
             self.fail('Expected JSONDecodeError')
         self.assertEquals(err.lineno, 2)
