@@ -1,4 +1,4 @@
-Version 2.1.4 released XXXX-XX-XX
+Version 2.1.4 released 2011-04-17
 
 * Does not try to build the extension when using PyPy
 * Trailing whitespace after commas no longer emitted when indent is used
