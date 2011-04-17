@@ -1,3 +1,7 @@
+Version 2.1.5 released 2011-04-17
+
+* Built sdist tarball with setuptools_git installed. Argh.
+
 Version 2.1.4 released 2011-04-17
 
 * Does not try to build the extension when using PyPy
