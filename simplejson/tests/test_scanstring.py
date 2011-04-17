@@ -2,7 +2,7 @@ import sys
 from unittest import TestCase
 
 import simplejson as json
-from simplejson.compat import u, b
+from simplejson.compat import u, b, PY3
 import simplejson.decoder
 
 class TestScanString(TestCase):
@@ -107,8 +107,10 @@ class TestScanString(TestCase):
     def test_issue3623(self):
         self.assertRaises(ValueError, json.decoder.scanstring, "xxx", 1,
                           "xxx")
-        self.assertRaises(UnicodeDecodeError,
-                          json.encoder.encode_basestring_ascii, b("xx\xff"))
+        if not PY3:
+            self.assertRaises(UnicodeDecodeError,
+                              json.encoder.encode_basestring_ascii,
+                              b("xx\xff"))
 
     def test_overflow(self):
         # Python 2.5 does not have maxsize

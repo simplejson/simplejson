@@ -1,23 +1,29 @@
 from unittest import TestCase
 
 import simplejson as json
-from simplejson.compat import text_type, b, u, unichr
+from simplejson.compat import text_type, b, u, unichr, PY3
 
 class TestUnicode(TestCase):
     def test_encoding1(self):
-        encoder = json.JSONEncoder(encoding='utf-8')
-        uu = u('\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}')
-        s = uu.encode('utf-8')
-        ju = encoder.encode(uu)
-        js = encoder.encode(s)
-        self.assertEquals(ju, js)
+        # This test is not appropriate for Python 3: You're not supposed
+        # to pass bytes to JSON APIs.
+        if not PY3:
+            encoder = json.JSONEncoder(encoding='utf-8')
+            uu = u('\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}')
+            s = uu.encode('utf-8')
+            ju = encoder.encode(uu)
+            js = encoder.encode(s)
+            self.assertEquals(ju, js)
 
     def test_encoding2(self):
-        uu = u('\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}')
-        s = uu.encode('utf-8')
-        ju = json.dumps(uu, encoding='utf-8')
-        js = json.dumps(s, encoding='utf-8')
-        self.assertEquals(ju, js)
+        # This test is not appropriate for Python 3: You're not supposed
+        # to pass bytes to JSON APIs.
+        if not PY3:
+            uu = u('\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}')
+            s = uu.encode('utf-8')
+            ju = json.dumps(uu, encoding='utf-8')
+            js = json.dumps(s, encoding='utf-8')
+            self.assertEquals(ju, js)
 
     def test_encoding3(self):
         uu = u('\N{GREEK SMALL LETTER ALPHA}\N{GREEK CAPITAL LETTER OMEGA}')
@@ -94,7 +100,8 @@ class TestUnicode(TestCase):
         doc2 = {u('quux'): u('Arr\xeat sur images')}
         doc_ascii = '{"quux": "Arr\\u00eat sur images"}'
         doc_unicode = u('{"quux": "Arr\xeat sur images"}')
-        #import pdb; pdb.set_trace()
+        if PY3:
+            doc1[u('quux')] = doc1[u('quux')].decode('utf-8')
         self.assertEquals(json.dumps(doc1), doc_ascii)
         self.assertEquals(json.dumps(doc2), doc_ascii)
         self.assertEquals(json.dumps(doc1, ensure_ascii=False), doc_unicode)

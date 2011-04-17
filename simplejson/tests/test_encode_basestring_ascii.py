@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from simplejson.compat import u, b
+from simplejson.compat import u, b, binary_type, PY3
 import simplejson.encoder
 
 CASES = [
@@ -34,6 +34,8 @@ class TestEncodeBaseStringAscii(TestCase):
     def _test_encode_basestring_ascii(self, encode_basestring_ascii):
         fname = encode_basestring_ascii.__name__
         for input_string, expect in CASES:
+            if PY3 and isinstance(input_string, binary_type):
+                input_string = input_string.decode('utf-8')
             result = encode_basestring_ascii(input_string)
             #self.assertEquals(result, expect,
             #    '{0!r} != {1!r} for {2}({3!r})'.format(

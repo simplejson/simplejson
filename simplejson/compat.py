@@ -1,6 +1,8 @@
 import sys
 
 if sys.version_info[0] < 3:
+    PY3 = False
+
     def b(s):
         return s
     def u(s):
@@ -17,6 +19,8 @@ if sys.version_info[0] < 3:
         return s.decode('hex')
 
 else:
+    PY3 = True
+
     def b(s):
         return s.encode("latin-1")
     def u(s):

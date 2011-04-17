@@ -410,7 +410,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             item_separator = _item_separator
         first = True
         if _sort_keys:
-            items = sorted(dct.items(), key=lambda kv: str(kv[0]))
+            items = sorted(dct.items(), key=lambda kv: kv[0])
         elif hasattr(dct, 'iteritems'):
             items = dct.iteritems()
         else:
