@@ -15,8 +15,13 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
     return x;
 }
 #endif
-#if PY_VERSION_HEX < 0x02060000 && !defined(Py_TYPE)
+#if PY_VERSION_HEX < 0x02060000
+#if !defined(Py_TYPE)
 #define Py_TYPE(ob)     (((PyObject*)(ob))->ob_type)
+#endif
+#if !defined(Py_SIZE)
+#define Py_SIZE(ob)     (((PyVarObject*)(ob))->ob_size)
+#endif
 #endif
 #if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;
