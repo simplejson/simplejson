@@ -35,6 +35,34 @@ typedef int Py_ssize_t;
 #define UNUSED
 #endif
 
+/* Python 2.x/3.x Portability definitions */
+
+#if PY_VERSION_HEX < 0x03000000
+
+#define PYINT_ASSSIZE_T 			PyInt_AsSsize_t
+#define PYINT_FROMSSIZE_T 			PyInt_FromSsize_t
+#define	PYSTRING_FROMSTRING			PyString_FromString
+#define PYSTRING_FROMSTRINGANDSIZE 	PyString_FromStringAndSize
+#define PYSTRING_AS_STRING			PyString_AS_STRING
+#define	PYCHAR						char
+#define PYSTRING_RESIZE				_PyString_Resize
+#define	PYSTRING_GET_SIZE			PyString_GET_SIZE
+#define	PYSTRING_INTERNFROMSTRING	PyString_InternFromString
+
+#else
+
+#define PYINT_ASSSIZE_T 			PyLong_AsSsize_t
+#define PYINT_FROMSSIZE_T 			PyLong_FromSsize_t
+#define	PYSTRING_FROMSTRING			PyUnicode_FromString
+#define PYSTRING_FROMSTRINGANDSIZE 	PyUnicode_FromStringAndSize
+#define PYSTRING_AS_STRING			PyUnicode_AS_UNICODE
+#define	PYCHAR						Py_UNICODE
+#define PYSTRING_RESIZE				PyUnicode_Resize
+#define	PYSTRING_GET_SIZE			PyUnicode_GET_SIZE
+#define	PYSTRING_INTERNFROMSTRING	PyUnicode_InternFromString
+
+#endif
+
 #define DEFAULT_ENCODING "utf-8"
 
 #define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
@@ -100,16 +128,20 @@ static PyMemberDef encoder_members[] = {
 };
 
 static Py_ssize_t
-ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars);
+ascii_escape_unichar(Py_UNICODE c, PYCHAR *output, Py_ssize_t chars);
 static PyObject *
 ascii_escape_unicode(PyObject *pystr);
+#if PY_VERSION_HEX < 0x03000000
 static PyObject *
 ascii_escape_str(PyObject *pystr);
+#endif
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
 void init_speedups(void);
+#if PY_VERSION_HEX < 0x03000000
 static PyObject *
 scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
+#endif
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
@@ -163,7 +195,7 @@ static int
 _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr)
 {
     /* PyObject to Py_ssize_t converter */
-    *size_ptr = PyInt_AsSsize_t(o);
+    *size_ptr = PYINT_ASSSIZE_T(o);
     if (*size_ptr == -1 && PyErr_Occurred())
         return 0;
     return 1;
@@ -173,11 +205,11 @@ static PyObject *
 _convertPyInt_FromSsize_t(Py_ssize_t *size_ptr)
 {
     /* Py_ssize_t to PyObject converter */
-    return PyInt_FromSsize_t(*size_ptr);
+    return PYINT_FROMSSIZE_T(*size_ptr);
 }
 
 static Py_ssize_t
-ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars)
+ascii_escape_unichar(Py_UNICODE c, PYCHAR *output, Py_ssize_t chars)
 {
     /* Escape unicode code point c to ASCII escape sequences
     in char *output. output must have at least 12 bytes unused to
@@ -225,7 +257,7 @@ ascii_escape_unicode(PyObject *pystr)
     Py_ssize_t max_output_size;
     Py_ssize_t chars;
     PyObject *rval;
-    char *output;
+    PYCHAR *output;
     Py_UNICODE *input_unicode;
 
     input_chars = PyUnicode_GET_SIZE(pystr);
@@ -234,20 +266,20 @@ ascii_escape_unicode(PyObject *pystr)
     /* One char input can be up to 6 chars output, estimate 4 of these */
     output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
     max_output_size = 2 + (input_chars * MAX_EXPANSION);
-    rval = PyString_FromStringAndSize(NULL, output_size);
+    rval = PYSTRING_FROMSTRINGANDSIZE(NULL, output_size);
     if (rval == NULL) {
         return NULL;
     }
-    output = PyString_AS_STRING(rval);
+    output = PYSTRING_AS_STRING(rval);
     chars = 0;
     output[chars++] = '"';
     for (i = 0; i < input_chars; i++) {
         Py_UNICODE c = input_unicode[i];
         if (S_CHAR(c)) {
-            output[chars++] = (char)c;
+            output[chars++] = (PYCHAR) c;
         }
         else {
-            chars = ascii_escape_char(c, output, chars);
+            chars = ascii_escape_unichar(c, output, chars);
         }
         if (output_size - chars < (1 + MAX_EXPANSION)) {
             /* There's more than four, so let's resize by a lot */
@@ -259,19 +291,21 @@ ascii_escape_unicode(PyObject *pystr)
             /* Make sure that the output size changed before resizing */
             if (new_output_size != output_size) {
                 output_size = new_output_size;
-                if (_PyString_Resize(&rval, output_size) == -1) {
+                if (PYSTRING_RESIZE(&rval, output_size) == -1) {
                     return NULL;
                 }
-                output = PyString_AS_STRING(rval);
+                output = PYSTRING_AS_STRING(rval);
             }
         }
     }
     output[chars++] = '"';
-    if (_PyString_Resize(&rval, chars) == -1) {
+    if (PYSTRING_RESIZE(&rval, chars) == -1) {
         return NULL;
     }
     return rval;
 }
+
+#if PY_VERSION_HEX < 0x03000000
 
 static PyObject *
 ascii_escape_str(PyObject *pystr)
@@ -282,11 +316,11 @@ ascii_escape_str(PyObject *pystr)
     Py_ssize_t output_size;
     Py_ssize_t chars;
     PyObject *rval;
-    char *output;
+    PYCHAR *output;
     char *input_str;
 
-    input_chars = PyString_GET_SIZE(pystr);
-    input_str = PyString_AS_STRING(pystr);
+    input_chars = PYSTRING_GET_SIZE(pystr);
+    input_str = PYSTRING_AS_STRING(pystr);
 
     /* Fast path for a string that's already ASCII */
     for (i = 0; i < input_chars; i++) {
@@ -320,11 +354,11 @@ ascii_escape_str(PyObject *pystr)
         /* One char input can be up to 6 chars output, estimate 4 of these */
         output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
     }
-    rval = PyString_FromStringAndSize(NULL, output_size);
+    rval = PYSTRING_FROMSTRINGANDSIZE(NULL, output_size);
     if (rval == NULL) {
         return NULL;
     }
-    output = PyString_AS_STRING(rval);
+    output = PYSTRING_AS_STRING(rval);
     output[0] = '"';
 
     /* We know that everything up to i is ASCII already */
@@ -337,7 +371,7 @@ ascii_escape_str(PyObject *pystr)
             output[chars++] = (char)c;
         }
         else {
-            chars = ascii_escape_char(c, output, chars);
+            chars = ascii_escape_unichar(c, output, chars);
         }
         /* An ASCII char can't possibly expand to a surrogate! */
         if (output_size - chars < (1 + MIN_EXPANSION)) {
@@ -346,18 +380,20 @@ ascii_escape_str(PyObject *pystr)
             if (output_size > 2 + (input_chars * MIN_EXPANSION)) {
                 output_size = 2 + (input_chars * MIN_EXPANSION);
             }
-            if (_PyString_Resize(&rval, output_size) == -1) {
+            if (PYSTRING_RESIZE(&rval, output_size) == -1) {
                 return NULL;
             }
-            output = PyString_AS_STRING(rval);
+            output = PYSTRING_AS_STRING(rval);
         }
     }
     output[chars++] = '"';
-    if (_PyString_Resize(&rval, chars) == -1) {
+    if (PYSTRING_RESIZE(&rval, chars) == -1) {
         return NULL;
     }
     return rval;
 }
+
+#endif
 
 static void
 raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
@@ -400,13 +436,15 @@ join_list_unicode(PyObject *lst)
     return PyObject_CallFunctionObjArgs(joinfn, lst, NULL);
 }
 
+#if PY_VERSION_HEX < 0x03000000
+
 static PyObject *
 join_list_string(PyObject *lst)
 {
     /* return ''.join(lst) */
     static PyObject *joinfn = NULL;
     if (joinfn == NULL) {
-        PyObject *ustr = PyString_FromStringAndSize(NULL, 0);
+        PyObject *ustr = PYSTRING_FROMSTRINGANDSIZE(NULL, 0);
         if (ustr == NULL)
             return NULL;
 
@@ -417,6 +455,8 @@ join_list_string(PyObject *lst)
     }
     return PyObject_CallFunctionObjArgs(joinfn, lst, NULL);
 }
+
+#endif
 
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
@@ -429,7 +469,7 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
     if (rval == NULL) {
         return NULL;
     }
-    pyidx = PyInt_FromSsize_t(idx);
+    pyidx = PYINT_FROMSSIZE_T(idx);
     if (pyidx == NULL) {
         Py_DECREF(rval);
         return NULL;
@@ -459,6 +499,8 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
         Py_CLEAR(chunk); \
     }
 
+#if PY_VERSION_HEX < 0x03000000
+
 static PyObject *
 scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_ssize_t *next_end_ptr)
 {
@@ -472,11 +514,11 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
     Return value is a new PyString (if ASCII-only) or PyUnicode
     */
     PyObject *rval;
-    Py_ssize_t len = PyString_GET_SIZE(pystr);
+    Py_ssize_t len = PYSTRING_GET_SIZE(pystr);
     Py_ssize_t begin = end - 1;
     Py_ssize_t next = begin;
     int has_unicode = 0;
-    char *buf = PyString_AS_STRING(pystr);
+    PYCHAR *buf = PYSTRING_AS_STRING(pystr);
     PyObject *chunks = NULL;
     PyObject *chunk = NULL;
 
@@ -508,7 +550,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         if (next != end) {
             PyObject *strchunk;
             APPEND_OLD_CHUNK
-            strchunk = PyString_FromStringAndSize(&buf[end], next - end);
+            strchunk = PYSTRING_FROMSTRINGANDSIZE(&buf[end], next - end);
             if (strchunk == NULL) {
                 goto bail;
             }
@@ -635,7 +677,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         }
         else {
             char c_char = Py_CHARMASK(c);
-            chunk = PyString_FromStringAndSize(&c_char, 1);
+            chunk = PYSTRING_FROMSTRINGANDSIZE(&c_char, 1);
             if (chunk == NULL) {
                 goto bail;
             }
@@ -646,7 +688,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         if (chunk != NULL)
             rval = chunk;
         else
-            rval = PyString_FromStringAndSize("", 0);
+            rval = PYSTRING_FROMSTRINGANDSIZE("", 0);
     }
     else {
         APPEND_OLD_CHUNK
@@ -666,6 +708,7 @@ bail:
     return NULL;
 }
 
+#endif
 
 static PyObject *
 scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr)
@@ -873,12 +916,18 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
     if (encoding == NULL) {
         encoding = DEFAULT_ENCODING;
     }
+#if PY_VERSION_HEX < 0x03000000
     if (PyString_Check(pystr)) {
         rval = scanstring_str(pystr, end, encoding, strict, &next_end);
     }
     else if (PyUnicode_Check(pystr)) {
         rval = scanstring_unicode(pystr, end, strict, &next_end);
     }
+#else
+    if (PyUnicode_Check(pystr)) {
+        rval = scanstring_unicode(pystr, end, strict, &next_end);
+    }
+#endif
     else {
         PyErr_Format(PyExc_TypeError,
                      "first argument must be a string, not %.80s",
@@ -899,12 +948,18 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
 {
     /* Return an ASCII-only JSON representation of a Python string */
     /* METH_O */
+#if PY_VERSION_HEX < 0x03000000
     if (PyString_Check(pystr)) {
         return ascii_escape_str(pystr);
     }
     else if (PyUnicode_Check(pystr)) {
         return ascii_escape_unicode(pystr);
     }
+#else
+    if (PyUnicode_Check(pystr)) {
+        return ascii_escape_unicode(pystr);
+    }
+#endif
     else {
         PyErr_Format(PyExc_TypeError,
                      "first argument must be a string, not %.80s",
@@ -955,6 +1010,8 @@ scanner_clear(PyObject *self)
     return 0;
 }
 
+#if PY_VERSION_HEX < 0x03000000
+
 static PyObject *
 _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     /* Read a JSON object from PyString pystr.
@@ -965,14 +1022,14 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     Returns a new PyObject (usually a dict, but object_hook or
     object_pairs_hook can change that)
     */
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
+    char *str = PYSTRING_AS_STRING(pystr);
+    Py_ssize_t end_idx = PYSTRING_GET_SIZE(pystr) - 1;
     PyObject *rval = NULL;
     PyObject *pairs = NULL;
     PyObject *item;
     PyObject *key = NULL;
     PyObject *val = NULL;
-    char *encoding = PyString_AS_STRING(s->encoding);
+    char *encoding = PYSTRING_AS_STRING(s->encoding);
     int strict = PyObject_IsTrue(s->strict);
     int has_pairs_hook = (s->pairs_hook != Py_None);
     Py_ssize_t next_idx;
@@ -1102,6 +1159,8 @@ bail:
     return NULL;
 }
 
+#endif
+
 static PyObject *
 _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     /* Read a JSON object from PyUnicode pystr.
@@ -1132,7 +1191,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
         if (rval == NULL)
             return NULL;
     }
-    
+
     /* skip whitespace after { */
     while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
@@ -1249,6 +1308,8 @@ bail:
     return NULL;
 }
 
+#if PY_VERSION_HEX < 0x03000000
+
 static PyObject *
 _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
     /* Read a JSON array from PyString pystr.
@@ -1258,8 +1319,8 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
 
     Returns a new PyList
     */
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
+    char *str = PYSTRING_AS_STRING(pystr);
+    Py_ssize_t end_idx = PYSTRING_GET_SIZE(pystr) - 1;
     PyObject *val = NULL;
     PyObject *rval = PyList_New(0);
     Py_ssize_t next_idx;
@@ -1320,6 +1381,8 @@ bail:
     Py_DECREF(rval);
     return NULL;
 }
+
+#endif
 
 static PyObject *
 _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
@@ -1407,17 +1470,19 @@ _parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx, Py_ssize_t *
     PyObject *cstr;
     PyObject *rval;
     /* constant is "NaN", "Infinity", or "-Infinity" */
-    cstr = PyString_InternFromString(constant);
+    cstr = PYSTRING_INTERNFROMSTRING(constant);
     if (cstr == NULL)
         return NULL;
 
     /* rval = parse_constant(constant) */
     rval = PyObject_CallFunctionObjArgs(s->parse_constant, cstr, NULL);
-    idx += PyString_GET_SIZE(cstr);
+    idx += PYSTRING_GET_SIZE(cstr);
     Py_DECREF(cstr);
     *next_idx_ptr = idx;
     return rval;
 }
+
+#if PY_VERSION_HEX < 0x03000000
 
 static PyObject *
 _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr) {
@@ -1430,8 +1495,8 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
         PyInt, PyLong, or PyFloat.
         May return other types if parse_int or parse_float are set
     */
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
+    char *str = PYSTRING_AS_STRING(pystr);
+    Py_ssize_t end_idx = PYSTRING_GET_SIZE(pystr) - 1;
     Py_ssize_t idx = start;
     int is_float = 0;
     PyObject *rval;
@@ -1491,7 +1556,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     }
 
     /* copy the section we determined to be a number */
-    numstr = PyString_FromStringAndSize(&str[start], idx - start);
+    numstr = PYSTRING_FROMSTRINGANDSIZE(&str[start], idx - start);
     if (numstr == NULL)
         return NULL;
     if (is_float) {
@@ -1500,8 +1565,8 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
             rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
         }
         else {
-            /* rval = PyFloat_FromDouble(PyOS_ascii_atof(PyString_AS_STRING(numstr))); */
-            double d = PyOS_string_to_double(PyString_AS_STRING(numstr),
+            /* rval = PyFloat_FromDouble(PyOS_ascii_atof(PYSTRING_AS_STRING(numstr))); */
+            double d = PyOS_string_to_double(PYSTRING_AS_STRING(numstr),
                                              NULL, NULL);
             if (d == -1.0 && PyErr_Occurred())
                 return NULL;
@@ -1514,13 +1579,15 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
             rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
         }
         else {
-            rval = PyInt_FromString(PyString_AS_STRING(numstr), NULL, 10);
+            rval = PyInt_FromString(PYSTRING_AS_STRING(numstr), NULL, 10);
         }
     }
     Py_DECREF(numstr);
     *next_idx_ptr = idx;
     return rval;
 }
+
+#endif
 
 static PyObject *
 _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr) {
@@ -1601,7 +1668,11 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
             rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
         }
         else {
+#if PY_VERSION_HEX < 0x03000000
             rval = PyFloat_FromString(numstr, NULL);
+#else
+            rval = PyFloat_FromString(numstr);
+#endif
         }
     }
     else {
@@ -1613,6 +1684,8 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     return rval;
 }
 
+#if PY_VERSION_HEX < 0x03000000
+
 static PyObject *
 scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
 {
@@ -1623,8 +1696,8 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
 
     Returns a new PyObject representation of the term.
     */
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t length = PyString_GET_SIZE(pystr);
+    char *str = PYSTRING_AS_STRING(pystr);
+    Py_ssize_t length = PYSTRING_GET_SIZE(pystr);
     if (idx >= length) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
@@ -1633,7 +1706,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
         case '"':
             /* string */
             return scanstring_str(pystr, idx + 1,
-                PyString_AS_STRING(s->encoding),
+                PYSTRING_AS_STRING(s->encoding),
                 PyObject_IsTrue(s->strict),
                 next_idx_ptr);
         case '{':
@@ -1688,6 +1761,8 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     /* Didn't find a string, object, array, or named constant. Look for a number. */
     return _match_number_str(s, pystr, idx, next_idx_ptr);
 }
+
+#endif
 
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
@@ -1779,12 +1854,18 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:scan_once", kwlist, &pystr, _convertPyInt_AsSsize_t, &idx))
         return NULL;
 
+#if PY_VERSION_HEX < 0x03000000
     if (PyString_Check(pystr)) {
         rval = scan_once_str(s, pystr, idx, &next_idx);
     }
     else if (PyUnicode_Check(pystr)) {
         rval = scan_once_unicode(s, pystr, idx, &next_idx);
     }
+#else
+    if (PyUnicode_Check(pystr)) {
+        rval = scan_once_unicode(s, pystr, idx, &next_idx);
+    }
+#endif
     else {
         PyErr_Format(PyExc_TypeError,
                  "first argument must be a string, not %.80s",
@@ -1825,7 +1906,7 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:make_scanner", kwlist, &ctx))
         return -1;
-    
+
     if (s->memo == NULL) {
         s->memo = PyDict_New();
         if (s->memo == NULL)
@@ -1838,15 +1919,17 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
         goto bail;
     if (s->encoding == Py_None) {
         Py_DECREF(Py_None);
-        s->encoding = PyString_InternFromString(DEFAULT_ENCODING);
+        s->encoding = PYSTRING_INTERNFROMSTRING(DEFAULT_ENCODING);
     }
     else if (PyUnicode_Check(s->encoding)) {
         PyObject *tmp = PyUnicode_AsEncodedString(s->encoding, NULL, NULL);
         Py_DECREF(s->encoding);
         s->encoding = tmp;
     }
+#if PY_VERSION_HEX < 0x03000000
     if (s->encoding == NULL || !PyString_Check(s->encoding))
         goto bail;
+#endif
 
     /* All of these will fail "gracefully" so we don't need to verify them */
     s->strict = PyObject_GetAttrString(ctx, "strict");
@@ -1885,8 +1968,12 @@ PyDoc_STRVAR(scanner_doc, "JSON scanner object");
 
 static
 PyTypeObject PyScannerType = {
+#if PY_VERSION_HEX < 0x03000000
     PyObject_HEAD_INIT(NULL)
     0,                    /* tp_internal */
+#else
+    PyVarObject_HEAD_INIT(NULL, 0)
+#endif
     "simplejson._speedups.Scanner",       /* tp_name */
     sizeof(PyScannerObject), /* tp_basicsize */
     0,                    /* tp_itemsize */
@@ -2020,7 +2107,7 @@ _encoded_const(PyObject *obj)
     if (obj == Py_None) {
         static PyObject *s_null = NULL;
         if (s_null == NULL) {
-            s_null = PyString_InternFromString("null");
+            s_null = PYSTRING_INTERNFROMSTRING("null");
         }
         Py_INCREF(s_null);
         return s_null;
@@ -2028,7 +2115,7 @@ _encoded_const(PyObject *obj)
     else if (obj == Py_True) {
         static PyObject *s_true = NULL;
         if (s_true == NULL) {
-            s_true = PyString_InternFromString("true");
+            s_true = PYSTRING_INTERNFROMSTRING("true");
         }
         Py_INCREF(s_true);
         return s_true;
@@ -2036,7 +2123,7 @@ _encoded_const(PyObject *obj)
     else if (obj == Py_False) {
         static PyObject *s_false = NULL;
         if (s_false == NULL) {
-            s_false = PyString_InternFromString("false");
+            s_false = PYSTRING_INTERNFROMSTRING("false");
         }
         Py_INCREF(s_false);
         return s_false;
@@ -2058,13 +2145,13 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
             return NULL;
         }
         if (i > 0) {
-            return PyString_FromString("Infinity");
+            return PYSTRING_FROMSTRING("Infinity");
         }
         else if (i < 0) {
-            return PyString_FromString("-Infinity");
+            return PYSTRING_FROMSTRING("-Infinity");
         }
         else {
-            return PyString_FromString("NaN");
+            return PYSTRING_FROMSTRING("NaN");
         }
     }
     /* Use a better float format here? */
@@ -2103,14 +2190,22 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
             return -1;
         return _steal_list_append(rval, cstr);
     }
+#if PY_VERSION_HEX < 0x03000000
     else if (PyString_Check(obj) || PyUnicode_Check(obj))
+#else
+        else if (PyUnicode_Check(obj))
+#endif
     {
         PyObject *encoded = encoder_encode_string(s, obj);
         if (encoded == NULL)
             return -1;
         return _steal_list_append(rval, encoded);
     }
+#if PY_VERSION_HEX < 0x03000000
     else if (PyInt_Check(obj) || PyLong_Check(obj)) {
+#else
+        else if (PyLong_Check(obj)) {
+#endif
         PyObject *encoded = PyObject_Str(obj);
         if (encoded == NULL)
             return -1;
@@ -2193,10 +2288,10 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     Py_ssize_t idx;
 
     if (open_dict == NULL || close_dict == NULL || empty_dict == NULL || iteritems == NULL) {
-        open_dict = PyString_InternFromString("{");
-        close_dict = PyString_InternFromString("}");
-        empty_dict = PyString_InternFromString("{}");
-        iteritems = PyString_InternFromString("iteritems");
+        open_dict = PYSTRING_INTERNFROMSTRING("{");
+        close_dict = PYSTRING_INTERNFROMSTRING("}");
+        empty_dict = PYSTRING_INTERNFROMSTRING("{}");
+        iteritems = PYSTRING_INTERNFROMSTRING("iteritems");
         if (open_dict == NULL || close_dict == NULL || empty_dict == NULL || iteritems == NULL)
             return -1;
     }
@@ -2291,8 +2386,12 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         if (encoded != NULL) {
             Py_INCREF(encoded);
         }
+#if PY_VERSION_HEX < 0x03000000
         else if (PyString_Check(key) || PyUnicode_Check(key)) {
-            Py_INCREF(key);
+#else
+        else if (PyUnicode_Check(key)) {
+#endif
+        	Py_INCREF(key);
             kstr = key;
         }
         else if (PyFloat_Check(key)) {
@@ -2307,8 +2406,12 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             if (kstr == NULL)
                 goto bail;
         }
+#if PY_VERSION_HEX < 0x03000000
         else if (PyInt_Check(key) || PyLong_Check(key)) {
-            kstr = PyObject_Str(key);
+#else
+        else if (PyLong_Check(key)) {
+#endif
+        	kstr = PyObject_Str(key);
             if (kstr == NULL)
                 goto bail;
         }
@@ -2389,9 +2492,9 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
     int i = 0;
 
     if (open_array == NULL || close_array == NULL || empty_array == NULL) {
-        open_array = PyString_InternFromString("[");
-        close_array = PyString_InternFromString("]");
-        empty_array = PyString_InternFromString("[]");
+        open_array = PYSTRING_INTERNFROMSTRING("[");
+        close_array = PYSTRING_INTERNFROMSTRING("]");
+        empty_array = PYSTRING_INTERNFROMSTRING("[]");
         if (open_array == NULL || close_array == NULL || empty_array == NULL)
             return -1;
     }
@@ -2518,8 +2621,12 @@ PyDoc_STRVAR(encoder_doc, "_iterencode(obj, _current_indent_level) -> iterable")
 
 static
 PyTypeObject PyEncoderType = {
+#if PY_VERSION_HEX < 0x03000000
     PyObject_HEAD_INIT(NULL)
     0,                    /* tp_internal */
+#else
+    PyVarObject_HEAD_INIT(NULL, 0)
+#endif
     "simplejson._speedups.Encoder",       /* tp_name */
     sizeof(PyEncoderObject), /* tp_basicsize */
     0,                    /* tp_itemsize */
@@ -2575,6 +2682,8 @@ static PyMethodDef speedups_methods[] = {
 PyDoc_STRVAR(module_doc,
 "simplejson speedups\n");
 
+#if PY_VERSION_HEX < 0x03000000
+
 void
 init_speedups(void)
 {
@@ -2600,3 +2709,57 @@ init_speedups(void)
     Py_INCREF((PyObject*)&PyEncoderType);
     PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType);
 }
+
+#else
+
+static struct PyModuleDef speedupsmodule = {
+        PyModuleDef_HEAD_INIT,
+        "_speedups",
+        module_doc,
+        -1,
+        speedups_methods,
+        NULL,
+        NULL,
+        NULL,
+        NULL
+};
+
+PyObject*
+PyInit__speedups(void)
+{
+    PyObject *m = PyModule_Create(&speedupsmodule);
+    PyObject *decimal;
+
+    if (!m)
+        return NULL;
+    PyScannerType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&PyScannerType) < 0)
+        goto fail;
+    PyEncoderType.tp_new = PyType_GenericNew;
+    if (PyType_Ready(&PyEncoderType) < 0)
+        goto fail;
+    decimal = PyImport_ImportModule("decimal");
+    if (decimal == NULL)
+        goto fail;
+    DecimalTypePtr = (PyTypeObject*)PyObject_GetAttrString(decimal, "Decimal");
+    Py_DECREF(decimal);
+    if (DecimalTypePtr == NULL)
+        goto fail;
+
+    Py_INCREF((PyObject*)&PyScannerType);
+    if (PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType) < 0) {
+        Py_DECREF((PyObject*)&PyScannerType);
+        goto fail;
+    }
+    Py_INCREF((PyObject*)&PyEncoderType);
+    if (PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType) < 0) {
+        Py_DECREF((PyObject*)&PyEncoderType);
+        goto fail;
+    }
+    return m;
+  fail:
+    Py_DECREF(m);
+    return NULL;
+}
+
+#endif
