@@ -15,7 +15,7 @@ if sys.version_info[0] < 3:
     integer_types = (int, long)
     unichr = unichr
     
-    def hexify(s):
+    def fromhex(s):
         return s.decode('hex')
 
 else:
@@ -36,7 +36,7 @@ else:
     def unichr(s):
         return u(chr(s))
 
-    def hexify(s):
+    def fromhex(s):
         return bytes.fromhex(s)
 
 long_type = integer_types[-1]

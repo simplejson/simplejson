@@ -12,12 +12,12 @@ def _import_speedups():
 c_encode_basestring_ascii, c_make_encoder = _import_speedups()
 
 from simplejson.compat import (binary_type, text_type,
-                               integer_types, string_types, u)
+                               integer_types, string_types, u, b)
 from simplejson.decoder import PosInf
 
 ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
-HAS_UTF8 = re.compile(r'[\x80-\xff]')
+HAS_UTF8 = re.compile(b(r'[\x80-\xff]'))
 ESCAPE_DCT = {
     '\\': '\\\\',
     '"': '\\"',
@@ -37,7 +37,7 @@ def encode_basestring(s):
     """Return a JSON representation of a Python string
 
     """
-    if isinstance(s, binary_type) and HAS_UTF8.search(s.decode('latin-1')) is not None:
+    if isinstance(s, binary_type) and HAS_UTF8.search(s) is not None:
         s = s.decode('utf-8')
     def replace(match):
         return ESCAPE_DCT[match.group(0)]
@@ -48,7 +48,7 @@ def py_encode_basestring_ascii(s):
     """Return an ASCII-only JSON representation of a Python string
 
     """
-    if isinstance(s, binary_type) and HAS_UTF8.search(s.decode('latin-1')) is not None:
+    if isinstance(s, binary_type) and HAS_UTF8.search(s) is not None:
         s = s.decode('utf-8')
     def replace(match):
         s = match.group(0)

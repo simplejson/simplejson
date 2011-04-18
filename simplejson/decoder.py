@@ -4,7 +4,7 @@ import re
 import sys
 import struct
 
-from simplejson.compat import text_type, binary_type, u, b, unichr, hexify
+from simplejson.compat import text_type, binary_type, u, b, unichr, fromhex
 from simplejson.scanner import make_scanner
 def _import_c_scanstring():
     try:
@@ -19,7 +19,7 @@ __all__ = ['JSONDecoder']
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 
 def _floatconstants():
-    _BYTES = hexify('7FF80000000000007FF0000000000000')
+    _BYTES = fromhex('7FF80000000000007FF0000000000000')
     # The struct module in Python 2.4 would get frexp() out of range here
     # when an endian is specified in the format string. Fixed in Python 2.5+
     if sys.byteorder != 'big':
