@@ -1,5 +1,5 @@
 from unittest import TestCase
-from simplejson.compat import StringIO, long_type, PY3
+from simplejson.compat import StringIO, long_type as L, PY3
 
 import simplejson as json
 
@@ -16,13 +16,16 @@ class TestDump(TestCase):
         self.assertEquals(json.dumps(
                  {True: False, False: True}, sort_keys=True),
                  '{"false": true, "true": false}')
-        # strs and floats can't be compared on Python 3, so make all keys strings.
+        # strs and floats can't be compared on Python 3, so make all keys of
+        # comparable types for that case. This test is for coercion of the
+        # keys; the sorting is just to make the output stable for comparison
+        # purposes.
         if not PY3:
-            d = {2: 3.0, 4.0: long_type(5), False: 1, long_type(6): True, "7": 0}
+            d = {2: 3.0, 4.0: L(5), False: 1, L(6): True, "7": 0}
             expected = '{"false": 1, "2": 3.0, "4.0": 5, "6": true, "7": 0}'
         else:
-            d = {'2': 3.0, '4.0': long_type(5), 'false': 1, str(long_type(6)): True, "7": 0}
-            expected = '{"2": 3.0, "4.0": 5, "6": true, "7": 0, "false": 1}'
+            d = {2: 3.0, 4.0: L(5), False: 1, L(6): True, 7.0: 0 }
+            expected = '{"false": 1, "2": 3.0, "4.0": 5, "6": true, "7.0": 0}'
         self.assertEquals(json.dumps(d, sort_keys=True), expected)
 
     def test_ordered_dict(self):
