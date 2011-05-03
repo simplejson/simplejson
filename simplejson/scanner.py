@@ -11,6 +11,8 @@ c_make_scanner = _import_c_make_scanner()
 
 __all__ = ['make_scanner']
 
+JSON_TOKENER_MAX_DEPTH = 32
+
 NUMBER_RE = re.compile(
     r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?',
     (re.VERBOSE | re.MULTILINE | re.DOTALL))
@@ -29,7 +31,9 @@ def py_make_scanner(context):
     object_pairs_hook = context.object_pairs_hook
     memo = context.memo
 
-    def _scan_once(string, idx):
+    def _scan_once(string, idx, depth=0):
+        if depth >= JSON_TOKENER_MAX_DEPTH:
+            raise OverflowError()
         try:
             nextchar = string[idx]
         except IndexError:
@@ -39,9 +43,9 @@ def py_make_scanner(context):
             return parse_string(string, idx + 1, encoding, strict)
         elif nextchar == '{':
             return parse_object((string, idx + 1), encoding, strict,
-                _scan_once, object_hook, object_pairs_hook, memo)
+                _scan_once, object_hook, object_pairs_hook, depth + 1, memo)
         elif nextchar == '[':
-            return parse_array((string, idx + 1), _scan_once)
+            return parse_array((string, idx + 1), _scan_once, depth + 1)
         elif nextchar == 'n' and string[idx:idx + 4] == 'null':
             return None, idx + 4
         elif nextchar == 't' and string[idx:idx + 4] == 'true':

@@ -40,6 +40,9 @@ typedef int Py_ssize_t;
 
 #define DEFAULT_ENCODING "utf-8"
 
+/* match the limit in json-c-0.9 */
+#define JSON_TOKENER_MAX_DEPTH 32
+
 #define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
 #define PyScanner_CheckExact(op) (Py_TYPE(op) == &PyScannerType)
 #define PyEncoder_Check(op) PyObject_TypeCheck(op, &PyEncoderType)
@@ -112,9 +115,9 @@ static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
 void init_speedups(void);
 static PyObject *
-scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
+scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth);
 static PyObject *
-scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
+scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth);
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
 static PyObject *
@@ -959,7 +962,7 @@ scanner_clear(PyObject *self)
 }
 
 static PyObject *
-_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth) {
     /* Read a JSON object from PyString pystr.
     idx is the index of the first character after the opening curly brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1028,7 +1031,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
             /* read any JSON data type */
-            val = scan_once_str(s, pystr, idx, &next_idx);
+            val = scan_once_str(s, pystr, idx, &next_idx, depth);
             if (val == NULL)
                 goto bail;
 
@@ -1106,7 +1109,7 @@ bail:
 }
 
 static PyObject *
-_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth) {
     /* Read a JSON object from PyUnicode pystr.
     idx is the index of the first character after the opening curly brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1174,7 +1177,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
             /* read any JSON term */
-            val = scan_once_unicode(s, pystr, idx, &next_idx);
+            val = scan_once_unicode(s, pystr, idx, &next_idx, depth);
             if (val == NULL)
                 goto bail;
 
@@ -1253,7 +1256,7 @@ bail:
 }
 
 static PyObject *
-_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth) {
     /* Read a JSON array from PyString pystr.
     idx is the index of the first character after the opening brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1277,7 +1280,7 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
         while (idx <= end_idx) {
 
             /* read any JSON term and de-tuplefy the (rval, idx) */
-            val = scan_once_str(s, pystr, idx, &next_idx);
+            val = scan_once_str(s, pystr, idx, &next_idx, depth);
             if (val == NULL) {
                 if (PyErr_ExceptionMatches(PyExc_StopIteration)) {
                     PyErr_Clear();
@@ -1325,7 +1328,7 @@ bail:
 }
 
 static PyObject *
-_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth) {
     /* Read a JSON array from PyString pystr.
     idx is the index of the first character after the opening brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1349,7 +1352,7 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
         while (idx <= end_idx) {
 
             /* read any JSON term  */
-            val = scan_once_unicode(s, pystr, idx, &next_idx);
+            val = scan_once_unicode(s, pystr, idx, &next_idx, depth);
             if (val == NULL) {
                 if (PyErr_ExceptionMatches(PyExc_StopIteration)) {
                     PyErr_Clear();
@@ -1617,7 +1620,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
 }
 
 static PyObject *
-scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth)
 {
     /* Read one JSON term (of any kind) from PyString pystr.
     idx is the index of the first character of the term
@@ -1626,6 +1629,10 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
 
     Returns a new PyObject representation of the term.
     */
+    if(depth >= JSON_TOKENER_MAX_DEPTH) {
+        PyErr_SetNone(PyExc_OverflowError);
+        return NULL;
+    }
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t length = PyString_GET_SIZE(pystr);
     if (idx >= length) {
@@ -1641,10 +1648,10 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
                 next_idx_ptr);
         case '{':
             /* object */
-            return _parse_object_str(s, pystr, idx + 1, next_idx_ptr);
+            return _parse_object_str(s, pystr, idx + 1, next_idx_ptr, depth + 1);
         case '[':
             /* array */
-            return _parse_array_str(s, pystr, idx + 1, next_idx_ptr);
+            return _parse_array_str(s, pystr, idx + 1, next_idx_ptr, depth + 1);
         case 'n':
             /* null */
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
@@ -1693,7 +1700,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
 }
 
 static PyObject *
-scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr, int depth)
 {
     /* Read one JSON term (of any kind) from PyUnicode pystr.
     idx is the index of the first character of the term
@@ -1702,6 +1709,10 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
 
     Returns a new PyObject representation of the term.
     */
+    if(depth >= JSON_TOKENER_MAX_DEPTH) {
+        PyErr_SetNone(PyExc_OverflowError);
+        return NULL;
+    }
     Py_UNICODE *str = PyUnicode_AS_UNICODE(pystr);
     Py_ssize_t length = PyUnicode_GET_SIZE(pystr);
     if (idx >= length) {
@@ -1716,10 +1727,10 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
                 next_idx_ptr);
         case '{':
             /* object */
-            return _parse_object_unicode(s, pystr, idx + 1, next_idx_ptr);
+            return _parse_object_unicode(s, pystr, idx + 1, next_idx_ptr, depth + 1);
         case '[':
             /* array */
-            return _parse_array_unicode(s, pystr, idx + 1, next_idx_ptr);
+            return _parse_array_unicode(s, pystr, idx + 1, next_idx_ptr, depth + 1);
         case 'n':
             /* null */
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
@@ -1783,10 +1794,10 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
         return NULL;
 
     if (PyString_Check(pystr)) {
-        rval = scan_once_str(s, pystr, idx, &next_idx);
+        rval = scan_once_str(s, pystr, idx, &next_idx, 0);
     }
     else if (PyUnicode_Check(pystr)) {
-        rval = scan_once_unicode(s, pystr, idx, &next_idx);
+        rval = scan_once_unicode(s, pystr, idx, &next_idx, 0);
     }
     else {
         PyErr_Format(PyExc_TypeError,
