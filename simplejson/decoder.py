@@ -178,7 +178,7 @@ WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 WHITESPACE_STR = ' \t\n\r'
 
 def JSONObject((s, end), encoding, strict, scan_once, object_hook,
-        object_pairs_hook, memo=None,
+        object_pairs_hook, depth, memo=None,
         _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     # Backwards compatibility
     if memo is None:
@@ -227,7 +227,7 @@ def JSONObject((s, end), encoding, strict, scan_once, object_hook,
             pass
 
         try:
-            value, end = scan_once(s, end)
+            value, end = scan_once(s, end, depth)
         except StopIteration:
             raise JSONDecodeError("Expecting object", s, end)
         pairs.append((key, value))
@@ -269,7 +269,7 @@ def JSONObject((s, end), encoding, strict, scan_once, object_hook,
         pairs = object_hook(pairs)
     return pairs, end
 
-def JSONArray((s, end), scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+def JSONArray((s, end), scan_once, depth, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     values = []
     nextchar = s[end:end + 1]
     if nextchar in _ws:
@@ -281,7 +281,7 @@ def JSONArray((s, end), scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     _append = values.append
     while True:
         try:
-            value, end = scan_once(s, end)
+            value, end = scan_once(s, end, depth)
         except StopIteration:
             raise JSONDecodeError("Expecting object", s, end)
         _append(value)
@@ -418,4 +418,6 @@ class JSONDecoder(object):
             obj, end = self.scan_once(s, idx)
         except StopIteration:
             raise JSONDecodeError("No JSON object could be decoded", s, idx)
+        except OverflowError:
+            raise JSONDecodeError("Depth limit exceeded", s, idx)
         return obj, end

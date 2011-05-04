@@ -30,6 +30,7 @@ def all_tests_suite():
         'simplejson.tests.test_check_circular',
         'simplejson.tests.test_decode',
         'simplejson.tests.test_default',
+        'simplejson.tests.test_depthlimit',
         'simplejson.tests.test_dump',
         'simplejson.tests.test_encode_basestring_ascii',
         'simplejson.tests.test_encode_for_html',
