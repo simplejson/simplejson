@@ -2146,7 +2146,8 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
 {
     /* Encode Python object obj to a JSON term, rval is a PyList */
     int rv = -1;
-
+    if (Py_EnterRecursiveCall(" while encoding a JSON document"))
+        return rv;
     do {
         if (obj == Py_None || obj == Py_True || obj == Py_False) {
             PyObject *cstr = _encoded_const(obj);
