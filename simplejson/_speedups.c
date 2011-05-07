@@ -2145,85 +2145,83 @@ static int
 encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssize_t indent_level)
 {
     /* Encode Python object obj to a JSON term, rval is a PyList */
-    PyObject *newobj;
-    int rv;
+    int rv = -1;
 
-    if (obj == Py_None || obj == Py_True || obj == Py_False) {
-        PyObject *cstr = _encoded_const(obj);
-        if (cstr == NULL)
-            return -1;
-        return _steal_list_append(rval, cstr);
-    }
-    else if (PyString_Check(obj) || PyUnicode_Check(obj))
-    {
-        PyObject *encoded = encoder_encode_string(s, obj);
-        if (encoded == NULL)
-            return -1;
-        return _steal_list_append(rval, encoded);
-    }
-    else if (PyInt_Check(obj) || PyLong_Check(obj)) {
-        PyObject *encoded = PyObject_Str(obj);
-        if (encoded == NULL)
-            return -1;
-        return _steal_list_append(rval, encoded);
-    }
-    else if (PyFloat_Check(obj)) {
-        PyObject *encoded = encoder_encode_float(s, obj);
-        if (encoded == NULL)
-            return -1;
-        return _steal_list_append(rval, encoded);
-    }
-    else if (PyList_Check(obj) || PyTuple_Check(obj)) {
-        return encoder_listencode_list(s, rval, obj, indent_level);
-    }
-    else if (PyDict_Check(obj)) {
-        return encoder_listencode_dict(s, rval, obj, indent_level);
-    }
-    else if (s->use_decimal && Decimal_Check(obj)) {
-        PyObject *encoded = PyObject_Str(obj);
-        if (encoded == NULL)
-            return -1;
-        return _steal_list_append(rval, encoded);
-    }
-    else {
-        PyObject *ident = NULL;
-        if (s->markers != Py_None) {
-            int has_key;
-            ident = PyLong_FromVoidPtr(obj);
-            if (ident == NULL)
-                return -1;
-            has_key = PyDict_Contains(s->markers, ident);
-            if (has_key) {
-                if (has_key != -1)
-                    PyErr_SetString(PyExc_ValueError, "Circular reference detected");
-                Py_DECREF(ident);
-                return -1;
+    do {
+        if (obj == Py_None || obj == Py_True || obj == Py_False) {
+            PyObject *cstr = _encoded_const(obj);
+            if (cstr != NULL)
+                rv = _steal_list_append(rval, cstr);
+        }
+        else if (PyString_Check(obj) || PyUnicode_Check(obj))
+        {
+            PyObject *encoded = encoder_encode_string(s, obj);
+            if (encoded != NULL)
+                rv = _steal_list_append(rval, encoded);
+        }
+        else if (PyInt_Check(obj) || PyLong_Check(obj)) {
+            PyObject *encoded = PyObject_Str(obj);
+            if (encoded != NULL)
+                rv = _steal_list_append(rval, encoded);
+        }
+        else if (PyFloat_Check(obj)) {
+            PyObject *encoded = encoder_encode_float(s, obj);
+            if (encoded != NULL)
+                rv = _steal_list_append(rval, encoded);
+        }
+        else if (PyList_Check(obj) || PyTuple_Check(obj)) {
+            rv = encoder_listencode_list(s, rval, obj, indent_level);
+        }
+        else if (PyDict_Check(obj)) {
+            rv = encoder_listencode_dict(s, rval, obj, indent_level);
+        }
+        else if (s->use_decimal && Decimal_Check(obj)) {
+            PyObject *encoded = PyObject_Str(obj);
+            if (encoded != NULL)
+                rv = _steal_list_append(rval, encoded);
+        }
+        else {
+            PyObject *ident = NULL;
+            PyObject *newobj;
+            if (s->markers != Py_None) {
+                int has_key;
+                ident = PyLong_FromVoidPtr(obj);
+                if (ident == NULL)
+                    break;
+                has_key = PyDict_Contains(s->markers, ident);
+                if (has_key) {
+                    if (has_key != -1)
+                        PyErr_SetString(PyExc_ValueError, "Circular reference detected");
+                    Py_DECREF(ident);
+                    break;
+                }
+                if (PyDict_SetItem(s->markers, ident, obj)) {
+                    Py_DECREF(ident);
+                    break;
+                }
             }
-            if (PyDict_SetItem(s->markers, ident, obj)) {
-                Py_DECREF(ident);
-                return -1;
-            }
-        }
-        newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
-        if (newobj == NULL) {
-            Py_XDECREF(ident);
-            return -1;
-        }
-        rv = encoder_listencode_obj(s, rval, newobj, indent_level);
-        Py_DECREF(newobj);
-        if (rv) {
-            Py_XDECREF(ident);
-            return -1;
-        }
-        if (ident != NULL) {
-            if (PyDict_DelItem(s->markers, ident)) {
+            newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
+            if (newobj == NULL) {
                 Py_XDECREF(ident);
-                return -1;
+                break;
             }
-            Py_XDECREF(ident);
+            rv = encoder_listencode_obj(s, rval, newobj, indent_level);
+            Py_DECREF(newobj);
+            if (rv) {
+                Py_XDECREF(ident);
+                rv = -1;
+            }
+            else if (ident != NULL) {
+                if (PyDict_DelItem(s->markers, ident)) {
+                    Py_XDECREF(ident);
+                    rv = -1;
+                }
+                Py_XDECREF(ident);
+            }
         }
-        return rv;
-    }
+    } while (0);
+    Py_LeaveRecursiveCall();
+    return rv;
 }
 
 static int
