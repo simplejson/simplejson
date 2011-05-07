@@ -1628,68 +1628,92 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     */
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t length = PyString_GET_SIZE(pystr);
+    PyObject *rval = NULL;
+    int fallthrough = 0;
     if (idx >= length) {
         PyErr_SetNone(PyExc_StopIteration);
         return NULL;
     }
+    if (Py_EnterRecursiveCall(" while decoding a JSON document"))
+        return NULL;
     switch (str[idx]) {
         case '"':
             /* string */
-            return scanstring_str(pystr, idx + 1,
+            rval = scanstring_str(pystr, idx + 1,
                 PyString_AS_STRING(s->encoding),
                 PyObject_IsTrue(s->strict),
                 next_idx_ptr);
+            break;
         case '{':
             /* object */
-            return _parse_object_str(s, pystr, idx + 1, next_idx_ptr);
+            rval = _parse_object_str(s, pystr, idx + 1, next_idx_ptr);
+            break;
         case '[':
             /* array */
-            return _parse_array_str(s, pystr, idx + 1, next_idx_ptr);
+            rval = _parse_array_str(s, pystr, idx + 1, next_idx_ptr);
+            break;
         case 'n':
             /* null */
             if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
                 Py_INCREF(Py_None);
                 *next_idx_ptr = idx + 4;
-                return Py_None;
+                rval = Py_None;
             }
+            else
+                fallthrough = 1;
             break;
         case 't':
             /* true */
             if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
                 Py_INCREF(Py_True);
                 *next_idx_ptr = idx + 4;
-                return Py_True;
+                rval = Py_True;
             }
+            else
+                fallthrough = 1;
             break;
         case 'f':
             /* false */
             if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
                 Py_INCREF(Py_False);
                 *next_idx_ptr = idx + 5;
-                return Py_False;
+                rval = Py_False;
             }
+            else
+                fallthrough = 1;
             break;
         case 'N':
             /* NaN */
             if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
-                return _parse_constant(s, "NaN", idx, next_idx_ptr);
+                rval = _parse_constant(s, "NaN", idx, next_idx_ptr);
             }
+            else
+                fallthrough = 1;
             break;
         case 'I':
             /* Infinity */
             if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
-                return _parse_constant(s, "Infinity", idx, next_idx_ptr);
+                rval = _parse_constant(s, "Infinity", idx, next_idx_ptr);
             }
+            else
+                fallthrough = 1;
             break;
         case '-':
             /* -Infinity */
             if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
-                return _parse_constant(s, "-Infinity", idx, next_idx_ptr);
+                rval = _parse_constant(s, "-Infinity", idx, next_idx_ptr);
             }
+            else
+                fallthrough = 1;
             break;
+        default:
+            fallthrough = 1;
     }
     /* Didn't find a string, object, array, or named constant. Look for a number. */
-    return _match_number_str(s, pystr, idx, next_idx_ptr);
+    if (fallthrough)
+        rval = _match_number_str(s, pystr, idx, next_idx_ptr);
+    Py_LeaveRecursiveCall();
+    return rval;
 }
 
 static PyObject *
