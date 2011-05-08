@@ -1,4 +1,4 @@
-Version 2.1.6 released 2011-XX-XX
+Version 2.1.6 released 2011-05-08
 
 * Prevent segfaults with deeply nested JSON documents
   https://github.com/simplejson/simplejson/issues/11
