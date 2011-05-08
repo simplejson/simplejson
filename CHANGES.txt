@@ -1,5 +1,7 @@
 Version 2.1.6 released 2011-XX-XX
 
+* Prevent segfaults with deeply nested JSON documents
+  https://github.com/simplejson/simplejson/issues/11
 * Fix compatibility with Python 2.5
   https://github.com/simplejson/simplejson/issues/5
 
