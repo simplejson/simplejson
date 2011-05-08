@@ -4,7 +4,7 @@ pure Python code with no dependencies, but includes an optional C
 extension for a serious speed boost.
 
 The latest documentation for simplejson can be read online here:
-http://simplejson.github.com/simplejson/
+http://simplejson.readthedocs.org/
 
 simplejson is the externally maintained development version of the
 json library included with Python 2.6 and Python 3.0, but maintains
