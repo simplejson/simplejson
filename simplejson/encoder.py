@@ -13,7 +13,7 @@ c_encode_basestring_ascii, c_make_encoder = _import_speedups()
 
 from simplejson.decoder import PosInf
 
-ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
+ESCAPE = re.compile(ur'[\x00-\x1f\\"\b\f\n\r\t\u2028\u2029]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 ESCAPE_DCT = {
@@ -24,6 +24,8 @@ ESCAPE_DCT = {
     '\n': '\\n',
     '\r': '\\r',
     '\t': '\\t',
+    u'\u2028': '\\u2028',
+    u'\u2029': '\\u2029',
 }
 for i in range(0x20):
     #ESCAPE_DCT.setdefault(chr(i), '\\u{0:04x}'.format(i))

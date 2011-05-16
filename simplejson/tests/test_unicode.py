@@ -97,3 +97,13 @@ class TestUnicode(TestCase):
         self.assertEquals(json.dumps(doc2), doc_ascii)
         self.assertEquals(json.dumps(doc1, ensure_ascii=False), doc_unicode)
         self.assertEquals(json.dumps(doc2, ensure_ascii=False), doc_unicode)
+
+    def test_ensure_ascii_linebreak_encoding(self):
+        # http://timelessrepo.com/json-isnt-a-javascript-subset
+        s1 = u'\u2029\u2028'
+        s2 = s1.encode('utf8')
+        expect = '"\\u2029\\u2028"'
+        self.assertEquals(json.dumps(s1), expect)
+        self.assertEquals(json.dumps(s2), expect)
+        self.assertEquals(json.dumps(s1, ensure_ascii=False), expect)
+        self.assertEquals(json.dumps(s2, ensure_ascii=False), expect)
