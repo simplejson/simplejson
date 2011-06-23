@@ -179,10 +179,10 @@ Basic Usage
    To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
    :meth:`default` method to serialize additional types), specify it with the
    *cls* kwarg.
-   
+
    If *use_decimal* is true (default: ``False``) then :class:`decimal.Decimal`
    will be natively serialized to JSON with full precision.
-   
+
    .. versionchanged:: 2.1.0
       *use_decimal* is new in 2.1.0.
 
@@ -206,7 +206,8 @@ Basic Usage
 .. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, **kw]]]]]]]]])
 
    Deserialize *fp* (a ``.read()``-supporting file-like object containing a JSON
-   document) to a Python object.
+   document) to a Python object. :exc:`JSONDecodeError` will be
+   raised if the given JSON document is not valid.
 
    If the contents of *fp* are encoded with an ASCII based encoding other than
    UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be specified.
@@ -253,7 +254,7 @@ Basic Usage
    If *use_decimal* is true (default: ``False``) then *parse_float* is set to
    :class:`decimal.Decimal`. This is a convenience for parity with the
    :func:`dump` parameter.
-   
+
    .. versionchanged:: 2.1.0
       *use_decimal* is new in 2.1.0.
 
@@ -273,7 +274,8 @@ Basic Usage
 .. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, **kw]]]]]]]]])
 
    Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
-   document) to a Python object.
+   document) to a Python object. :exc:`JSONDecodeError` will be
+   raised if the given JSON document is not valid.
 
    If *s* is a :class:`str` instance and is encoded with an ASCII based encoding
    other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
@@ -373,6 +375,9 @@ Encoders and decoders
       appropriate solution is decode *s* to :class:`unicode` prior to calling
       decode.
 
+      :exc:`JSONDecodeError` will be raised if the given JSON
+      document is not valid.
+
    .. method:: raw_decode(s)
 
       Decode a JSON document from *s* (a :class:`str` or :class:`unicode`
@@ -382,6 +387,8 @@ Encoders and decoders
       This can be used to decode a JSON document from a string that may have
       extraneous data at the end.
 
+      :exc:`JSONDecodeError` will be raised if the given JSON
+      document is not valid.
 
 .. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default]]]]]]]]])
 
@@ -504,3 +511,42 @@ Encoders and decoders
 
    .. versionchanged:: 2.1.0
       New in 2.1.0
+
+Exceptions
+----------
+
+.. exception:: JSONDecodeError(msg, doc, pos[, end])
+
+    Subclass of :exc:`ValueError` with the following additional attributes:
+
+    .. attribute:: msg
+
+        The unformatted error message
+
+    .. attribute:: doc
+
+        The JSON document being parsed
+
+    .. attribute:: pos
+
+        The start index of doc where parsing failed
+
+    .. attribute:: end
+
+        The end index of doc where parsing failed (may be ``None``)
+
+    .. attribute:: lineno
+
+        The line corresponding to pos
+
+    .. attribute:: colno
+
+        The column corresponding to pos
+
+    .. attribute:: endlineno
+
+        The line corresponding to end (may be ``None``)
+
+    .. attribute:: endcolno
+
+        The column corresponding to end (may be ``None``)
