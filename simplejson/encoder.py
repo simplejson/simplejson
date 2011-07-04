@@ -78,7 +78,7 @@ class JSONEncoder(object):
     +-------------------+---------------+
     | Python            | JSON          |
     +===================+===============+
-    | dict              | object        |
+    | dict, namedtupe   | object        |
     +-------------------+---------------+
     | list, tuple       | array         |
     +-------------------+---------------+
@@ -372,7 +372,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 yield buf + str(value)
             else:
                 yield buf
-                if isinstance(value, _array_types):
+                if isinstance(value, tuple) and hasattr('_asdict'):
+                    chunks = _iterencode_dict(value._asdict(), _current_indent_level)
+                elif isinstance(value, _array_types):
                     chunks = _iterencode_list(value, _current_indent_level)
                 elif isinstance(value, dict):
                     chunks = _iterencode_dict(value, _current_indent_level)
@@ -451,7 +453,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif _use_decimal and isinstance(value, Decimal):
                 yield str(value)
             else:
-                if isinstance(value, _array_types):
+                if isinstance(value, tuple) and hasattr(value, '_asdict'):
+                    chunks = _iterencode_dict(value._asdict(), _current_indent_level)
+                elif isinstance(value, _array_types):
                     chunks = _iterencode_list(value, _current_indent_level)
                 elif isinstance(value, dict):
                     chunks = _iterencode_dict(value, _current_indent_level)
@@ -479,6 +483,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             yield str(o)
         elif isinstance(o, float):
             yield _floatstr(o)
+        elif isinstance(o, tuple) and hasattr(o, '_asdict'):
+            for chunk in _iterencode_dict(o._asdict(), _current_indent_level):
+                yield chunk
         elif isinstance(o, _array_types):
             for chunk in _iterencode_list(o, _current_indent_level):
                 yield chunk
