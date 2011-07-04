@@ -372,7 +372,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 yield buf + str(value)
             else:
                 yield buf
-                if isinstance(value, tuple) and hasattr('_asdict'):
+                if isinstance(value, tuple) and hasattr(value, '_asdict'):
                     chunks = _iterencode_dict(value._asdict(), _current_indent_level)
                 elif isinstance(value, _array_types):
                     chunks = _iterencode_list(value, _current_indent_level)
