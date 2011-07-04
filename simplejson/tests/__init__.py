@@ -47,6 +47,7 @@ def all_tests_suite():
         'simplejson.tests.test_unicode',
         'simplejson.tests.test_decimal',
         'simplejson.tests.test_tuples',
+        'simplejson.tests.test_namedtuples',
     ])
     suite = additional_tests(suite)
     return OptionalExtensionTestSuite([suite])
