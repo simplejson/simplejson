@@ -29,3 +29,17 @@ class TestNamedTuples(unittest.TestCase):
         tuple_json = simplejson.dumps(point_tuple)
         self.assertIn(tuple_json, possibilities, 
                 "namedtuple JSON does not match dict JSON")
+
+    def test_nested_namedtuple(self):
+        Point = namedtuple("Point", ['x', 'y'])
+        point = Point(1, 2)
+
+        dictnested = {'outer': point}
+        possibilities = ['{"outer": {"x": 1, "y": 2}}', '{"outer": {"y": 2, "x": 1}}']
+        self.assertIn(simplejson.dumps(dictnested), possibilities,
+                "namedtuple nested in dict serialized incorrectly")
+
+        listnested = [1, 2, 3, point]
+        possibilities = ['[1, 2, 3, {"x": 1, "y": 2}]', '[1, 2, 3, {"y": 2, "x": 1}}']
+        self.assertIn(simplejson.dumps(listnested), possibilities,
+                "namedtuple nested in list serialized incorrectly")
