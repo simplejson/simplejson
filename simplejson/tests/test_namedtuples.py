@@ -2,10 +2,8 @@ import unittest
 import simplejson
 try:
     from collections import namedtuple
-    from itertools import permutations
 except ImportError:
     namedtuple = None
-    permutations = None
 
 @unittest.skipUnless(namedtuple, "namedtuple tests can only be run if the namedtuple function is available")
 class TestNamedTuples(unittest.TestCase):
