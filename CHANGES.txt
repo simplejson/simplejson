@@ -1,6 +1,7 @@
 Version 2.1.4 released XXXX-XX-XX
 
 * Migrated to github http://github.com/simplejson/simplejson
+* namedtuples now serialize to objects, rather than arrays
 
 Version 2.1.3 released 2011-01-17
 
