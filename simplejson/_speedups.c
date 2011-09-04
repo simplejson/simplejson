@@ -483,7 +483,10 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
     PyObject *chunks = NULL;
     PyObject *chunk = NULL;
 
-    if (end < 0 || len <= end) {
+    if (len == end) {
+        raise_errmsg("Unterminated string starting at", pystr, begin);
+    }
+    else if (end < 0 || len < end) {
         PyErr_SetString(PyExc_ValueError, "end is out of bounds");
         goto bail;
     }
@@ -689,7 +692,10 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
     PyObject *chunks = NULL;
     PyObject *chunk = NULL;
 
-    if (end < 0 || len <= end) {
+    if (len == end) {
+        raise_errmsg("Unterminated string starting at", pystr, begin);
+    }
+    else if (end < 0 || len < end) {
         PyErr_SetString(PyExc_ValueError, "end is out of bounds");
         goto bail;
     }
