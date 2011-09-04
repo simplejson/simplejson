@@ -89,6 +89,7 @@ typedef struct _PyEncoderObject {
     int use_decimal;
     int namedtuple_as_object;
     int tuple_as_array;
+    int iterable_as_array;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -2017,11 +2018,11 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "iterable_as_array", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
-    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array;
+    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array, *iterable_as_array;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
@@ -2029,7 +2030,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
-        &namedtuple_as_object, &tuple_as_array))
+        &namedtuple_as_object, &tuple_as_array, &iterable_as_array))
         return -1;
 
     s->markers = markers;
@@ -2046,6 +2047,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->use_decimal = PyObject_IsTrue(use_decimal);
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
+    s->iterable_as_array = PyObject_IsTrue(iterable_as_array);
 
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
@@ -2210,6 +2212,16 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         else {
             PyObject *ident = NULL;
             PyObject *newobj;
+            if (s->iterable_as_array) {
+                newobj = PyObject_GetIter(obj);
+                if (newobj == NULL)
+                    PyErr_Clear();
+                else {
+                    rv = encoder_listencode_list(s, rval, newobj, indent_level);
+                    Py_DECREF(newobj);
+                    break;
+                }
+            }
             if (s->markers != Py_None) {
                 int has_key;
                 ident = PyLong_FromVoidPtr(obj);

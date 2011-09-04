@@ -129,7 +129,7 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 Basic Usage
 -----------
 
-.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, **kw]]]]]]]]]]]]])
+.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, iterable_as_array[, **kw]]]]]]]]]]]]]])
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
    file-like object).
@@ -192,7 +192,7 @@ Basic Usage
   If *namedtuple_as_object* is true (default: ``True``),
   :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
   as JSON objects.
-  
+
   .. versionchanged:: 2.2.0
     *namedtuple_as_object* is new in 2.2.0.
 
@@ -202,6 +202,14 @@ Basic Usage
   .. versionchanged:: 2.2.0
     *tuple_as_array* is new in 2.2.0.
 
+  If *iterable_as_array* is true (default: ``False``),
+  any object not in the above table that implements ``__iter__()``
+  will be encoded as a JSON array.
+
+  .. versionchanged:: 2.3.0
+    *iterable_as_array* is new in 2.3.0.
+
+
     .. note::
 
         JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
@@ -209,7 +217,7 @@ Basic Usage
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, **kw]]]]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, iterable_as_array[, **kw]]]]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -273,6 +281,14 @@ Basic Usage
 
    .. versionchanged:: 2.1.0
       *use_decimal* is new in 2.1.0.
+
+   If *iterable_as_array* is true (default: ``False``),
+   any object not in the above table that implements ``__iter__()``
+   will be encoded as a JSON array.
+
+   .. versionchanged:: 2.3.0
+     *iterable_as_array* is new in 2.3.0.
+
 
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
    kwarg.  Additional keyword arguments will be passed to the constructor of the
@@ -406,7 +422,7 @@ Encoders and decoders
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
 
-.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array]]]]]]]]]]]])
+.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, iterable_as_array]]]]]]]]]]]]])
 
    Extensible JSON encoder for Python data structures.
 
@@ -495,6 +511,13 @@ Encoders and decoders
 
    .. versionchanged:: 2.2.0
      *tuple_as_array* is new in 2.2.0.
+
+   If *iterable_as_array* is true (default: ``False``),
+   any object not in the above table that implements ``__iter__()``
+   will be encoded as a JSON array.
+
+   .. versionchanged:: 2.3.0
+     *iterable_as_array* is new in 2.3.0.
 
    .. method:: default(o)
 

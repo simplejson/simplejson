@@ -5,9 +5,8 @@ interchange format.
 :mod:`simplejson` exposes an API familiar to users of the standard library
 :mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
 version of the :mod:`json` library contained in Python 2.6, but maintains
-compatibility with Python 2.4 and Python 2.5 and (currently) has
-significant performance advantages, even without using the optional C
-extension for speedups.
+compatibility back to Python 2.5 and (currently) has significant performance
+advantages, even without using the optional C extension for speedups.
 
 Encoding basic Python object hierarchies::
 
@@ -97,7 +96,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
-__version__ = '2.2.0'
+__version__ = '2.3.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -138,12 +137,14 @@ _default_encoder = JSONEncoder(
     use_decimal=True,
     namedtuple_as_object=True,
     tuple_as_array=True,
+    iterable_as_array=False,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True, tuple_as_array=True,
+        iterable_as_array=False,
         **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
@@ -189,9 +190,13 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *namedtuple_as_object* is true (default: ``True``),
     :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
     as JSON objects.
-    
+
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
+
+    If *iterable_as_array* is true (default: ``False``),
+    any object not in the above table that implements ``__iter__()``
+    will be encoded as a JSON array.
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
@@ -202,8 +207,9 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     if (not skipkeys and ensure_ascii and
         check_circular and allow_nan and
         cls is None and indent is None and separators is None and
-        encoding == 'utf-8' and default is None and use_decimal
-        and namedtuple_as_object and tuple_as_array and not kw):
+        encoding == 'utf-8' and default is None and use_decimal and
+        namedtuple_as_object and tuple_as_array and
+        not iterable_as_array and not kw):
         iterable = _default_encoder.iterencode(obj)
     else:
         if cls is None:
@@ -214,6 +220,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             default=default, use_decimal=use_decimal,
             namedtuple_as_object=namedtuple_as_object,
             tuple_as_array=tuple_as_array,
+            iterable_as_array=iterable_as_array,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -226,6 +233,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True,
         tuple_as_array=True,
+        iterable_as_array=False,
         **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
@@ -268,9 +276,13 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *namedtuple_as_object* is true (default: ``True``),
     :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
     as JSON objects.
-    
+
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
+
+    If *iterable_as_array* is true (default: ``False``),
+    any object not in the above table that implements ``__iter__()``
+    will be encoded as a JSON array.
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
@@ -281,8 +293,9 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     if (not skipkeys and ensure_ascii and
         check_circular and allow_nan and
         cls is None and indent is None and separators is None and
-        encoding == 'utf-8' and default is None and use_decimal
-        and namedtuple_as_object and tuple_as_array and not kw):
+        encoding == 'utf-8' and default is None and use_decimal and
+        namedtuple_as_object and tuple_as_array and
+        not iterable_as_array and not kw):
         return _default_encoder.encode(obj)
     if cls is None:
         cls = JSONEncoder
@@ -293,6 +306,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         use_decimal=use_decimal,
         namedtuple_as_object=namedtuple_as_object,
         tuple_as_array=tuple_as_array,
+        iterable_as_array=iterable_as_array,
         **kw).encode(obj)
 
 
@@ -438,7 +452,7 @@ def _toggle_speedups(enabled):
     if enabled:
         dec.scanstring = dec.c_scanstring or dec.py_scanstring
         enc.c_make_encoder = c_make_encoder
-        enc.encode_basestring_ascii = (enc.c_encode_basestring_ascii or 
+        enc.encode_basestring_ascii = (enc.c_encode_basestring_ascii or
             enc.py_encode_basestring_ascii)
         scan.make_scanner = scan.c_make_scanner or scan.py_make_scanner
     else:

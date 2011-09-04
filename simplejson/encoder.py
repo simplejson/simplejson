@@ -107,7 +107,7 @@ class JSONEncoder(object):
             check_circular=True, allow_nan=True, sort_keys=False,
             indent=None, separators=None, encoding='utf-8', default=None,
             use_decimal=True, namedtuple_as_object=True,
-            tuple_as_array=True):
+            tuple_as_array=True, iterable_as_array=False):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -157,9 +157,14 @@ class JSONEncoder(object):
 
         If namedtuple_as_object is true (the default), tuple subclasses with
         ``_asdict()`` methods will be encoded as JSON objects.
-        
+
         If tuple_as_array is true (the default), tuple (and subclasses) will
         be encoded as JSON arrays.
+
+        If *iterable_as_array* is true (default: ``False``),
+        any object not in the above table that implements ``__iter__()``
+        will be encoded as a JSON array.
+
         """
 
         self.skipkeys = skipkeys
@@ -170,6 +175,7 @@ class JSONEncoder(object):
         self.use_decimal = use_decimal
         self.namedtuple_as_object = namedtuple_as_object
         self.tuple_as_array = tuple_as_array
+        self.iterable_as_array = iterable_as_array
         if isinstance(indent, (int, long)):
             indent = ' ' * indent
         self.indent = indent
@@ -285,13 +291,15 @@ class JSONEncoder(object):
                 markers, self.default, _encoder, self.indent,
                 self.key_separator, self.item_separator, self.sort_keys,
                 self.skipkeys, self.allow_nan, key_memo, self.use_decimal,
-                self.namedtuple_as_object, self.tuple_as_array)
+                self.namedtuple_as_object, self.tuple_as_array,
+                self.iterable_as_array)
         else:
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
                 self.key_separator, self.item_separator, self.sort_keys,
                 self.skipkeys, _one_shot, self.use_decimal,
-                self.namedtuple_as_object, self.tuple_as_array)
+                self.namedtuple_as_object, self.tuple_as_array,
+                self.iterable_as_array)
         try:
             return _iterencode(o, 0)
         finally:
@@ -328,6 +336,7 @@ class JSONEncoderForHTML(JSONEncoder):
 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
         _use_decimal, _namedtuple_as_object, _tuple_as_array,
+        _iterable_as_array,
         ## HACK: hand-optimized bytecode; turn globals into locals
         False=False,
         True=True,
@@ -343,6 +352,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         long=long,
         str=str,
         tuple=tuple,
+        iter=iter,
     ):
 
     def _iterencode_list(lst, _current_indent_level):
@@ -520,6 +530,16 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif _use_decimal and isinstance(o, Decimal):
             yield str(o)
         else:
+            while _iterable_as_array:
+                # Markers are not checked here because it is valid for an
+                # iterable to return self.
+                try:
+                    o = iter(o)
+                except TypeError:
+                    break
+                for chunk in _iterencode_list(o, _current_indent_level):
+                    yield chunk
+                return
             if markers is not None:
                 markerid = id(o)
                 if markerid in markers:

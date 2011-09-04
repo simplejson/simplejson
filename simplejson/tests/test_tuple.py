@@ -43,7 +43,3 @@ class TestTuples(unittest.TestCase):
         self.assertEqual(
             json.dumps(repr(t)),
             sio.getvalue())
-
-class TestNamedTuple(unittest.TestCase):
-    def test_namedtuple_dump(self):
-        pass

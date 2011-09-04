@@ -1,3 +1,8 @@
+Version 2.3.0 released 2011-XX-XX
+
+* New iterable_as_array encoder option to perform lazy serialization of
+  any iterable objects, without having to convert to tuple or list.
+
 Version 2.2.0 released 2011-09-04
 
 * Remove setuptools requirement, reverted to pure distutils
