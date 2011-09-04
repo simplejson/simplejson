@@ -1,4 +1,4 @@
-Version 2.2.0 released 2011-XX-XX
+Version 2.2.0 released 2011-09-04
 
 * Remove setuptools requirement, reverted to pure distutils
 * use_decimal default for encoding (dump, dumps, JSONEncoder) is now True
