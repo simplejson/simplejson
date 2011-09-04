@@ -2,6 +2,7 @@
 *.egg
 *.pyc
 *.so
+/MANIFEST
 /.coverage
 /coverage.xml
 /build

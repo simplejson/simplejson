@@ -1,5 +1,6 @@
 Version 2.2.0 released 2011-XX-XX
 
+* Remove setuptools requirement, reverted to pure distutils
 * use_decimal default for encoding (dump, dumps, JSONEncoder) is now True
 * tuple encoding as JSON objects can be turned off with new
   tuple_as_array=False option.

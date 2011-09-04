@@ -56,7 +56,7 @@ def all_tests_suite():
 def main():
     runner = unittest.TextTestRunner()
     suite = all_tests_suite()
-    runner.run(suite)
+    raise SystemExit(not runner.run(suite).wasSuccessful())
 
 
 if __name__ == '__main__':

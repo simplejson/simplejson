@@ -1,13 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-try:
-    import setuptools
-except ImportError:
-    from ez_setup import use_setuptools
-    use_setuptools()
-
-from setuptools import setup, find_packages, Extension, Feature
+from distutils.core import setup, Extension, Command
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
@@ -24,15 +18,6 @@ License :: OSI Approved :: MIT License
 Programming Language :: Python
 Topic :: Software Development :: Libraries :: Python Modules
 """.splitlines()))
-
-
-speedups = Feature(
-    "optional C speed-enhancement module",
-    standard=True,
-    ext_modules = [
-        Extension("simplejson._speedups", ["simplejson/_speedups.c"]),
-    ],
-)
 
 if sys.platform == 'win32' and sys.version_info > (2, 6):
    # 2.6's distutils.msvc9compiler can raise an IOError when failing to
@@ -60,11 +45,32 @@ class ve_build_ext(build_ext):
         except ext_errors, x:
             raise BuildFailed()
 
+
+class TestCommand(Command):
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        import sys, subprocess
+        raise SystemExit(
+            subprocess.call([sys.executable, 'simplejson/tests/__init__.py']))
+
 def run_setup(with_binary):
+    cmdclass = dict(test=TestCommand)
     if with_binary:
-        features = {'speedups': speedups}
+        kw = dict(
+            ext_modules = [
+                Extension("simplejson._speedups", ["simplejson/_speedups.c"]),
+            ],
+            cmdclass=dict(cmdclass, build_ext=ve_build_ext),
+        )
     else:
-        features = {}
+        kw = dict(cmdclass=cmdclass)
 
     setup(
         name="simplejson",
@@ -76,13 +82,9 @@ def run_setup(with_binary):
         author_email="bob@redivi.com",
         url="http://github.com/simplejson/simplejson",
         license="MIT License",
-        packages=find_packages(exclude=['ez_setup']),
+        packages=['simplejson', 'simplejson.tests'],
         platforms=['any'],
-        test_suite="simplejson.tests.all_tests_suite",
-        zip_safe=True,
-        features=features,
-        cmdclass={'build_ext': ve_build_ext},
-    )
+        **kw)
 
 try:
     run_setup(not IS_PYPY)
