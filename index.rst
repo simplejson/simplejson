@@ -399,7 +399,7 @@ Encoders and decoders
    +-------------------+---------------+
    | Python            | JSON          |
    +===================+===============+
-   | dict              | object        |
+   | dict, namedtuple  | object        |
    +-------------------+---------------+
    | list, tuple       | array         |
    +-------------------+---------------+
@@ -413,6 +413,9 @@ Encoders and decoders
    +-------------------+---------------+
    | None              | null          |
    +-------------------+---------------+
+
+   .. versionchanged:: 2.2.0
+      Changed *namedtuple* encoding from JSON array to object.
 
    To extend this to recognize other objects, subclass and implement a
    :meth:`default` method with another method that returns a serializable object
