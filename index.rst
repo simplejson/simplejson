@@ -129,7 +129,7 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 Basic Usage
 -----------
 
-.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, **kw]]]]]]]]]]])
+.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, **kw]]]]]]]]]]]]])
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
    file-like object).
@@ -180,11 +180,27 @@ Basic Usage
    :meth:`default` method to serialize additional types), specify it with the
    *cls* kwarg.
 
-   If *use_decimal* is true (default: ``False``) then :class:`decimal.Decimal`
+   If *use_decimal* is true (default: ``True``) then :class:`decimal.Decimal`
    will be natively serialized to JSON with full precision.
 
    .. versionchanged:: 2.1.0
       *use_decimal* is new in 2.1.0.
+
+   .. versionchanged:: 2.2.0
+      The default of *use_decimal* changed to ``True`` in 2.2.0.
+
+  If *namedtuple_as_object* is true (default: ``True``),
+  :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
+  as JSON objects.
+  
+  .. versionchanged:: 2.2.0
+    *namedtuple_as_object* is new in 2.2.0.
+
+  If *tuple_as_array* is true (default: ``True``),
+  :class:`tuple` (and subclasses) will be encoded as JSON arrays.
+
+  .. versionchanged:: 2.2.0
+    *tuple_as_array* is new in 2.2.0.
 
     .. note::
 
@@ -193,7 +209,7 @@ Basic Usage
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, **kw]]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, **kw]]]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -390,7 +406,7 @@ Encoders and decoders
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
 
-.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default]]]]]]]]])
+.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array]]]]]]]]]]]])
 
    Extensible JSON encoder for Python data structures.
 
@@ -467,6 +483,18 @@ Encoders and decoders
    into unicode using that encoding prior to JSON-encoding.  The default is
    ``'utf-8'``.
 
+   If *namedtuple_as_object* is true (default: ``True``),
+   :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
+   as JSON objects.
+
+   .. versionchanged:: 2.2.0
+     *namedtuple_as_object* is new in 2.2.0.
+
+   If *tuple_as_array* is true (default: ``True``),
+   :class:`tuple` (and subclasses) will be encoded as JSON arrays.
+
+   .. versionchanged:: 2.2.0
+     *tuple_as_array* is new in 2.2.0.
 
    .. method:: default(o)
 
