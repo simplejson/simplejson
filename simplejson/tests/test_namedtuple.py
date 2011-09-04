@@ -6,9 +6,15 @@ try:
     from collections import namedtuple
 except ImportError:
     class Value(tuple):
+        def __new__(cls, *args):
+            return tuple.__new__(cls, args)
+
         def _asdict(self):
             return {'value': self[0]}
     class Point(tuple):
+        def __new__(cls, *args):
+            return tuple.__new__(cls, args)
+
         def _asdict(self):
             return {'x': self[0], 'y': self[1]}
 else:
