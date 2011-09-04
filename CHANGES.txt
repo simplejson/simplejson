@@ -1,5 +1,13 @@
-Version 2.1.7 released 2011-XX-XX
+Version 2.2.0 released 2011-XX-XX
 
+* use_decimal default for encoding (dump, dumps, JSONEncoder) is now True
+* tuple encoding as JSON objects can be turned off with new
+  tuple_as_array=False option.
+  https://github.com/simplejson/simplejson/pull/6
+* namedtuple (or other tuple subclasses with _asdict methods) are now
+  encoded as JSON objects rather than arrays by default. Can be disabled
+  and treated as a tuple with the new namedtuple_as_object=False option.
+  https://github.com/simplejson/simplejson/pull/6
 * JSONDecodeError is now raised instead of ValueError when a document
   ends with an opening quote and the C speedups are in use.
   https://github.com/simplejson/simplejson/issues/15

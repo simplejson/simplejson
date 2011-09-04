@@ -87,6 +87,8 @@ typedef struct _PyEncoderObject {
     int fast_encode;
     int allow_nan;
     int use_decimal;
+    int namedtuple_as_object;
+    int tuple_as_array;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -151,6 +153,8 @@ static PyObject *
 _convertPyInt_FromSsize_t(Py_ssize_t *size_ptr);
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
+static int
+_is_namedtuple(PyObject *obj);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
@@ -161,6 +165,12 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 #else
 #define MAX_EXPANSION MIN_EXPANSION
 #endif
+
+static int
+_is_namedtuple(PyObject *obj)
+{
+    return PyTuple_Check(obj) && PyObject_HasAttrString(obj, "_asdict");
+}
 
 static int
 _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr)
@@ -2007,18 +2017,19 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
-    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal;
+    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
-        &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal))
+        &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
+        &namedtuple_as_object, &tuple_as_array))
         return -1;
 
     s->markers = markers;
@@ -2033,6 +2044,8 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
     s->allow_nan = PyObject_IsTrue(allow_nan);
     s->use_decimal = PyObject_IsTrue(use_decimal);
+    s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
+    s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
 
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
@@ -2176,7 +2189,14 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
             if (encoded != NULL)
                 rv = _steal_list_append(rval, encoded);
         }
-        else if (PyList_Check(obj) || PyTuple_Check(obj)) {
+        else if (s->namedtuple_as_object && _is_namedtuple(obj)) {
+            PyObject *newobj = PyObject_CallMethod(obj, "_asdict", NULL);
+            if (newobj != NULL) {
+                rv = encoder_listencode_dict(s, rval, newobj, indent_level);
+                Py_DECREF(newobj);
+            }
+        }
+        else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
             rv = encoder_listencode_list(s, rval, obj, indent_level);
         }
         else if (PyDict_Check(obj)) {
