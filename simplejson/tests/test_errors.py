@@ -19,3 +19,16 @@ class TestErrors(TestCase):
         self.assertEquals(err.colno, 1)
         self.assertEquals(err.endlineno, 3)
         self.assertEquals(err.endcolno, 2)
+
+    def test_scan_error(self):
+        err = None
+        for t in (str, unicode):
+            try:
+                json.loads(t('{"asdf": "'))
+            except json.JSONDecodeError, e:
+                err = e
+            else:
+                self.fail('Expected JSONDecodeError')
+            self.assertEquals(err.lineno, 1)
+            self.assertEquals(err.colno, 9)
+        
