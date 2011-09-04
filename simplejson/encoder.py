@@ -80,7 +80,7 @@ class JSONEncoder(object):
     +-------------------+---------------+
     | Python            | JSON          |
     +===================+===============+
-    | dict              | object        |
+    | dict, namedtuple  | object        |
     +-------------------+---------------+
     | list, tuple       | array         |
     +-------------------+---------------+
@@ -103,6 +103,7 @@ class JSONEncoder(object):
     """
     item_separator = ', '
     key_separator = ': '
+    array_types = (list, tuple)
     def __init__(self, skipkeys=False, ensure_ascii=True,
             check_circular=True, allow_nan=True, sort_keys=False,
             indent=None, separators=None, encoding='utf-8', default=None,
@@ -272,7 +273,7 @@ class JSONEncoder(object):
 
         key_memo = {}
         if (_one_shot and c_make_encoder is not None
-                and self.indent is None):
+                and self.indent is None and self.array_types==(list, tuple)):
             _iterencode = c_make_encoder(
                 markers, self.default, _encoder, self.indent,
                 self.key_separator, self.item_separator, self.sort_keys,
@@ -281,7 +282,7 @@ class JSONEncoder(object):
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
                 self.key_separator, self.item_separator, self.sort_keys,
-                self.skipkeys, _one_shot, self.use_decimal)
+                self.skipkeys, _one_shot, self.use_decimal, self.array_types)
         try:
             return _iterencode(o, 0)
         finally:
@@ -317,7 +318,7 @@ class JSONEncoderForHTML(JSONEncoder):
 
 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
-        _use_decimal,
+        _use_decimal, _array_types,
         ## HACK: hand-optimized bytecode; turn globals into locals
         False=False,
         True=True,
@@ -375,7 +376,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 yield buf + str(value)
             else:
                 yield buf
-                if isinstance(value, (list, tuple)):
+                if isinstance(value, tuple) and hasattr(value, '_asdict'):
+                    chunks = _iterencode_dict(value._asdict(), _current_indent_level)
+                elif isinstance(value, _array_types):
                     chunks = _iterencode_list(value, _current_indent_level)
                 elif isinstance(value, dict):
                     chunks = _iterencode_dict(value, _current_indent_level)
@@ -454,7 +457,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif _use_decimal and isinstance(value, Decimal):
                 yield str(value)
             else:
-                if isinstance(value, (list, tuple)):
+                if isinstance(value, tuple) and hasattr(value, '_asdict'):
+                    chunks = _iterencode_dict(value._asdict(), _current_indent_level)
+                elif isinstance(value, _array_types):
                     chunks = _iterencode_list(value, _current_indent_level)
                 elif isinstance(value, dict):
                     chunks = _iterencode_dict(value, _current_indent_level)
@@ -482,7 +487,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             yield str(o)
         elif isinstance(o, float):
             yield _floatstr(o)
-        elif isinstance(o, (list, tuple)):
+        elif isinstance(o, tuple) and hasattr(o, '_asdict'):
+            for chunk in _iterencode_dict(o._asdict(), _current_indent_level):
+                yield chunk
+        elif isinstance(o, _array_types):
             for chunk in _iterencode_list(o, _current_indent_level):
                 yield chunk
         elif isinstance(o, dict):
