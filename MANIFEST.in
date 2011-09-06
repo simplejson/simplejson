@@ -2,3 +2,4 @@ include *.py
 include *.txt
 include *.rst
 include scripts/*.py
+include MANIFEST.in
