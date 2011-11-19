@@ -1,3 +1,9 @@
+Version 2.3.0 released 2011-11-18
+
+* Any objects with _asdict() methods are now considered for 
+  namedtuple_as_object.
+  https://github.com/simplejson/simplejson/pull/22
+
 Version 2.2.1 released 2011-09-06
 
 * Fix MANIFEST.in issue when building a sdist from a sdist.
