@@ -155,7 +155,7 @@ class JSONEncoder(object):
         be supported directly by the encoder. For the inverse, decode JSON
         with ``parse_float=decimal.Decimal``.
 
-        If namedtuple_as_object is true (the default), tuple subclasses with
+        If namedtuple_as_object is true (the default), objects with
         ``_asdict()`` methods will be encoded as JSON objects.
         
         If tuple_as_array is true (the default), tuple (and subclasses) will
@@ -387,8 +387,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 yield buf
                 if isinstance(value, list):
                     chunks = _iterencode_list(value, _current_indent_level)
-                elif (_namedtuple_as_object and isinstance(value, tuple) and
-                        hasattr(value, '_asdict')):
+                elif (_namedtuple_as_object and hasattr(value, '_asdict')):
                     chunks = _iterencode_dict(value._asdict(),
                                               _current_indent_level)
                 elif _tuple_as_array and isinstance(value, tuple):
@@ -472,8 +471,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             else:
                 if isinstance(value, list):
                     chunks = _iterencode_list(value, _current_indent_level)
-                elif (_namedtuple_as_object and isinstance(value, tuple) and
-                        hasattr(value, '_asdict')):
+                elif (_namedtuple_as_object and hasattr(value, '_asdict')):
                     chunks = _iterencode_dict(value._asdict(),
                                               _current_indent_level)
                 elif _tuple_as_array and isinstance(value, tuple):
@@ -507,8 +505,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif isinstance(o, list):
             for chunk in _iterencode_list(o, _current_indent_level):
                 yield chunk
-        elif (_namedtuple_as_object and isinstance(o, tuple) and
-                hasattr(o, '_asdict')):
+        elif (_namedtuple_as_object and hasattr(o, '_asdict')):
             for chunk in _iterencode_dict(o._asdict(), _current_indent_level):
                 yield chunk
         elif (_tuple_as_array and isinstance(o, tuple)):
