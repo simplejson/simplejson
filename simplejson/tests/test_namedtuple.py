@@ -21,11 +21,24 @@ else:
     Value = namedtuple('Value', ['value'])
     Point = namedtuple('Point', ['x', 'y'])
 
+class DuckValue(object):
+    def __init__(self, *args):
+	self.value = Value(*args)
+
+    def _asdict(self):
+	return self.value._asdict()
+
+class DuckPoint(object):
+    def __init__(self, *args):
+	self.point = Point(*args)
+
+    def _asdict(self):
+	return self.point._asdict()
+
 class TestNamedTuple(unittest.TestCase):
     def test_namedtuple_dumps(self):
-        for v in [Value(1), Point(1, 2)]:
+        for v in [Value(1), Point(1, 2), DuckValue(1), DuckPoint(1, 2)]:
             d = v._asdict()
-            l = list(v)
             self.assertEqual(d, json.loads(json.dumps(v)))
             self.assertEqual(
                 d,
@@ -35,6 +48,10 @@ class TestNamedTuple(unittest.TestCase):
                 d,
                 json.loads(json.dumps(v, namedtuple_as_object=True,
                                       tuple_as_array=False)))
+
+    def test_namedtuple_dumps_false(self):
+        for v in [Value(1), Point(1, 2)]:
+            l = list(v)
             self.assertEqual(
                 l,
                 json.loads(json.dumps(v, namedtuple_as_object=False)))
@@ -42,9 +59,8 @@ class TestNamedTuple(unittest.TestCase):
                 tuple_as_array=False, namedtuple_as_object=False)
 
     def test_namedtuple_dump(self):
-        for v in [Value(1), Point(1, 2)]:
+        for v in [Value(1), Point(1, 2), DuckValue(1), DuckPoint(1, 2)]:
             d = v._asdict()
-            l = list(v)
             sio = StringIO()
             json.dump(v, sio)
             self.assertEqual(d, json.loads(sio.getvalue()))
@@ -62,6 +78,10 @@ class TestNamedTuple(unittest.TestCase):
             self.assertEqual(
                 d,
                 json.loads(sio.getvalue()))
+
+    def test_namedtuple_dump_false(self):
+        for v in [Value(1), Point(1, 2)]:
+            l = list(v)
             sio = StringIO()
             json.dump(v, sio, namedtuple_as_object=False)
             self.assertEqual(
