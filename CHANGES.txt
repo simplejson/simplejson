@@ -1,4 +1,4 @@
-Version 2.3.0 released 2011-11-18
+Version 2.3.0 released 2011-12-05
 
 * Any objects with _asdict() methods are now considered for 
   namedtuple_as_object.
