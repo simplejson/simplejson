@@ -190,11 +190,15 @@ Basic Usage
       The default of *use_decimal* changed to ``True`` in 2.2.0.
 
   If *namedtuple_as_object* is true (default: ``True``),
-  :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
+  objects with ``_asdict()`` methods will be encoded
   as JSON objects.
-  
+
   .. versionchanged:: 2.2.0
     *namedtuple_as_object* is new in 2.2.0.
+
+  .. versionchanged:: 2.3.0
+    *namedtuple_as_object* no longer requires that these objects be
+    subclasses of :class:`tuple`.
 
   If *tuple_as_array* is true (default: ``True``),
   :class:`tuple` (and subclasses) will be encoded as JSON arrays.
@@ -484,11 +488,15 @@ Encoders and decoders
    ``'utf-8'``.
 
    If *namedtuple_as_object* is true (default: ``True``),
-   :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
+   objects with ``_asdict()`` methods will be encoded
    as JSON objects.
 
    .. versionchanged:: 2.2.0
      *namedtuple_as_object* is new in 2.2.0.
+
+   .. versionchanged:: 2.3.0
+     *namedtuple_as_object* no longer requires that these objects be
+     subclasses of :class:`tuple`.
 
    If *tuple_as_array* is true (default: ``True``),
    :class:`tuple` (and subclasses) will be encoded as JSON arrays.
