@@ -23,17 +23,17 @@ else:
 
 class DuckValue(object):
     def __init__(self, *args):
-	self.value = Value(*args)
+        self.value = Value(*args)
 
     def _asdict(self):
-	return self.value._asdict()
+        return self.value._asdict()
 
 class DuckPoint(object):
     def __init__(self, *args):
-	self.point = Point(*args)
+        self.point = Point(*args)
 
     def _asdict(self):
-	return self.point._asdict()
+        return self.point._asdict()
 
 class TestNamedTuple(unittest.TestCase):
     def test_namedtuple_dumps(self):
