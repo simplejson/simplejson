@@ -169,7 +169,15 @@ _is_namedtuple(PyObject *obj);
 static int
 _is_namedtuple(PyObject *obj)
 {
-    return PyObject_HasAttrString(obj, "_asdict");
+    int rval = 0;
+    PyObject *_asdict = PyObject_GetAttrString(obj, "_asdict");
+    if (_asdict == NULL) {
+        PyErr_Clear();
+        return 0;
+    }
+    rval = PyCallable_Check(obj);
+    Py_DECREF(obj);
+    return rval;
 }
 
 static int
