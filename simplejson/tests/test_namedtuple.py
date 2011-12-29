@@ -35,6 +35,18 @@ class DuckPoint(object):
     def _asdict(self):
         return self.point._asdict()
 
+class DeadDuck(object):
+    _asdict = None
+
+class DeadDict(dict):
+    _asdict = None
+
+CONSTRUCTORS = [
+    lambda v: v,
+    lambda v: [v],
+    lambda v: [{'key': v}],
+]
+
 class TestNamedTuple(unittest.TestCase):
     def test_namedtuple_dumps(self):
         for v in [Value(1), Point(1, 2), DuckValue(1), DuckPoint(1, 2)]:
@@ -89,3 +101,21 @@ class TestNamedTuple(unittest.TestCase):
                 json.loads(sio.getvalue()))
             self.assertRaises(TypeError, json.dump, v, StringIO(),
                 tuple_as_array=False, namedtuple_as_object=False)
+
+    def test_asdict_not_callable_dump(self):
+        for f in CONSTRUCTORS:
+            self.assertRaises(TypeError,
+                json.dump, f(DeadDuck()), StringIO(), namedtuple_as_object=True)
+            sio = StringIO()
+            json.dump(f(DeadDict()), sio, namedtuple_as_object=True)
+            self.assertEqual(
+                json.dumps(f({})),
+                sio.getvalue())
+
+    def test_asdict_not_callable_dumps(self):
+        for f in CONSTRUCTORS:
+            self.assertRaises(TypeError,
+                json.dumps, f(DeadDuck()), namedtuple_as_object=True)
+            self.assertEqual(
+                json.dumps(f({})),
+                json.dumps(f(DeadDict()), namedtuple_as_object=True))

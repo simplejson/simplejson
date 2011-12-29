@@ -1,6 +1,12 @@
+Version 2.3.1 released 2011-12-29
+
+* namedtuple_as_object now checks _asdict to ensure that it
+  is callable.
+  https://github.com/simplejson/simplejson/issues/26
+
 Version 2.3.0 released 2011-12-05
 
-* Any objects with _asdict() methods are now considered for 
+* Any objects with _asdict() methods are now considered for
   namedtuple_as_object.
   https://github.com/simplejson/simplejson/pull/22
 
