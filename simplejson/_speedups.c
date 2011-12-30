@@ -175,8 +175,8 @@ _is_namedtuple(PyObject *obj)
         PyErr_Clear();
         return 0;
     }
-    rval = PyCallable_Check(obj);
-    Py_DECREF(obj);
+    rval = PyCallable_Check(_asdict);
+    Py_DECREF(_asdict);
     return rval;
 }
 

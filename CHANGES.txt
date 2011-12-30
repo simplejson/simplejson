@@ -1,3 +1,7 @@
+Version 2.3.2 released 2011-12-30
+
+* Fix crashing regression in speedups introduced in 2.3.1
+
 Version 2.3.1 released 2011-12-29
 
 * namedtuple_as_object now checks _asdict to ensure that it
