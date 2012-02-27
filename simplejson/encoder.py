@@ -170,10 +170,8 @@ class JSONEncoder(object):
         self.use_decimal = use_decimal
         self.namedtuple_as_object = namedtuple_as_object
         self.tuple_as_array = tuple_as_array
-        try:
+        if indent is not None and not isinstance(indent, basestring):
             indent = indent * ' '
-        except TypeError:
-            pass
         self.indent = indent
         if separators is not None:
             self.item_separator, self.key_separator = separators

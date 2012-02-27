@@ -1,3 +1,8 @@
+Version 2.3.3 released 2012-02-27
+
+* Allow unknown numerical types for indent parameter
+  https://github.com/simplejson/simplejson/pull/29
+
 Version 2.3.2 released 2011-12-30
 
 * Fix crashing regression in speedups introduced in 2.3.1
@@ -253,7 +258,7 @@ Version 1.1 released 2005-12-31
 * dump, dumps, load, loads now accept an optional cls kwarg to use an
   alternate JSONEncoder or JSONDecoder class for convenience.
 * The read/write compatibility shim for json-py now have deprecation warnings
- 
+
 Version 1.0 released 2005-12-25
 
  * Initial release

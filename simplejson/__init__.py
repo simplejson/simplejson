@@ -97,7 +97,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
-__version__ = '2.3.2'
+__version__ = '2.3.3'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -189,7 +189,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *namedtuple_as_object* is true (default: ``True``),
     :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
     as JSON objects.
-    
+
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
@@ -268,7 +268,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *namedtuple_as_object* is true (default: ``True``),
     :class:`tuple` subclasses with ``_asdict()`` methods will be encoded
     as JSON objects.
-    
+
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
@@ -438,7 +438,7 @@ def _toggle_speedups(enabled):
     if enabled:
         dec.scanstring = dec.c_scanstring or dec.py_scanstring
         enc.c_make_encoder = c_make_encoder
-        enc.encode_basestring_ascii = (enc.c_encode_basestring_ascii or 
+        enc.encode_basestring_ascii = (enc.c_encode_basestring_ascii or
             enc.py_encode_basestring_ascii)
         scan.make_scanner = scan.c_make_scanner or scan.py_make_scanner
     else:
