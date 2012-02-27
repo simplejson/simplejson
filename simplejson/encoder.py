@@ -171,7 +171,7 @@ class JSONEncoder(object):
         self.namedtuple_as_object = namedtuple_as_object
         self.tuple_as_array = tuple_as_array
         try:
-            indent = ' ' * indent
+            indent = indent * ' '
         except TypeError:
             pass
         self.indent = indent
