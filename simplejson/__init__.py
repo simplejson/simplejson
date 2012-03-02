@@ -138,12 +138,13 @@ _default_encoder = JSONEncoder(
     use_decimal=True,
     namedtuple_as_object=True,
     tuple_as_array=True,
+    javascript_safe_ints=False
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
-        namedtuple_as_object=True, tuple_as_array=True,
+        namedtuple_as_object=True, tuple_as_array=True, javascript_safe_ints=False,
         **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
@@ -193,6 +194,10 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
+    If javascript_safe_ints is true (not the default), ints 2**54 and higher
+    or -2**54 and lower will be encoded as strings. This is to avoid the
+    rounding that happens in Javascript otherwise.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -214,6 +219,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             default=default, use_decimal=use_decimal,
             namedtuple_as_object=namedtuple_as_object,
             tuple_as_array=tuple_as_array,
+            javascript_safe_ints=javascript_safe_ints,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -225,7 +231,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True,
-        tuple_as_array=True,
+        tuple_as_array=True, javascript_safe_ints=False,
         **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
@@ -272,6 +278,10 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
+    If javascript_safe_ints is true (not the default), ints 2**54 and higher
+    or -2**54 and lower will be encoded as strings. This is to avoid the
+    rounding that happens in Javascript otherwise.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -293,6 +303,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         use_decimal=use_decimal,
         namedtuple_as_object=namedtuple_as_object,
         tuple_as_array=tuple_as_array,
+        javascript_safe_ints=javascript_safe_ints,
         **kw).encode(obj)
 
 

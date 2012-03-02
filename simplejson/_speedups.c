@@ -89,6 +89,7 @@ typedef struct _PyEncoderObject {
     int use_decimal;
     int namedtuple_as_object;
     int tuple_as_array;
+    int javascript_safe_ints;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -2025,19 +2026,19 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "javascript_safe_ints", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
-    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array;
+    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array, *javascript_safe_ints;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
-        &namedtuple_as_object, &tuple_as_array))
+        &namedtuple_as_object, &tuple_as_array, &javascript_safe_ints))
         return -1;
 
     s->markers = markers;
@@ -2054,6 +2055,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->use_decimal = PyObject_IsTrue(use_decimal);
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
+    s->javascript_safe_ints = PyObject_IsTrue(javascript_safe_ints);
 
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
@@ -2189,8 +2191,18 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         }
         else if (PyInt_Check(obj) || PyLong_Check(obj)) {
             PyObject *encoded = PyObject_Str(obj);
-            if (encoded != NULL)
+            if (encoded != NULL) {
+				if (s->javascript_safe_ints) {
+					int overflow;
+					PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(obj, &overflow);
+					if (overflow || (value>0 && (value>>54)) || (value<0 && ((-value)>>54))) {
+						PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(encoded));
+						Py_DECREF(encoded);
+						encoded = quoted;
+					}
+				}
                 rv = _steal_list_append(rval, encoded);
+            }
         }
         else if (PyFloat_Check(obj)) {
             PyObject *encoded = encoder_encode_float(s, obj);
@@ -2395,6 +2407,15 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             kstr = PyObject_Str(key);
             if (kstr == NULL)
                 goto bail;
+			if (s->javascript_safe_ints) {
+				int overflow;
+				PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(kstr, &overflow);
+				if (overflow || (value>0 && (value>>54)) || (value<0 && ((-value)>>54))) {
+					PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(kstr));
+					Py_DECREF(kstr);
+					kstr = quoted;
+				}
+			}
         }
         else if (skipkeys) {
             Py_DECREF(item);
