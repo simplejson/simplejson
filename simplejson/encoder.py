@@ -161,8 +161,8 @@ class JSONEncoder(object):
         If tuple_as_array is true (the default), tuple (and subclasses) will
         be encoded as JSON arrays.
 
-        If javascript_safe_ints is true (not the default), ints 2**54 and higher
-        or -2**54 and lower will be encoded as strings. This is to avoid the
+        If javascript_safe_ints is true (not the default), ints 2**53 and higher
+        or -2**53 and lower will be encoded as strings. This is to avoid the
         rounding that happens in Javascript otherwise.
         """
 
@@ -383,7 +383,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield buf + 'false'
             elif isinstance(value, (int, long)):
-                yield buf + str(value) if not _javascript_safe_ints or -2**54<value<2**54 else buf + '"' + str(value) + '"'
+                yield buf + str(value) if not _javascript_safe_ints or -2**53<value<2**53 else buf + '"' + str(value) + '"'
             elif isinstance(value, float):
                 yield buf + _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -470,7 +470,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield 'false'
             elif isinstance(value, (int, long)):
-                yield str(value) if not _javascript_safe_ints or -2**54<value<2**54 else '"' + str(value) + '"'
+                yield str(value) if not _javascript_safe_ints or -2**53<value<2**53 else '"' + str(value) + '"'
             elif isinstance(value, float):
                 yield _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -508,7 +508,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif o is False:
             yield 'false'
         elif isinstance(o, (int, long)):
-            yield str(o) if not _javascript_safe_ints or -2**54<value<2**54 else '"' + str(o) + '"'
+            yield str(o) if not _javascript_safe_ints or -2**53<value<2**53 else '"' + str(o) + '"'
         elif isinstance(o, float):
             yield _floatstr(o)
         elif isinstance(o, list):

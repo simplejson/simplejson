@@ -194,8 +194,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
-    If javascript_safe_ints is true (not the default), ints 2**54 and higher
-    or -2**54 and lower will be encoded as strings. This is to avoid the
+    If javascript_safe_ints is true (not the default), ints 2**53 and higher
+    or -2**53 and lower will be encoded as strings. This is to avoid the
     rounding that happens in Javascript otherwise.
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
@@ -278,8 +278,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
-    If javascript_safe_ints is true (not the default), ints 2**54 and higher
-    or -2**54 and lower will be encoded as strings. This is to avoid the
+    If javascript_safe_ints is true (not the default), ints 2**53 and higher
+    or -2**53 and lower will be encoded as strings. This is to avoid the
     rounding that happens in Javascript otherwise.
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the

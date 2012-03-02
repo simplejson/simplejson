@@ -2195,7 +2195,7 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
 				if (s->javascript_safe_ints) {
 					int overflow;
 					PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(obj, &overflow);
-					if (overflow || (value>0 && (value>>54)) || (value<0 && ((-value)>>54))) {
+					if (overflow || (value>0 && (value>>53)) || (value<0 && ((-value)>>53))) {
 						PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(encoded));
 						Py_DECREF(encoded);
 						encoded = quoted;
@@ -2410,7 +2410,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
 			if (s->javascript_safe_ints) {
 				int overflow;
 				PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(kstr, &overflow);
-				if (overflow || (value>0 && (value>>54)) || (value<0 && ((-value)>>54))) {
+				if (overflow || (value>0 && (value>>53)) || (value<0 && ((-value)>>53))) {
 					PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(kstr));
 					Py_DECREF(kstr);
 					kstr = quoted;
