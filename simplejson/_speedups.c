@@ -89,7 +89,7 @@ typedef struct _PyEncoderObject {
     int use_decimal;
     int namedtuple_as_object;
     int tuple_as_array;
-    int javascript_safe_ints;
+    int bigint_as_string;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -2026,11 +2026,11 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "javascript_safe_ints", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
-    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array, *javascript_safe_ints;
+    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array, *bigint_as_string;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
@@ -2038,7 +2038,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
-        &namedtuple_as_object, &tuple_as_array, &javascript_safe_ints))
+        &namedtuple_as_object, &tuple_as_array, &bigint_as_string))
         return -1;
 
     s->markers = markers;
@@ -2055,7 +2055,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->use_decimal = PyObject_IsTrue(use_decimal);
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
-    s->javascript_safe_ints = PyObject_IsTrue(javascript_safe_ints);
+    s->bigint_as_string = PyObject_IsTrue(bigint_as_string);
 
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
@@ -2192,10 +2192,13 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         else if (PyInt_Check(obj) || PyLong_Check(obj)) {
             PyObject *encoded = PyObject_Str(obj);
             if (encoded != NULL) {
-				if (s->javascript_safe_ints) {
+				if (s->bigint_as_string) {
 					int overflow;
 					PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(obj, &overflow);
-					if (overflow || (value>0 && (value>>53)) || (value<0 && ((-value)>>53))) {
+					if (value < 0) {
+						value = ~value;
+					}
+					if (overflow || (value>>53)) {
 						PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(encoded));
 						Py_DECREF(encoded);
 						encoded = quoted;
@@ -2407,10 +2410,13 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             kstr = PyObject_Str(key);
             if (kstr == NULL)
                 goto bail;
-			if (s->javascript_safe_ints) {
+			if (s->bigint_as_string) {
 				int overflow;
 				PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(kstr, &overflow);
-				if (overflow || (value>0 && (value>>53)) || (value<0 && ((-value)>>53))) {
+				if (value < 0) {
+					value = ~value;
+				}
+				if (overflow || (value>>53)) {
 					PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(kstr));
 					Py_DECREF(kstr);
 					kstr = quoted;

@@ -107,7 +107,7 @@ class JSONEncoder(object):
             check_circular=True, allow_nan=True, sort_keys=False,
             indent=None, separators=None, encoding='utf-8', default=None,
             use_decimal=True, namedtuple_as_object=True,
-            tuple_as_array=True, javascript_safe_ints=False):
+            tuple_as_array=True, bigint_as_string=False):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -161,8 +161,8 @@ class JSONEncoder(object):
         If tuple_as_array is true (the default), tuple (and subclasses) will
         be encoded as JSON arrays.
 
-        If javascript_safe_ints is true (not the default), ints 2**53 and higher
-        or -2**53 and lower will be encoded as strings. This is to avoid the
+        If bigint_as_string is true (not the default), ints 2**53 and higher
+        or lower than -2**53 will be encoded as strings. This is to avoid the
         rounding that happens in Javascript otherwise.
         """
 
@@ -174,7 +174,7 @@ class JSONEncoder(object):
         self.use_decimal = use_decimal
         self.namedtuple_as_object = namedtuple_as_object
         self.tuple_as_array = tuple_as_array
-        self.javascript_safe_ints = javascript_safe_ints
+        self.bigint_as_string = bigint_as_string
         if indent is not None and not isinstance(indent, basestring):
             indent = indent * ' '
         self.indent = indent
@@ -290,13 +290,13 @@ class JSONEncoder(object):
                 markers, self.default, _encoder, self.indent,
                 self.key_separator, self.item_separator, self.sort_keys,
                 self.skipkeys, self.allow_nan, key_memo, self.use_decimal,
-                self.namedtuple_as_object, self.tuple_as_array, self.javascript_safe_ints)
+                self.namedtuple_as_object, self.tuple_as_array, self.bigint_as_string)
         else:
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
                 self.key_separator, self.item_separator, self.sort_keys,
                 self.skipkeys, _one_shot, self.use_decimal,
-                self.namedtuple_as_object, self.tuple_as_array, self.javascript_safe_ints)
+                self.namedtuple_as_object, self.tuple_as_array, self.bigint_as_string)
         try:
             return _iterencode(o, 0)
         finally:
@@ -332,7 +332,7 @@ class JSONEncoderForHTML(JSONEncoder):
 
 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
-        _use_decimal, _namedtuple_as_object, _tuple_as_array, _javascript_safe_ints,
+        _use_decimal, _namedtuple_as_object, _tuple_as_array, _bigint_as_string,
         ## HACK: hand-optimized bytecode; turn globals into locals
         False=False,
         True=True,
@@ -383,7 +383,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield buf + 'false'
             elif isinstance(value, (int, long)):
-                yield buf + str(value) if not _javascript_safe_ints or -2**53<value<2**53 else buf + '"' + str(value) + '"'
+                yield buf + str(value) if not _bigint_as_string or -(1<<53) <= value < (1<<53) else buf + '"' + str(value) + '"'
             elif isinstance(value, float):
                 yield buf + _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -470,7 +470,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield 'false'
             elif isinstance(value, (int, long)):
-                yield str(value) if not _javascript_safe_ints or -2**53<value<2**53 else '"' + str(value) + '"'
+                yield str(value) if not _bigint_as_string or -(1<<53) <= value < (1<<53) else '"' + str(value) + '"'
             elif isinstance(value, float):
                 yield _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -508,7 +508,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif o is False:
             yield 'false'
         elif isinstance(o, (int, long)):
-            yield str(o) if not _javascript_safe_ints or -2**53<value<2**53 else '"' + str(o) + '"'
+            yield str(o) if not _bigint_as_string or -(1<<53) <= o < (1<<53) else '"' + str(o) + '"'
         elif isinstance(o, float):
             yield _floatstr(o)
         elif isinstance(o, list):
