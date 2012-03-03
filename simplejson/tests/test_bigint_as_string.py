@@ -21,21 +21,3 @@ class TestBigintAsString(TestCase):
             d = {'value': value_pair[0]}
             self.assertEquals('{"value": %s}' % value_pair[0], json.dumps(d))
             self.assertEquals('{"value": %s}' % value_pair[1], json.dumps(d, bigint_as_string=True))
-
-    def test_ints_without_speedups(self):
-        self.assertIsNotNone(json.encoder.c_make_encoder)
-        json._toggle_speedups(False)
-        self.test_ints()
-        json._toggle_speedups(True)
-
-    def test_lists_without_speedups(self):
-        self.assertIsNotNone(json.encoder.c_make_encoder)
-        json._toggle_speedups(False)
-        self.test_lists()
-        json._toggle_speedups(True)
-
-    def test_dicts_without_speedups(self):
-        self.assertIsNotNone(json.encoder.c_make_encoder)
-        json._toggle_speedups(False)
-        self.test_dicts()
-        json._toggle_speedups(True)
