@@ -105,6 +105,9 @@ static PyMemberDef encoder_members[] = {
     {NULL}
 };
 
+static PyObject *
+maybe_quote_bigint(PyObject *encoded, PyObject *obj);
+
 static Py_ssize_t
 ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars);
 static PyObject *
@@ -166,6 +169,35 @@ _is_namedtuple(PyObject *obj);
 #else
 #define MAX_EXPANSION MIN_EXPANSION
 #endif
+
+static PyObject *
+maybe_quote_bigint(PyObject *encoded, PyObject *obj)
+{
+    static PyObject *big_long = NULL;
+    static PyObject *small_long = NULL;
+    if (big_long == NULL) {
+        big_long = PyLong_FromLongLong(1 << 53);
+        if (big_long == NULL) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+    }
+    if (small_long == NULL) {
+        small_long = PyLong_FromLongLong(-1 << 53);
+        if (small_long == NULL) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+    }
+    if (PyObject_RichCompareBool(obj, big_long, Py_GE) ||
+        PyObject_RichCompareBool(obj, small_long, Py_LE)) {
+        PyObject* quoted = PyString_FromFormat("\"%s\"",
+                                               PyString_AsString(encoded));
+        Py_DECREF(encoded);
+        encoded = quoted;
+    }
+    return encoded;
+}
 
 static int
 _is_namedtuple(PyObject *obj)
@@ -1160,7 +1192,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
         if (rval == NULL)
             return NULL;
     }
-    
+
     /* skip whitespace after { */
     while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
@@ -1901,7 +1933,7 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:make_scanner", kwlist, &ctx))
         return -1;
-    
+
     if (s->memo == NULL) {
         s->memo = PyDict_New();
         if (s->memo == NULL)
@@ -2192,18 +2224,11 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         else if (PyInt_Check(obj) || PyLong_Check(obj)) {
             PyObject *encoded = PyObject_Str(obj);
             if (encoded != NULL) {
-				if (s->bigint_as_string) {
-					int overflow;
-					PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(obj, &overflow);
-					if (value < 0) {
-						value = ~value;
-					}
-					if (overflow || (value>>53)) {
-						PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(encoded));
-						Py_DECREF(encoded);
-						encoded = quoted;
-					}
-				}
+                if (s->bigint_as_string) {
+                    encoded = maybe_quote_bigint(encoded, obj);
+                    if (encoded == NULL)
+                        break;
+                }
                 rv = _steal_list_append(rval, encoded);
             }
         }
@@ -2410,18 +2435,6 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             kstr = PyObject_Str(key);
             if (kstr == NULL)
                 goto bail;
-			if (s->bigint_as_string) {
-				int overflow;
-				PY_LONG_LONG value = PyLong_AsLongLongAndOverflow(kstr, &overflow);
-				if (value < 0) {
-					value = ~value;
-				}
-				if (overflow || (value>>53)) {
-					PyObject* quoted = PyString_FromFormat("\"%s\"", PyString_AsString(kstr));
-					Py_DECREF(kstr);
-					kstr = quoted;
-				}
-			}
         }
         else if (skipkeys) {
             Py_DECREF(item);

@@ -138,14 +138,14 @@ _default_encoder = JSONEncoder(
     use_decimal=True,
     namedtuple_as_object=True,
     tuple_as_array=True,
-    bigint_as_string=False
+    bigint_as_string=False,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
-        namedtuple_as_object=True, tuple_as_array=True, bigint_as_string=False,
-        **kw):
+        namedtuple_as_object=True, tuple_as_array=True,
+        bigint_as_string=False, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
@@ -194,9 +194,11 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
-    If bigint_as_string is true (not the default), ints 2**53 and higher
+    If *bigint_as_string* is true (default: ``False``), ints 2**53 and higher
     or lower than -2**53 will be encoded as strings. This is to avoid the
-    rounding that happens in Javascript otherwise.
+    rounding that happens in Javascript otherwise. Note that this is still a
+    lossy operation that will not round-trip correctly and should be used
+    sparingly.
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with

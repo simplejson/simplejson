@@ -290,13 +290,15 @@ class JSONEncoder(object):
                 markers, self.default, _encoder, self.indent,
                 self.key_separator, self.item_separator, self.sort_keys,
                 self.skipkeys, self.allow_nan, key_memo, self.use_decimal,
-                self.namedtuple_as_object, self.tuple_as_array, self.bigint_as_string)
+                self.namedtuple_as_object, self.tuple_as_array,
+                self.bigint_as_string)
         else:
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
                 self.key_separator, self.item_separator, self.sort_keys,
                 self.skipkeys, _one_shot, self.use_decimal,
-                self.namedtuple_as_object, self.tuple_as_array, self.bigint_as_string)
+                self.namedtuple_as_object, self.tuple_as_array,
+                self.bigint_as_string)
         try:
             return _iterencode(o, 0)
         finally:
@@ -332,7 +334,8 @@ class JSONEncoderForHTML(JSONEncoder):
 
 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
-        _use_decimal, _namedtuple_as_object, _tuple_as_array, _bigint_as_string,
+        _use_decimal, _namedtuple_as_object, _tuple_as_array,
+        _bigint_as_string,
         ## HACK: hand-optimized bytecode; turn globals into locals
         False=False,
         True=True,
@@ -383,7 +386,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield buf + 'false'
             elif isinstance(value, (int, long)):
-                yield buf + str(value) if not _bigint_as_string or -(1<<53) <= value < (1<<53) else buf + '"' + str(value) + '"'
+                yield ((buf + str(value))
+                       if (not _bigint_as_string or
+                           (-1 << 53) < value < (1 << 53))
+                           else (buf + '"' + str(value) + '"'))
             elif isinstance(value, float):
                 yield buf + _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -470,7 +476,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield 'false'
             elif isinstance(value, (int, long)):
-                yield str(value) if not _bigint_as_string or -(1<<53) <= value < (1<<53) else '"' + str(value) + '"'
+                yield (str(value)
+                       if (not _bigint_as_string or
+                           (-1 << 53) < value < (1 << 53))
+                           else ('"' + str(value) + '"'))
             elif isinstance(value, float):
                 yield _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -508,7 +517,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif o is False:
             yield 'false'
         elif isinstance(o, (int, long)):
-            yield str(o) if not _bigint_as_string or -(1<<53) <= o < (1<<53) else '"' + str(o) + '"'
+            yield (str(o)
+                   if (not _bigint_as_string or
+                       (-1 << 53) < o < (1 << 53))
+                       else ('"' + str(o) + '"'))
         elif isinstance(o, float):
             yield _floatstr(o)
         elif isinstance(o, list):
