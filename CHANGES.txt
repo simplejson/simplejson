@@ -1,3 +1,9 @@
+Version 2.4.0 released 2012-03-XX
+
+* New bigint_as_string option for encoder to trade JavaScript number precision
+  issues for type issues.
+  https://github.com/simplejson/simplejson/issues/31
+
 Version 2.3.3 released 2012-02-27
 
 * Allow unknown numerical types for indent parameter
