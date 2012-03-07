@@ -176,14 +176,14 @@ maybe_quote_bigint(PyObject *encoded, PyObject *obj)
     static PyObject *big_long = NULL;
     static PyObject *small_long = NULL;
     if (big_long == NULL) {
-        big_long = PyLong_FromLongLong(1 << 53);
+        big_long = PyLong_FromLongLong(1LL << 53);
         if (big_long == NULL) {
             Py_DECREF(encoded);
             return NULL;
         }
     }
     if (small_long == NULL) {
-        small_long = PyLong_FromLongLong(-1 << 53);
+        small_long = PyLong_FromLongLong(-1LL << 53);
         if (small_long == NULL) {
             Py_DECREF(encoded);
             return NULL;
