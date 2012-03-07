@@ -97,7 +97,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
-__version__ = '2.3.3'
+__version__ = '2.4.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -138,13 +138,14 @@ _default_encoder = JSONEncoder(
     use_decimal=True,
     namedtuple_as_object=True,
     tuple_as_array=True,
+    bigint_as_string=False,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True, tuple_as_array=True,
-        **kw):
+        bigint_as_string=False, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
@@ -193,6 +194,12 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
+    If *bigint_as_string* is true (default: ``False``), ints 2**53 and higher
+    or lower than -2**53 will be encoded as strings. This is to avoid the
+    rounding that happens in Javascript otherwise. Note that this is still a
+    lossy operation that will not round-trip correctly and should be used
+    sparingly.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -203,7 +210,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         check_circular and allow_nan and
         cls is None and indent is None and separators is None and
         encoding == 'utf-8' and default is None and use_decimal
-        and namedtuple_as_object and tuple_as_array and not kw):
+        and namedtuple_as_object and tuple_as_array
+        and not bigint_as_string and not kw):
         iterable = _default_encoder.iterencode(obj)
     else:
         if cls is None:
@@ -214,6 +222,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             default=default, use_decimal=use_decimal,
             namedtuple_as_object=namedtuple_as_object,
             tuple_as_array=tuple_as_array,
+            bigint_as_string=bigint_as_string,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -225,7 +234,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True,
-        tuple_as_array=True,
+        tuple_as_array=True, bigint_as_string=False,
         **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
@@ -272,6 +281,10 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *tuple_as_array* is true (default: ``True``),
     :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
+    If bigint_as_string is true (not the default), ints 2**53 and higher
+    or lower than -2**53 will be encoded as strings. This is to avoid the
+    rounding that happens in Javascript otherwise.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -282,7 +295,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         check_circular and allow_nan and
         cls is None and indent is None and separators is None and
         encoding == 'utf-8' and default is None and use_decimal
-        and namedtuple_as_object and tuple_as_array and not kw):
+        and namedtuple_as_object and tuple_as_array
+        and not bigint_as_string and not kw):
         return _default_encoder.encode(obj)
     if cls is None:
         cls = JSONEncoder
@@ -293,6 +307,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         use_decimal=use_decimal,
         namedtuple_as_object=namedtuple_as_object,
         tuple_as_array=tuple_as_array,
+        bigint_as_string=bigint_as_string,
         **kw).encode(obj)
 
 
