@@ -1,4 +1,4 @@
-Version 2.4.0 released 2012-03-XX
+Version 2.4.0 released 2012-03-06
 
 * New bigint_as_string option for encoder to trade JavaScript number precision
   issues for type issues.
