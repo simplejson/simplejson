@@ -129,7 +129,7 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 Basic Usage
 -----------
 
-.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, **kw]]]]]]]]]]]]])
+.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, **kw]]]]]]]]]]]]]]]])
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
    file-like object).
@@ -189,22 +189,42 @@ Basic Usage
    .. versionchanged:: 2.2.0
       The default of *use_decimal* changed to ``True`` in 2.2.0.
 
-  If *namedtuple_as_object* is true (default: ``True``),
-  objects with ``_asdict()`` methods will be encoded
-  as JSON objects.
+   If *namedtuple_as_object* is true (default: ``True``),
+   objects with ``_asdict()`` methods will be encoded
+   as JSON objects.
 
-  .. versionchanged:: 2.2.0
-    *namedtuple_as_object* is new in 2.2.0.
+   .. versionchanged:: 2.2.0
+     *namedtuple_as_object* is new in 2.2.0.
 
-  .. versionchanged:: 2.3.0
-    *namedtuple_as_object* no longer requires that these objects be
-    subclasses of :class:`tuple`.
+   .. versionchanged:: 2.3.0
+     *namedtuple_as_object* no longer requires that these objects be
+     subclasses of :class:`tuple`.
 
-  If *tuple_as_array* is true (default: ``True``),
-  :class:`tuple` (and subclasses) will be encoded as JSON arrays.
+   If *tuple_as_array* is true (default: ``True``),
+   :class:`tuple` (and subclasses) will be encoded as JSON arrays.
 
-  .. versionchanged:: 2.2.0
-    *tuple_as_array* is new in 2.2.0.
+   .. versionchanged:: 2.2.0
+     *tuple_as_array* is new in 2.2.0.
+
+   If *bigint_as_string* is true (default: ``False``), :class:`int`` ``2**53``
+   and higher or lower than ``-2**53`` will be encoded as strings. This is to
+   avoid the rounding that happens in Javascript otherwise. Note that this
+   option loses type information, so use with extreme caution.
+
+   .. versionchanged:: 2.4.0
+     *bigint_as_string* is new in 2.4.0.
+
+   If *sort_keys* is true (not the default), then the output of dictionaries
+   will be sorted by key; this is useful for regression tests to ensure that
+   JSON serializations can be compared on a day-to-day basis.
+
+   If *item_sort_key* is a callable (not the default), then the output of
+   dictionaries will be sorted with it. The callable will be used like this:
+   ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
+   over *sort_keys*.
+
+   .. versionchanged:: 2.5.0
+      *item_sort_key* is new in 2.5.0.
 
     .. note::
 
@@ -213,7 +233,7 @@ Basic Usage
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, **kw]]]]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, **kw]]]]]]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -410,7 +430,7 @@ Encoders and decoders
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
 
-.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array]]]]]]]]]]]])
+.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key]]]]]]]]]]]]])
 
    Extensible JSON encoder for Python data structures.
 
@@ -465,6 +485,14 @@ Encoders and decoders
    will be sorted by key; this is useful for regression tests to ensure that
    JSON serializations can be compared on a day-to-day basis.
 
+   If *item_sort_key* is a callable (not the default), then the output of
+   dictionaries will be sorted with it. The callable will be used like this:
+   ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
+   over *sort_keys*.
+
+   .. versionchanged:: 2.5.0
+      *item_sort_key* is new in 2.5.0.
+
    If *indent* is a string, then JSON array elements and object members
    will be pretty-printed with a newline followed by that string repeated
    for each level of nesting. ``None`` (the default) selects the most compact
@@ -503,6 +531,15 @@ Encoders and decoders
 
    .. versionchanged:: 2.2.0
      *tuple_as_array* is new in 2.2.0.
+
+   If *bigint_as_string* is true (default: ``False``), :class:`int`` ``2**53``
+   and higher or lower than ``-2**53`` will be encoded as strings. This is to
+   avoid the rounding that happens in Javascript otherwise. Note that this
+   option loses type information, so use with extreme caution.
+
+   .. versionchanged:: 2.4.0
+     *bigint_as_string* is new in 2.4.0.
+
 
    .. method:: default(o)
 
@@ -544,7 +581,7 @@ Encoders and decoders
       Note that :meth:`encode` has much better performance than
       :meth:`iterencode`.
 
-.. class:: JSONEncoderForHTML([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default]]]]]]]]])
+.. class:: JSONEncoderForHTML([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key]]]]]]]]]]]]])
 
    Subclass of :class:`JSONEncoder` that escapes &, <, and > for embedding in HTML.
 
