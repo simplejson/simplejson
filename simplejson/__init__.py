@@ -101,7 +101,7 @@ __version__ = '2.4.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
-    'OrderedDict',
+    'OrderedDict', 'simple_first'
 ]
 
 __author__ = 'Bob Ippolito <bob@redivi.com>'
@@ -139,13 +139,14 @@ _default_encoder = JSONEncoder(
     namedtuple_as_object=True,
     tuple_as_array=True,
     bigint_as_string=False,
+    item_sort_key=None,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True, tuple_as_array=True,
-        bigint_as_string=False, **kw):
+        bigint_as_string=False, item_sort_key=None, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
@@ -200,6 +201,10 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     lossy operation that will not round-trip correctly and should be used
     sparingly.
 
+    If specified, *item_sort_key* is a callable used to sort the items in
+    each dictionary. This is useful if you want to sort items other than
+    in alphabetical order by key.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -211,7 +216,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         cls is None and indent is None and separators is None and
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array
-        and not bigint_as_string and not kw):
+        and not bigint_as_string and not item_sort_key and not kw):
         iterable = _default_encoder.iterencode(obj)
     else:
         if cls is None:
@@ -223,6 +228,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             namedtuple_as_object=namedtuple_as_object,
             tuple_as_array=tuple_as_array,
             bigint_as_string=bigint_as_string,
+            item_sort_key=item_sort_key,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -233,8 +239,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
 def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         allow_nan=True, cls=None, indent=None, separators=None,
         encoding='utf-8', default=None, use_decimal=True,
-        namedtuple_as_object=True,
-        tuple_as_array=True, bigint_as_string=False,
+        namedtuple_as_object=True, tuple_as_array=True,
+        bigint_as_string=False, item_sort_key=None,
         **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
@@ -285,6 +291,10 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     or lower than -2**53 will be encoded as strings. This is to avoid the
     rounding that happens in Javascript otherwise.
 
+    If specified, *item_sort_key* is a callable used to sort the items in
+    each dictionary. This is useful if you want to sort items other than
+    in alphabetical order by key.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg.
@@ -296,7 +306,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         cls is None and indent is None and separators is None and
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array
-        and not bigint_as_string and not kw):
+        and not bigint_as_string and not item_sort_key and not kw):
         return _default_encoder.encode(obj)
     if cls is None:
         cls = JSONEncoder
@@ -308,6 +318,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         namedtuple_as_object=namedtuple_as_object,
         tuple_as_array=tuple_as_array,
         bigint_as_string=bigint_as_string,
+        item_sort_key=item_sort_key,
         **kw).encode(obj)
 
 
@@ -479,3 +490,9 @@ def _toggle_speedups(enabled):
        encoding='utf-8',
        default=None,
    )
+
+def simple_first(kv):
+    """Helper function to pass to item_sort_key to sort simple
+    elements to the top, then container elements.
+    """
+    return isinstance(kv[1],(list,dict,tuple)), kv[0]
