@@ -358,6 +358,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         str=str,
         tuple=tuple,
     ):
+    if _item_sort_key and not callable(_item_sort_key):
+        raise TypeError("item_sort_key must be None or callable")
 
     def _iterencode_list(lst, _current_indent_level):
         if not lst:

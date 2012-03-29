@@ -1,3 +1,8 @@
+Version 2.5.0 released 2012-03-29
+
+* New item_sort_key option for encoder to allow fine grained control of sorted
+  output
+
 Version 2.4.0 released 2012-03-06
 
 * New bigint_as_string option for encoder to trade JavaScript number precision

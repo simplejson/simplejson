@@ -2361,13 +2361,13 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         */
     }
 
-	if (PyCallable_Check(s->item_sort_key)) {
+    if (PyCallable_Check(s->item_sort_key)) {
         if (PyDict_CheckExact(dct))
             items = PyDict_Items(dct);
         else
             items = PyMapping_Items(dct);
         PyObject_CallMethod(items, "sort", "OO", Py_None, s->item_sort_key);
-	}
+    }
     else if (PyObject_IsTrue(s->sort_keys)) {
         /* First sort the keys then replace them with (key, value) tuples. */
         Py_ssize_t i, nitems;
