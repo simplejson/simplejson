@@ -220,7 +220,7 @@ Basic Usage
 
    If *item_sort_key* is a callable (not the default), then the output of
    dictionaries will be sorted with it. The callable will be used like this:
-   ``sorted(dct.items(), key=sort_item_key)``. This option takes precedence
+   ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
    over *sort_keys*.
 
    .. versionchanged:: 2.5.0
@@ -487,7 +487,7 @@ Encoders and decoders
 
    If *item_sort_key* is a callable (not the default), then the output of
    dictionaries will be sorted with it. The callable will be used like this:
-   ``sorted(dct.items(), key=sort_item_key)``. This option takes precedence
+   ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
    over *sort_keys*.
 
    .. versionchanged:: 2.5.0
