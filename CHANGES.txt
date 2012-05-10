@@ -1,3 +1,8 @@
+Version 2.5.2 released 2012-05-10
+
+* Fix for regression introduced in 2.5.1
+  https://github.com/simplejson/simplejson/issues/35
+
 Version 2.5.1 released 2012-05-10
 
 * Support for use_decimal=True in environments that use Python
