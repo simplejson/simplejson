@@ -1,3 +1,9 @@
+Version 2.5.1 released 2012-05-10
+
+* Support for use_decimal=True in environments that use Python
+  sub-interpreters such as uWSGI
+  https://github.com/simplejson/simplejson/issues/34
+
 Version 2.5.0 released 2012-03-29
 
 * New item_sort_key option for encoder to allow fine grained control of sorted

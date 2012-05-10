@@ -44,11 +44,9 @@ typedef int Py_ssize_t;
 #define PyScanner_CheckExact(op) (Py_TYPE(op) == &PyScannerType)
 #define PyEncoder_Check(op) PyObject_TypeCheck(op, &PyEncoderType)
 #define PyEncoder_CheckExact(op) (Py_TYPE(op) == &PyEncoderType)
-#define Decimal_Check(op) (PyObject_TypeCheck(op, DecimalTypePtr))
 
 static PyTypeObject PyScannerType;
 static PyTypeObject PyEncoderType;
-static PyTypeObject *DecimalTypePtr;
 
 typedef struct _PyScannerObject {
     PyObject_HEAD
@@ -84,6 +82,7 @@ typedef struct _PyEncoderObject {
     PyObject *sort_keys;
     PyObject *skipkeys;
     PyObject *key_memo;
+    PyObject *Decimal;
     int fast_encode;
     int allow_nan;
     int use_decimal;
@@ -2053,6 +2052,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         s->skipkeys = NULL;
         s->key_memo = NULL;
         s->item_sort_key = NULL;
+        s->Decimal = NULL;
     }
     return (PyObject *)s;
 }
@@ -2065,15 +2065,18 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
-    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo, *use_decimal, *namedtuple_as_object, *tuple_as_array, *bigint_as_string, *item_sort_key;
+    PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
+    PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array;
+    PyObject *bigint_as_string, *item_sort_key, *Decimal;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
-        &namedtuple_as_object, &tuple_as_array, &bigint_as_string, &item_sort_key))
+        &namedtuple_as_object, &tuple_as_array, &bigint_as_string,
+        &item_sort_key, &Decimal))
         return -1;
 
     s->markers = markers;
@@ -2092,6 +2095,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
     s->bigint_as_string = PyObject_IsTrue(bigint_as_string);
     s->item_sort_key = item_sort_key;
+    s->Decimal = Decimal;
 
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
@@ -2103,6 +2107,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(s->skipkeys);
     Py_INCREF(s->key_memo);
     Py_INCREF(s->item_sort_key);
+    Py_INCREF(s->Decimal);
     return 0;
 }
 
@@ -2255,7 +2260,7 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         else if (PyDict_Check(obj)) {
             rv = encoder_listencode_dict(s, rval, obj, indent_level);
         }
-        else if (s->use_decimal && Decimal_Check(obj)) {
+        else if (s->use_decimal && PyObject_TypeCheck(obj, s->Decimal)) {
             PyObject *encoded = PyObject_Str(obj);
             if (encoded != NULL)
                 rv = _steal_list_append(rval, encoded);
@@ -2649,6 +2654,7 @@ encoder_clear(PyObject *self)
     Py_CLEAR(s->skipkeys);
     Py_CLEAR(s->key_memo);
     Py_CLEAR(s->item_sort_key);
+    Py_CLEAR(s->Decimal);
     return 0;
 }
 
@@ -2716,7 +2722,7 @@ PyDoc_STRVAR(module_doc,
 void
 init_speedups(void)
 {
-    PyObject *m, *decimal;
+    PyObject *m;
     PyScannerType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&PyScannerType) < 0)
         return;
@@ -2724,13 +2730,6 @@ init_speedups(void)
     if (PyType_Ready(&PyEncoderType) < 0)
         return;
 
-    decimal = PyImport_ImportModule("decimal");
-    if (decimal == NULL)
-        return;
-    DecimalTypePtr = (PyTypeObject*)PyObject_GetAttrString(decimal, "Decimal");
-    Py_DECREF(decimal);
-    if (DecimalTypePtr == NULL)
-        return;
 
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
     Py_INCREF((PyObject*)&PyScannerType);
