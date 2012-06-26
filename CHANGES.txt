@@ -1,3 +1,8 @@
+Version 2.6.0 released 2012-06-26
+
+* Error messages changed to match proposal for Python 3.3.1
+  http://bugs.python.org/issue5067
+
 Version 2.5.2 released 2012-05-10
 
 * Fix for regression introduced in 2.5.1

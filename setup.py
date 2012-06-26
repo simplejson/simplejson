@@ -7,7 +7,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '2.5.2'
+VERSION = '2.6.0'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 LONG_DESCRIPTION = open('README.rst', 'r').read()
 

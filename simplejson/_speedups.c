@@ -1058,7 +1058,9 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
 
             /* read key */
             if (str[idx] != '"') {
-                raise_errmsg("Expecting property name", pystr, idx);
+                raise_errmsg(
+                    "Expecting property name enclosed in double quotes",
+                    pystr, idx);
                 goto bail;
             }
             key = scanstring_str(pystr, idx + 1, encoding, strict, &next_idx);
@@ -1079,7 +1081,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             /* skip whitespace between key and : delimiter, read :, skip whitespace */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             if (idx > end_idx || str[idx] != ':') {
-                raise_errmsg("Expecting : delimiter", pystr, idx);
+                raise_errmsg("Expecting ':' delimiter", pystr, idx);
                 goto bail;
             }
             idx++;
@@ -1119,7 +1121,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
                 break;
             }
             else if (str[idx] != ',') {
-                raise_errmsg("Expecting , delimiter", pystr, idx);
+                raise_errmsg("Expecting ',' delimiter", pystr, idx);
                 goto bail;
             }
             idx++;
@@ -1204,7 +1206,9 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
 
             /* read key */
             if (str[idx] != '"') {
-                raise_errmsg("Expecting property name", pystr, idx);
+                raise_errmsg(
+                    "Expecting property name enclosed in double quotes",
+                    pystr, idx);
                 goto bail;
             }
             key = scanstring_unicode(pystr, idx + 1, strict, &next_idx);
@@ -1222,10 +1226,11 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
             }
             idx = next_idx;
 
-            /* skip whitespace between key and : delimiter, read :, skip whitespace */
+            /* skip whitespace between key and : delimiter, read :, skip
+               whitespace */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
             if (idx > end_idx || str[idx] != ':') {
-                raise_errmsg("Expecting : delimiter", pystr, idx);
+                raise_errmsg("Expecting ':' delimiter", pystr, idx);
                 goto bail;
             }
             idx++;
@@ -1259,13 +1264,14 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
             /* skip whitespace before } or , */
             while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
 
-            /* bail if the object is closed or we didn't get the , delimiter */
+            /* bail if the object is closed or we didn't get the ,
+               delimiter */
             if (idx > end_idx) break;
             if (str[idx] == '}') {
                 break;
             }
             else if (str[idx] != ',') {
-                raise_errmsg("Expecting , delimiter", pystr, idx);
+                raise_errmsg("Expecting ',' delimiter", pystr, idx);
                 goto bail;
             }
             idx++;
@@ -1359,7 +1365,7 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
                 break;
             }
             else if (str[idx] != ',') {
-                raise_errmsg("Expecting , delimiter", pystr, idx);
+                raise_errmsg("Expecting ',' delimiter", pystr, idx);
                 goto bail;
             }
             idx++;
@@ -1431,7 +1437,7 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
                 break;
             }
             else if (str[idx] != ',') {
-                raise_errmsg("Expecting , delimiter", pystr, idx);
+                raise_errmsg("Expecting ',' delimiter", pystr, idx);
                 goto bail;
             }
             idx++;
