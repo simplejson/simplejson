@@ -403,23 +403,25 @@ class JSONDecoder(object):
         instance containing a JSON document)
 
         """
-        obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+        obj, end = self.raw_decode(s)
         end = _w(s, end).end()
         if end != len(s):
             raise JSONDecodeError("Extra data", s, end, len(s))
         return obj
 
-    def raw_decode(self, s, idx=0):
+    def raw_decode(self, s, idx=0, _w=WHITESPACE.match):
         """Decode a JSON document from ``s`` (a ``str`` or ``unicode``
         beginning with a JSON document) and return a 2-tuple of the Python
         representation and the index in ``s`` where the document ended.
+        Optionally, ``idx`` can be used to specify an offset in ``s`` where
+        the JSON document begins.
 
         This can be used to decode a JSON document from a string that may
         have extraneous data at the end.
 
         """
         try:
-            obj, end = self.scan_once(s, idx)
+            obj, end = self.scan_once(s, idx=_w(s, idx).end())
         except StopIteration:
             raise JSONDecodeError("No JSON object could be decoded", s, idx)
         return obj, end
