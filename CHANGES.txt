@@ -1,3 +1,8 @@
+Version 2.6.1 released 2012-07-27
+
+* raw_decode() now skips whitespace before the object
+  https://github.com/simplejson/simplejson/pull/38
+
 Version 2.6.0 released 2012-06-26
 
 * Error messages changed to match proposal for Python 3.3.1

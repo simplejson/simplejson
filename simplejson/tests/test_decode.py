@@ -81,3 +81,7 @@ class TestDecode(TestCase):
         self.assertEqual(
             ({'a': {}}, 9),
             cls(object_pairs_hook=dict).raw_decode("{\"a\": {}}"))
+        # https://github.com/simplejson/simplejson/pull/38
+        self.assertEqual(
+            ({'a': {}}, 11),
+            cls().raw_decode(" \n{\"a\": {}}"))

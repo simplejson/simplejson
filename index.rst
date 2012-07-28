@@ -418,14 +418,16 @@ Encoders and decoders
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
 
-   .. method:: raw_decode(s)
+   .. method:: raw_decode(s[, idx=0])
 
       Decode a JSON document from *s* (a :class:`str` or :class:`unicode`
-      beginning with a JSON document) and return a 2-tuple of the Python
-      representation and the index in *s* where the document ended.
+      beginning with a JSON document) starting from the index *idx* and return
+      a 2-tuple of the Python representation and the index in *s* where the
+      document ended.
 
       This can be used to decode a JSON document from a string that may have
-      extraneous data at the end.
+      extraneous data at the end, or to decode a string that has a series of
+      JSON objects.
 
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
