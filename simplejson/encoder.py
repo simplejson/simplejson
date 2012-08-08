@@ -396,10 +396,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield buf + 'false'
             elif isinstance(value, (int, long)):
-                yield ((buf + str(value))
-                       if (not _bigint_as_string or
-                           (-1 << 53) < value < (1 << 53))
-                           else (buf + '"' + str(value) + '"'))
+                if (not _bigint_as_string or (-1 << 53) < value < (1 << 53)):
+                    yield buf + str(value)
+                else: 
+                    yield buf + '"' + str(value) + '"'
             elif isinstance(value, float):
                 yield buf + _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -489,10 +489,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif value is False:
                 yield 'false'
             elif isinstance(value, (int, long)):
-                yield (str(value)
-                       if (not _bigint_as_string or
-                           (-1 << 53) < value < (1 << 53))
-                           else ('"' + str(value) + '"'))
+                if (not _bigint_as_string or
+                    (-1 << 53) < value < (1 << 53)):
+                    yield str(value)
+                else:
+                    yield '"' + str(value) + '"'
             elif isinstance(value, float):
                 yield _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
@@ -530,10 +531,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif o is False:
             yield 'false'
         elif isinstance(o, (int, long)):
-            yield (str(o)
-                   if (not _bigint_as_string or
-                       (-1 << 53) < o < (1 << 53))
-                       else ('"' + str(o) + '"'))
+            if (not _bigint_as_string or
+                (-1 << 53) < o < (1 << 53)):
+                yield str(o)
+            else: 
+                yield '"' + str(o) + '"'
         elif isinstance(o, float):
             yield _floatstr(o)
         elif isinstance(o, list):
