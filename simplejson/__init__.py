@@ -97,7 +97,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 2 (char 2)
 """
-__version__ = '2.6.1'
+__version__ = '2.6.2'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -109,7 +109,7 @@ __author__ = 'Bob Ippolito <bob@redivi.com>'
 from decimal import Decimal
 
 from decoder import JSONDecoder, JSONDecodeError
-from encoder import JSONEncoder
+from encoder import JSONEncoder, JSONEncoderForHTML
 def _import_OrderedDict():
     import collections
     try:
