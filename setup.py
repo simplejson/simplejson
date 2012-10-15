@@ -1,10 +1,16 @@
 #!/usr/bin/env python
 
 import sys
-from distutils.core import setup, Extension, Command
+import distutils
+from distutils.core import Command
+from distutils.core import Extension as _Extension
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
+from setuptools import setup
+
+distutils.command.build_ext.Extension = _Extension
+Extension = _Extension
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
 VERSION = '2.6.2'
