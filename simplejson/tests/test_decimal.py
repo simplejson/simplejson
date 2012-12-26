@@ -1,7 +1,7 @@
 import decimal
 from decimal import Decimal
 from unittest import TestCase
-from StringIO import StringIO
+from simplejson.compat import StringIO, reload_module
 
 import simplejson as json
 
@@ -60,7 +60,7 @@ class TestDecimal(TestCase):
         # Simulate a subinterpreter that reloads the Python modules but not
         # the C code https://github.com/simplejson/simplejson/issues/34
         global Decimal
-        Decimal = reload(decimal).Decimal
+        Decimal = reload_module(decimal).Decimal
         import simplejson.encoder
         simplejson.encoder.Decimal = Decimal
         self.test_decimal_roundtrip()

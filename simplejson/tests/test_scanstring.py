@@ -3,6 +3,7 @@ from unittest import TestCase
 
 import simplejson as json
 import simplejson.decoder
+from simplejson.compat import b
 
 class TestScanString(TestCase):
     def test_py_scanstring(self):
@@ -107,11 +108,10 @@ class TestScanString(TestCase):
         self.assertRaises(ValueError, json.decoder.scanstring, "xxx", 1,
                           "xxx")
         self.assertRaises(UnicodeDecodeError,
-                          json.encoder.encode_basestring_ascii, "xx\xff")
+                          json.encoder.encode_basestring_ascii, b("xx\xff"))
 
     def test_overflow(self):
-        # Python 2.5 does not have maxsize
-        maxsize = getattr(sys, 'maxsize', sys.maxint)
+        # Python 2.5 does not have maxsize, Python 3 does not have maxint
+        maxsize = getattr(sys, 'maxsize') or getattr(sys, 'maxint')
         self.assertRaises(OverflowError, json.decoder.scanstring, "xxx",
                           maxsize + 1)
-

@@ -1,6 +1,31 @@
 #include "Python.h"
 #include "structmember.h"
-#if PY_VERSION_HEX < 0x02070000 && !defined(PyOS_string_to_double)
+
+#if PY_MAJOR_VERSION >= 3
+#define PyInt_FromSsize_t PyLong_FromSsize_t
+#define PyInt_AsSsize_t PyLong_AsSsize_t
+#define PyString_Check PyBytes_Check
+#define PyString_GET_SIZE PyBytes_GET_SIZE
+#define PyString_AS_STRING PyBytes_AS_STRING
+#define PyString_FromStringAndSize PyBytes_FromStringAndSize
+#define PyInt_Check(obj) 0
+#define JSON_UNICHR Py_UCS4
+#define JSON_InternFromString PyUnicode_InternFromString
+#define JSON_Intern_GET_SIZE PyUnicode_GET_SIZE
+#define JSON_ASCII_Check PyUnicode_Check
+#define JSON_ASCII_AS_STRING PyUnicode_AsUTF8
+#define PyInt_Type PyLong_Type
+#define PyInt_FromString PyLong_FromString
+#else /* PY_MAJOR_VERSION >= 3 */
+#define JSON_UNICHR Py_UNICODE
+#define JSON_ASCII_Check PyString_Check
+#define JSON_ASCII_AS_STRING PyString_AS_STRING
+#define JSON_InternFromString PyString_InternFromString
+#define JSON_Intern_GET_SIZE PyString_GET_SIZE
+#endif /* PY_MAJOR_VERSION < 3 */
+
+#if PY_VERSION_HEX < 0x02070000
+#if !defined(PyOS_string_to_double)
 #define PyOS_string_to_double json_PyOS_string_to_double
 static double
 json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exception);
@@ -15,22 +40,32 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
     return x;
 }
 #endif
-#if PY_VERSION_HEX < 0x02060000 && !defined(Py_TYPE)
+#endif /* PY_VERSION_HEX < 0x02070000 */
+
+#if PY_VERSION_HEX < 0x02060000
+#if !defined(Py_TYPE)
 #define Py_TYPE(ob)     (((PyObject*)(ob))->ob_type)
 #endif
-#if PY_VERSION_HEX < 0x02060000 && !defined(Py_SIZE)
+#if !defined(Py_SIZE)
 #define Py_SIZE(ob)     (((PyVarObject*)(ob))->ob_size)
 #endif
-#if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
+#if !defined(PyVarObject_HEAD_INIT)
+#define PyVarObject_HEAD_INIT(type, size) PyObject_HEAD_INIT(type) size,
+#endif
+#endif /* PY_VERSION_HEX < 0x02060000 */
+
+#if PY_VERSION_HEX < 0x02050000
+#if !defined(PY_SSIZE_T_MIN)
 typedef int Py_ssize_t;
 #define PY_SSIZE_T_MAX INT_MAX
 #define PY_SSIZE_T_MIN INT_MIN
 #define PyInt_FromSsize_t PyInt_FromLong
 #define PyInt_AsSsize_t PyInt_AsLong
 #endif
-#ifndef Py_IS_FINITE
+#if !defined(Py_IS_FINITE)
 #define Py_IS_FINITE(X) (!Py_IS_INFINITY(X) && !Py_IS_NAN(X))
 #endif
+#endif /* PY_VERSION_HEX < 0x02050000 */
 
 #ifdef __GNUC__
 #define UNUSED __attribute__((__unused__))
@@ -90,6 +125,7 @@ typedef struct _PyEncoderObject {
     int tuple_as_array;
     int bigint_as_string;
     PyObject *item_sort_key;
+    PyObject *item_sort_kw;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -110,14 +146,15 @@ static PyObject *
 maybe_quote_bigint(PyObject *encoded, PyObject *obj);
 
 static Py_ssize_t
-ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars);
+ascii_char_size(JSON_UNICHR c);
+static Py_ssize_t
+ascii_escape_char(JSON_UNICHR c, char *output, Py_ssize_t chars);
 static PyObject *
 ascii_escape_unicode(PyObject *pystr);
 static PyObject *
 ascii_escape_str(PyObject *pystr);
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
-void init_speedups(void);
 static PyObject *
 scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
@@ -160,16 +197,13 @@ static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 static int
 _is_namedtuple(PyObject *obj);
+static PyObject *
+moduleinit(void);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
 
 #define MIN_EXPANSION 6
-#ifdef Py_UNICODE_WIDE
-#define MAX_EXPANSION (2 * MIN_EXPANSION)
-#else
-#define MAX_EXPANSION MIN_EXPANSION
-#endif
 
 static PyObject *
 maybe_quote_bigint(PyObject *encoded, PyObject *obj)
@@ -192,8 +226,12 @@ maybe_quote_bigint(PyObject *encoded, PyObject *obj)
     }
     if (PyObject_RichCompareBool(obj, big_long, Py_GE) ||
         PyObject_RichCompareBool(obj, small_long, Py_LE)) {
+#if PY_MAJOR_VERSION >= 3
+        PyObject* quoted = PyUnicode_FromFormat("\"%U\"", encoded);
+#else
         PyObject* quoted = PyString_FromFormat("\"%s\"",
                                                PyString_AsString(encoded));
+#endif
         Py_DECREF(encoded);
         encoded = quoted;
     }
@@ -232,43 +270,73 @@ _convertPyInt_FromSsize_t(Py_ssize_t *size_ptr)
 }
 
 static Py_ssize_t
-ascii_escape_char(Py_UNICODE c, char *output, Py_ssize_t chars)
+ascii_escape_char(JSON_UNICHR c, char *output, Py_ssize_t chars)
 {
     /* Escape unicode code point c to ASCII escape sequences
     in char *output. output must have at least 12 bytes unused to
     accommodate an escaped surrogate pair "\uXXXX\uXXXX" */
-    output[chars++] = '\\';
-    switch (c) {
-        case '\\': output[chars++] = (char)c; break;
-        case '"': output[chars++] = (char)c; break;
-        case '\b': output[chars++] = 'b'; break;
-        case '\f': output[chars++] = 'f'; break;
-        case '\n': output[chars++] = 'n'; break;
-        case '\r': output[chars++] = 'r'; break;
-        case '\t': output[chars++] = 't'; break;
-        default:
-#ifdef Py_UNICODE_WIDE
-            if (c >= 0x10000) {
-                /* UTF-16 surrogate pair */
-                Py_UNICODE v = c - 0x10000;
-                c = 0xd800 | ((v >> 10) & 0x3ff);
+    if (S_CHAR(c)) {
+        output[chars++] = (char)c;
+    }
+    else {
+        output[chars++] = '\\';
+        switch (c) {
+            case '\\': output[chars++] = (char)c; break;
+            case '"': output[chars++] = (char)c; break;
+            case '\b': output[chars++] = 'b'; break;
+            case '\f': output[chars++] = 'f'; break;
+            case '\n': output[chars++] = 'n'; break;
+            case '\r': output[chars++] = 'r'; break;
+            case '\t': output[chars++] = 't'; break;
+            default:
+#if defined(Py_UNICODE_WIDE) || PY_MAJOR_VERSION >= 3
+                if (c >= 0x10000) {
+                    /* UTF-16 surrogate pair */
+                    JSON_UNICHR v = c - 0x10000;
+                    c = 0xd800 | ((v >> 10) & 0x3ff);
+                    output[chars++] = 'u';
+                    output[chars++] = "0123456789abcdef"[(c >> 12) & 0xf];
+                    output[chars++] = "0123456789abcdef"[(c >>  8) & 0xf];
+                    output[chars++] = "0123456789abcdef"[(c >>  4) & 0xf];
+                    output[chars++] = "0123456789abcdef"[(c      ) & 0xf];
+                    c = 0xdc00 | (v & 0x3ff);
+                    output[chars++] = '\\';
+                }
+#endif
                 output[chars++] = 'u';
                 output[chars++] = "0123456789abcdef"[(c >> 12) & 0xf];
                 output[chars++] = "0123456789abcdef"[(c >>  8) & 0xf];
                 output[chars++] = "0123456789abcdef"[(c >>  4) & 0xf];
                 output[chars++] = "0123456789abcdef"[(c      ) & 0xf];
-                c = 0xdc00 | (v & 0x3ff);
-                output[chars++] = '\\';
-            }
-#endif
-            output[chars++] = 'u';
-            output[chars++] = "0123456789abcdef"[(c >> 12) & 0xf];
-            output[chars++] = "0123456789abcdef"[(c >>  8) & 0xf];
-            output[chars++] = "0123456789abcdef"[(c >>  4) & 0xf];
-            output[chars++] = "0123456789abcdef"[(c      ) & 0xf];
+        }
     }
     return chars;
 }
+
+static Py_ssize_t
+ascii_char_size(JSON_UNICHR c)
+{
+    if (S_CHAR(c)) {
+        return 1;
+    }
+    else if (c == '\\' ||
+               c == '"'  ||
+               c == '\b' ||
+               c == '\f' ||
+               c == '\n' ||
+               c == '\r' ||
+               c == '\t') {
+        return 2;
+    }
+    else if (c < 0x10000U) {
+        return MIN_EXPANSION;
+    }
+    else {
+        return 2 * MIN_EXPANSION;
+    }
+}
+
+#if PY_MAJOR_VERSION >= 3
 
 static PyObject *
 ascii_escape_unicode(PyObject *pystr)
@@ -277,7 +345,58 @@ ascii_escape_unicode(PyObject *pystr)
     Py_ssize_t i;
     Py_ssize_t input_chars;
     Py_ssize_t output_size;
-    Py_ssize_t max_output_size;
+    Py_ssize_t chars;
+    int kind;
+    void *data;
+    PyObject *rval;
+    char *output;
+
+    if (PyUnicode_READY(pystr))
+        return NULL;
+
+    kind = PyUnicode_KIND(pystr);
+    data = PyUnicode_DATA(pystr);
+    input_chars = PyUnicode_GetLength(pystr);
+    output_size = 2;
+    for (i = 0; i < input_chars; i++) {
+        output_size += ascii_char_size(PyUnicode_READ(kind, data, i));
+    }
+    rval = PyUnicode_New(output_size, 127);
+    if (rval == NULL) {
+        return NULL;
+    }
+    output = (char *)PyUnicode_DATA(rval);
+    chars = 0;
+    output[chars++] = '"';
+    for (i = 0; i < input_chars; i++) {
+        chars = ascii_escape_char(PyUnicode_READ(kind, data, i), output, chars);
+    }
+    output[chars++] = '"';
+    assert(chars == output_size);
+    return rval;
+}
+
+static PyObject *
+ascii_escape_str(PyObject *pystr)
+{
+    PyObject *rval;
+    PyObject *input = PyUnicode_DecodeUTF8(PyString_AS_STRING(pystr), PyString_GET_SIZE(pystr), NULL);
+    if (input == NULL)
+        return NULL;
+    rval = ascii_escape_unicode(input);
+    Py_DECREF(input);
+    return rval;
+}
+
+#else /* PY_MAJOR_VERSION >= 3 */
+
+static PyObject *
+ascii_escape_unicode(PyObject *pystr)
+{
+    /* Take a PyUnicode pystr and return a new ASCII-only escaped PyString */
+    Py_ssize_t i;
+    Py_ssize_t input_chars;
+    Py_ssize_t output_size;
     Py_ssize_t chars;
     PyObject *rval;
     char *output;
@@ -286,9 +405,10 @@ ascii_escape_unicode(PyObject *pystr)
     input_chars = PyUnicode_GET_SIZE(pystr);
     input_unicode = PyUnicode_AS_UNICODE(pystr);
 
-    /* One char input can be up to 6 chars output, estimate 4 of these */
-    output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
-    max_output_size = 2 + (input_chars * MAX_EXPANSION);
+    output_size = 2;
+    for (i = 0; i < input_chars; i++) {
+        output_size += ascii_char_size((JSON_UNICHR)input_unicode[i]);
+    }
     rval = PyString_FromStringAndSize(NULL, output_size);
     if (rval == NULL) {
         return NULL;
@@ -297,34 +417,10 @@ ascii_escape_unicode(PyObject *pystr)
     chars = 0;
     output[chars++] = '"';
     for (i = 0; i < input_chars; i++) {
-        Py_UNICODE c = input_unicode[i];
-        if (S_CHAR(c)) {
-            output[chars++] = (char)c;
-        }
-        else {
-            chars = ascii_escape_char(c, output, chars);
-        }
-        if (output_size - chars < (1 + MAX_EXPANSION)) {
-            /* There's more than four, so let's resize by a lot */
-            Py_ssize_t new_output_size = output_size * 2;
-            /* This is an upper bound */
-            if (new_output_size > max_output_size) {
-                new_output_size = max_output_size;
-            }
-            /* Make sure that the output size changed before resizing */
-            if (new_output_size != output_size) {
-                output_size = new_output_size;
-                if (_PyString_Resize(&rval, output_size) == -1) {
-                    return NULL;
-                }
-                output = PyString_AS_STRING(rval);
-            }
-        }
+        chars = ascii_escape_char((JSON_UNICHR)input_unicode[i], output, chars);
     }
     output[chars++] = '"';
-    if (_PyString_Resize(&rval, chars) == -1) {
-        return NULL;
-    }
+    assert(chars == output_size);
     return rval;
 }
 
@@ -342,76 +438,146 @@ ascii_escape_str(PyObject *pystr)
 
     input_chars = PyString_GET_SIZE(pystr);
     input_str = PyString_AS_STRING(pystr);
+    output_size = 2;
 
     /* Fast path for a string that's already ASCII */
     for (i = 0; i < input_chars; i++) {
-        Py_UNICODE c = (Py_UNICODE)(unsigned char)input_str[i];
-        if (!S_CHAR(c)) {
-            /* If we have to escape something, scan the string for unicode */
-            Py_ssize_t j;
-            for (j = i; j < input_chars; j++) {
-                c = (Py_UNICODE)(unsigned char)input_str[j];
-                if (c > 0x7f) {
-                    /* We hit a non-ASCII character, bail to unicode mode */
-                    PyObject *uni;
-                    uni = PyUnicode_DecodeUTF8(input_str, input_chars, "strict");
-                    if (uni == NULL) {
-                        return NULL;
-                    }
-                    rval = ascii_escape_unicode(uni);
-                    Py_DECREF(uni);
-                    return rval;
-                }
+        JSON_UNICHR c = (JSON_UNICHR)input_str[i];
+        if (c > 0x7f) {
+            /* We hit a non-ASCII character, bail to unicode mode */
+            PyObject *uni;
+            uni = PyUnicode_DecodeUTF8(input_str, input_chars, "strict");
+            if (uni == NULL) {
+                return NULL;
             }
-            break;
+            rval = ascii_escape_unicode(uni);
+            Py_DECREF(uni);
+            return rval;
         }
+        output_size += ascii_char_size(c);
     }
 
-    if (i == input_chars) {
-        /* Input is already ASCII */
-        output_size = 2 + input_chars;
-    }
-    else {
-        /* One char input can be up to 6 chars output, estimate 4 of these */
-        output_size = 2 + (MIN_EXPANSION * 4) + input_chars;
-    }
     rval = PyString_FromStringAndSize(NULL, output_size);
     if (rval == NULL) {
         return NULL;
     }
+    chars = 0;
     output = PyString_AS_STRING(rval);
-    output[0] = '"';
-
-    /* We know that everything up to i is ASCII already */
-    chars = i + 1;
-    memcpy(&output[1], input_str, i);
-
-    for (; i < input_chars; i++) {
-        Py_UNICODE c = (Py_UNICODE)(unsigned char)input_str[i];
-        if (S_CHAR(c)) {
-            output[chars++] = (char)c;
-        }
-        else {
-            chars = ascii_escape_char(c, output, chars);
-        }
-        /* An ASCII char can't possibly expand to a surrogate! */
-        if (output_size - chars < (1 + MIN_EXPANSION)) {
-            /* There's more than four, so let's resize by a lot */
-            output_size *= 2;
-            if (output_size > 2 + (input_chars * MIN_EXPANSION)) {
-                output_size = 2 + (input_chars * MIN_EXPANSION);
-            }
-            if (_PyString_Resize(&rval, output_size) == -1) {
-                return NULL;
-            }
-            output = PyString_AS_STRING(rval);
-        }
+    output[chars++] = '"';
+    for (i = 0; i < input_chars; i++) {
+        chars = ascii_escape_char((JSON_UNICHR)input_str[i], output, chars);
     }
     output[chars++] = '"';
-    if (_PyString_Resize(&rval, chars) == -1) {
-        return NULL;
-    }
+    assert(chars == output_size);
     return rval;
+}
+#endif /* PY_MAJOR_VERSION < 3 */
+
+static PyObject *
+encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
+{
+    PyObject *items;
+    PyObject *iter = NULL;
+    PyObject *lst = NULL;
+    PyObject *item = NULL;
+    PyObject *kstr = NULL;
+    static PyObject *sortfun = NULL;
+    static PyObject *sortargs = NULL;
+    int skipkeys;
+
+    if (sortargs == NULL) {
+        sortargs = PyTuple_New(0);
+        if (sortargs == NULL)
+            return NULL;
+    }
+
+    if (PyDict_CheckExact(dct))
+        items = PyDict_Items(dct);
+    else
+        items = PyMapping_Items(dct);
+    if (items == NULL)
+        return NULL;
+    iter = PyObject_GetIter(items);
+    Py_DECREF(items);
+    if (iter == NULL)
+        return NULL;
+    if (s->item_sort_kw == Py_None)
+        return iter;
+    skipkeys = PyObject_IsTrue(s->skipkeys);
+    lst = PyList_New(0);
+    if (lst == NULL)
+        goto bail;
+    while ((item = PyIter_Next(iter))) {
+        PyObject *key, *value;
+        if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
+            PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
+            goto bail;
+        }
+        key = PyTuple_GET_ITEM(item, 0);
+        if (key == NULL)
+            goto bail;
+        if (PyString_Check(key) || PyUnicode_Check(key)) {
+            // item can be added as-is
+        }
+        else {
+            if (PyFloat_Check(key)) {
+                kstr = encoder_encode_float(s, key);
+            }
+            else if (key == Py_True || key == Py_False || key == Py_None) {
+                /* This must come before the PyInt_Check because
+                   True and False are also 1 and 0.*/
+                kstr = _encoded_const(key);
+            }
+            else if (PyInt_Check(key) || PyLong_Check(key)) {
+                kstr = PyObject_Str(key);
+            }
+            else if (skipkeys) {
+                Py_DECREF(item);
+                continue;
+            }
+            else {
+                /* TODO: include repr of key */
+                PyErr_SetString(PyExc_TypeError, "keys must be a string");
+                goto bail;
+            }
+            if (kstr == NULL)
+                goto bail;
+            value = PyTuple_GET_ITEM(item, 1);
+            if (value == NULL)
+                goto bail;
+            PyObject *tpl = PyTuple_New(2);
+            if (tpl == NULL)
+                goto bail;
+            PyTuple_SET_ITEM(tpl, 0, kstr);
+            kstr = NULL;
+            Py_INCREF(value);
+            PyTuple_SET_ITEM(tpl, 1, value);
+            Py_DECREF(item);
+            item = tpl;
+        }
+        if (PyList_Append(lst, item))
+            goto bail;
+        Py_DECREF(item);
+    }
+    Py_CLEAR(iter);
+    if (PyErr_Occurred())
+        goto bail;
+    sortfun = PyObject_GetAttrString(lst, "sort");
+    if (sortfun == NULL)
+        goto bail;
+    if (!PyObject_Call(sortfun, sortargs, s->item_sort_kw))
+        goto bail;
+    Py_CLEAR(sortfun);
+    iter = PyObject_GetIter(lst);
+    Py_CLEAR(lst);
+    return iter;
+bail:
+    Py_XDECREF(sortfun);
+    Py_XDECREF(kstr);
+    Py_XDECREF(item);
+    Py_XDECREF(lst);
+    Py_XDECREF(iter);
+    return NULL;
 }
 
 static void
@@ -455,6 +621,9 @@ join_list_unicode(PyObject *lst)
     return PyObject_CallFunctionObjArgs(joinfn, lst, NULL);
 }
 
+#if PY_MAJOR_VERSION >= 3
+#define join_list_string join_list_unicode
+#else /* PY_MAJOR_VERSION >= 3 */
 static PyObject *
 join_list_string(PyObject *lst)
 {
@@ -472,6 +641,7 @@ join_list_string(PyObject *lst)
     }
     return PyObject_CallFunctionObjArgs(joinfn, lst, NULL);
 }
+#endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
@@ -564,9 +734,19 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         }
         /* Pick up this chunk if it's not zero length */
         if (next != end) {
-            PyObject *strchunk;
             APPEND_OLD_CHUNK
-            strchunk = PyString_FromStringAndSize(&buf[end], next - end);
+#if PY_MAJOR_VERSION >= 3
+            if (!has_unicode) {
+                chunk = PyUnicode_DecodeASCII(&buf[end], next - end, NULL);
+            }
+            else {
+                chunk = PyUnicode_Decode(&buf[end], next - end, encoding, NULL);
+            }
+            if (chunk == NULL) {
+                goto bail;
+            }
+#else /* PY_MAJOR_VERSION >= 3 */
+            PyObject *strchunk = PyString_FromStringAndSize(&buf[end], next - end);
             if (strchunk == NULL) {
                 goto bail;
             }
@@ -580,6 +760,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
             else {
                 chunk = strchunk;
             }
+#endif /* PY_MAJOR_VERSION < 3 */
         }
         next++;
         if (c == '"') {
@@ -620,7 +801,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
             }
             /* Decode 4 hex digits */
             for (; next < end; next++) {
-                Py_UNICODE digit = buf[next];
+                JSON_UNICHR digit = (JSON_UNICHR)buf[next];
                 c <<= 4;
                 switch (digit) {
                     case '0': case '1': case '2': case '3': case '4':
@@ -637,10 +818,10 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                         goto bail;
                 }
             }
-#ifdef Py_UNICODE_WIDE
+#if (PY_MAJOR_VERSION >= 3 || defined(Py_UNICODE_WIDE))
             /* Surrogate pair */
             if ((c & 0xfc00) == 0xd800) {
-                Py_UNICODE c2 = 0;
+                JSON_UNICHR c2 = 0;
                 if (end + 6 >= len) {
                     raise_errmsg("Unpaired high surrogate", pystr, end - 5);
                     goto bail;
@@ -653,7 +834,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                 /* Decode 4 hex digits */
                 for (; next < end; next++) {
                     c2 <<= 4;
-                    Py_UNICODE digit = buf[next];
+                    JSON_UNICHR digit = buf[next];
                     switch (digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
@@ -679,12 +860,19 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                 raise_errmsg("Unpaired low surrogate", pystr, end - 5);
                 goto bail;
             }
-#endif
+#endif /* PY_MAJOR_VERSION >= 3 || Py_UNICODE_WIDE */
         }
         if (c > 0x7f) {
             has_unicode = 1;
         }
         APPEND_OLD_CHUNK
+#if PY_MAJOR_VERSION >= 3
+        chunk = PyUnicode_New(1, c);
+        if (chunk == NULL) {
+            goto bail;
+        }
+        PyUnicode_WRITE(PyUnicode_KIND(chunk), PyUnicode_DATA(chunk), 0, c);
+#else /* PY_MAJOR_VERSION >= 3 */
         if (has_unicode) {
             chunk = PyUnicode_FromUnicode(&c, 1);
             if (chunk == NULL) {
@@ -698,13 +886,18 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                 goto bail;
             }
         }
+#endif
     }
 
     if (chunks == NULL) {
         if (chunk != NULL)
             rval = chunk;
         else
+#if PY_MAJOR_VERSION >= 3
+            rval = PyUnicode_New(0, 127);
+#else
             rval = PyString_FromStringAndSize("", 0);
+#endif
     }
     else {
         APPEND_OLD_CHUNK
@@ -1033,7 +1226,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     PyObject *item;
     PyObject *key = NULL;
     PyObject *val = NULL;
-    char *encoding = PyString_AS_STRING(s->encoding);
+    char *encoding = JSON_ASCII_AS_STRING(s->encoding);
     int strict = PyObject_IsTrue(s->strict);
     int has_pairs_hook = (s->pairs_hook != Py_None);
     Py_ssize_t next_idx;
@@ -1474,13 +1667,13 @@ _parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx, Py_ssize_t *
     PyObject *cstr;
     PyObject *rval;
     /* constant is "NaN", "Infinity", or "-Infinity" */
-    cstr = PyString_InternFromString(constant);
+    cstr = JSON_InternFromString(constant);
     if (cstr == NULL)
         return NULL;
 
     /* rval = parse_constant(constant) */
     rval = PyObject_CallFunctionObjArgs(s->parse_constant, cstr, NULL);
-    idx += PyString_GET_SIZE(cstr);
+    idx += JSON_Intern_GET_SIZE(cstr);
     Py_DECREF(cstr);
     *next_idx_ptr = idx;
     return rval;
@@ -1668,7 +1861,11 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
             rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
         }
         else {
+#if PY_MAJOR_VERSION >= 3
+            rval = PyFloat_FromString(numstr);
+#else
             rval = PyFloat_FromString(numstr, NULL);
+#endif
         }
     }
     else {
@@ -1704,7 +1901,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
         case '"':
             /* string */
             rval = scanstring_str(pystr, idx + 1,
-                PyString_AS_STRING(s->encoding),
+                JSON_ASCII_AS_STRING(s->encoding),
                 PyObject_IsTrue(s->strict),
                 next_idx_ptr);
             break;
@@ -1947,20 +2144,22 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
             goto bail;
     }
 
-    /* PyString_AS_STRING is used on encoding */
+    /* JSON_ASCII_AS_STRING is used on encoding */
     s->encoding = PyObject_GetAttrString(ctx, "encoding");
     if (s->encoding == NULL)
         goto bail;
     if (s->encoding == Py_None) {
         Py_DECREF(Py_None);
-        s->encoding = PyString_InternFromString(DEFAULT_ENCODING);
+        s->encoding = JSON_InternFromString(DEFAULT_ENCODING);
     }
+#if PY_MAJOR_VERSION < 3
     else if (PyUnicode_Check(s->encoding)) {
         PyObject *tmp = PyUnicode_AsEncodedString(s->encoding, NULL, NULL);
         Py_DECREF(s->encoding);
         s->encoding = tmp;
     }
-    if (s->encoding == NULL || !PyString_Check(s->encoding))
+#endif
+    if (s->encoding == NULL || !JSON_ASCII_Check(s->encoding))
         goto bail;
 
     /* All of these will fail "gracefully" so we don't need to verify them */
@@ -2000,8 +2199,7 @@ PyDoc_STRVAR(scanner_doc, "JSON scanner object");
 
 static
 PyTypeObject PyScannerType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                    /* tp_internal */
+    PyVarObject_HEAD_INIT(NULL, 0)
     "simplejson._speedups.Scanner",       /* tp_name */
     sizeof(PyScannerObject), /* tp_basicsize */
     0,                    /* tp_itemsize */
@@ -2054,10 +2252,11 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         s->indent = NULL;
         s->key_separator = NULL;
         s->item_separator = NULL;
-        s->sort_keys = NULL;
         s->skipkeys = NULL;
         s->key_memo = NULL;
+        s->sort_keys = NULL;
         s->item_sort_key = NULL;
+        s->item_sort_kw = NULL;
         s->Decimal = NULL;
     }
     return (PyObject *)s;
@@ -2091,7 +2290,6 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->indent = indent;
     s->key_separator = key_separator;
     s->item_separator = item_separator;
-    s->sort_keys = sort_keys;
     s->skipkeys = skipkeys;
     s->key_memo = key_memo;
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
@@ -2100,6 +2298,35 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
     s->bigint_as_string = PyObject_IsTrue(bigint_as_string);
+    if (item_sort_key != Py_None) {
+        if (!PyCallable_Check(item_sort_key))
+            PyErr_SetString(PyExc_TypeError, "item_sort_key must be None or callable");
+    }
+    else if (PyObject_IsTrue(sort_keys)) {
+        static PyObject *itemgetter0 = NULL;
+        if (!itemgetter0) {
+            PyObject *operator = PyImport_ImportModule("operator");
+            if (!operator)
+                return -1;
+            itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
+            Py_DECREF(operator);
+        }
+        item_sort_key = itemgetter0;
+        if (!item_sort_key)
+            return -1;
+    }
+    if (item_sort_key == Py_None) {
+        Py_INCREF(Py_None);
+        s->item_sort_kw = Py_None;
+    }
+    else {
+        s->item_sort_kw = PyDict_New();
+        if (s->item_sort_kw == NULL)
+            return -1;
+        if (PyDict_SetItemString(s->item_sort_kw, "key", item_sort_key))
+            return -1;
+    }
+    s->sort_keys = sort_keys;
     s->item_sort_key = item_sort_key;
     s->Decimal = Decimal;
 
@@ -2109,9 +2336,9 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(s->indent);
     Py_INCREF(s->key_separator);
     Py_INCREF(s->item_separator);
-    Py_INCREF(s->sort_keys);
     Py_INCREF(s->skipkeys);
     Py_INCREF(s->key_memo);
+    Py_INCREF(s->sort_keys);
     Py_INCREF(s->item_sort_key);
     Py_INCREF(s->Decimal);
     return 0;
@@ -2148,7 +2375,7 @@ _encoded_const(PyObject *obj)
     if (obj == Py_None) {
         static PyObject *s_null = NULL;
         if (s_null == NULL) {
-            s_null = PyString_InternFromString("null");
+            s_null = JSON_InternFromString("null");
         }
         Py_INCREF(s_null);
         return s_null;
@@ -2156,7 +2383,7 @@ _encoded_const(PyObject *obj)
     else if (obj == Py_True) {
         static PyObject *s_true = NULL;
         if (s_true == NULL) {
-            s_true = PyString_InternFromString("true");
+            s_true = JSON_InternFromString("true");
         }
         Py_INCREF(s_true);
         return s_true;
@@ -2164,7 +2391,7 @@ _encoded_const(PyObject *obj)
     else if (obj == Py_False) {
         static PyObject *s_false = NULL;
         if (s_false == NULL) {
-            s_false = PyString_InternFromString("false");
+            s_false = JSON_InternFromString("false");
         }
         Py_INCREF(s_false);
         return s_false;
@@ -2186,13 +2413,28 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
             return NULL;
         }
         if (i > 0) {
-            return PyString_FromString("Infinity");
+            static PyObject *sInfinity = NULL;
+            if (sInfinity == NULL)
+                sInfinity = JSON_InternFromString("Infinity");
+            if (sInfinity)
+                Py_INCREF(sInfinity);
+            return sInfinity;
         }
         else if (i < 0) {
-            return PyString_FromString("-Infinity");
+            static PyObject *sNegInfinity = NULL;
+            if (sNegInfinity == NULL)
+                sNegInfinity = JSON_InternFromString("-Infinity");
+            if (sNegInfinity)
+                Py_INCREF(sNegInfinity);
+            return sNegInfinity;
         }
         else {
-            return PyString_FromString("NaN");
+            static PyObject *sNaN = NULL;
+            if (sNaN == NULL)
+                sNaN = JSON_InternFromString("NaN");
+            if (sNaN)
+                Py_INCREF(sNaN);
+            return sNaN;
         }
     }
     /* Use a better float format here? */
@@ -2266,7 +2508,7 @@ encoder_listencode_obj(PyEncoderObject *s, PyObject *rval, PyObject *obj, Py_ssi
         else if (PyDict_Check(obj)) {
             rv = encoder_listencode_dict(s, rval, obj, indent_level);
         }
-        else if (s->use_decimal && PyObject_TypeCheck(obj, s->Decimal)) {
+        else if (s->use_decimal && PyObject_TypeCheck(obj, (PyTypeObject *)s->Decimal)) {
             PyObject *encoded = PyObject_Str(obj);
             if (encoded != NULL)
                 rv = _steal_list_append(rval, encoded);
@@ -2322,7 +2564,6 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     static PyObject *open_dict = NULL;
     static PyObject *close_dict = NULL;
     static PyObject *empty_dict = NULL;
-    static PyObject *iteritems = NULL;
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
@@ -2332,12 +2573,11 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     int skipkeys;
     Py_ssize_t idx;
 
-    if (open_dict == NULL || close_dict == NULL || empty_dict == NULL || iteritems == NULL) {
-        open_dict = PyString_InternFromString("{");
-        close_dict = PyString_InternFromString("}");
-        empty_dict = PyString_InternFromString("{}");
-        iteritems = PyString_InternFromString("iteritems");
-        if (open_dict == NULL || close_dict == NULL || empty_dict == NULL || iteritems == NULL)
+    if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
+        open_dict = JSON_InternFromString("{");
+        close_dict = JSON_InternFromString("}");
+        empty_dict = JSON_InternFromString("{}");
+        if (open_dict == NULL || close_dict == NULL || empty_dict == NULL)
             return -1;
     }
     if (PyDict_Size(dct) == 0)
@@ -2372,50 +2612,7 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         */
     }
 
-    if (PyCallable_Check(s->item_sort_key)) {
-        if (PyDict_CheckExact(dct))
-            items = PyDict_Items(dct);
-        else
-            items = PyMapping_Items(dct);
-        PyObject_CallMethod(items, "sort", "OO", Py_None, s->item_sort_key);
-    }
-    else if (PyObject_IsTrue(s->sort_keys)) {
-        /* First sort the keys then replace them with (key, value) tuples. */
-        Py_ssize_t i, nitems;
-        if (PyDict_CheckExact(dct))
-            items = PyDict_Keys(dct);
-        else
-            items = PyMapping_Keys(dct);
-        if (items == NULL)
-            goto bail;
-        if (!PyList_Check(items)) {
-            PyErr_SetString(PyExc_ValueError, "keys must return list");
-            goto bail;
-        }
-        if (PyList_Sort(items) < 0)
-            goto bail;
-        nitems = PyList_GET_SIZE(items);
-        for (i = 0; i < nitems; i++) {
-            PyObject *key, *value;
-            key = PyList_GET_ITEM(items, i);
-            value = PyDict_GetItem(dct, key);
-            item = PyTuple_Pack(2, key, value);
-            if (item == NULL)
-                goto bail;
-            PyList_SET_ITEM(items, i, item);
-            Py_DECREF(key);
-        }
-    }
-    else {
-        if (PyDict_CheckExact(dct))
-            items = PyDict_Items(dct);
-        else
-            items = PyMapping_Items(dct);
-    }
-    if (items == NULL)
-        goto bail;
-    iter = PyObject_GetIter(items);
-    Py_DECREF(items);
+    iter = encoder_dict_iteritems(s, dct);
     if (iter == NULL)
         goto bail;
 
@@ -2536,9 +2733,9 @@ encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ss
     int i = 0;
 
     if (open_array == NULL || close_array == NULL || empty_array == NULL) {
-        open_array = PyString_InternFromString("[");
-        close_array = PyString_InternFromString("]");
-        empty_array = PyString_InternFromString("[]");
+        open_array = JSON_InternFromString("[");
+        close_array = JSON_InternFromString("]");
+        empty_array = JSON_InternFromString("[]");
         if (open_array == NULL || close_array == NULL || empty_array == NULL)
             return -1;
     }
@@ -2636,10 +2833,12 @@ encoder_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(s->indent);
     Py_VISIT(s->key_separator);
     Py_VISIT(s->item_separator);
-    Py_VISIT(s->sort_keys);
     Py_VISIT(s->skipkeys);
     Py_VISIT(s->key_memo);
+    Py_VISIT(s->sort_keys);
+    Py_VISIT(s->item_sort_kw);
     Py_VISIT(s->item_sort_key);
+    Py_VISIT(s->Decimal);
     return 0;
 }
 
@@ -2656,9 +2855,10 @@ encoder_clear(PyObject *self)
     Py_CLEAR(s->indent);
     Py_CLEAR(s->key_separator);
     Py_CLEAR(s->item_separator);
-    Py_CLEAR(s->sort_keys);
     Py_CLEAR(s->skipkeys);
     Py_CLEAR(s->key_memo);
+    Py_CLEAR(s->sort_keys);
+    Py_CLEAR(s->item_sort_kw);
     Py_CLEAR(s->item_sort_key);
     Py_CLEAR(s->Decimal);
     return 0;
@@ -2668,8 +2868,7 @@ PyDoc_STRVAR(encoder_doc, "_iterencode(obj, _current_indent_level) -> iterable")
 
 static
 PyTypeObject PyEncoderType = {
-    PyObject_HEAD_INIT(NULL)
-    0,                    /* tp_internal */
+    PyVarObject_HEAD_INIT(NULL, 0)
     "simplejson._speedups.Encoder",       /* tp_name */
     sizeof(PyEncoderObject), /* tp_basicsize */
     0,                    /* tp_itemsize */
@@ -2725,21 +2924,53 @@ static PyMethodDef speedups_methods[] = {
 PyDoc_STRVAR(module_doc,
 "simplejson speedups\n");
 
-void
-init_speedups(void)
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "_speedups",        /* m_name */
+    module_doc,         /* m_doc */
+    -1,                 /* m_size */
+    speedups_methods,   /* m_methods */
+    NULL,               /* m_reload */
+    NULL,               /* m_traverse */
+    NULL,               /* m_clear*/
+    NULL,               /* m_free */
+};
+#endif
+
+static PyObject *
+moduleinit(void)
 {
     PyObject *m;
     PyScannerType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&PyScannerType) < 0)
-        return;
+        return NULL;
     PyEncoderType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&PyEncoderType) < 0)
-        return;
+        return NULL;
 
-
+#if PY_MAJOR_VERSION >= 3
+    m = PyModule_Create(&moduledef);
+#else
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
+#endif
     Py_INCREF((PyObject*)&PyScannerType);
     PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
     Py_INCREF((PyObject*)&PyEncoderType);
     PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType);
+    return m;
 }
+
+#if PY_MAJOR_VERSION >= 3
+PyMODINIT_FUNC
+PyInit__speedups(void)
+{
+    return moduleinit();
+}
+#else
+void
+init_speedups(void)
+{
+    moduleinit();
+}
+#endif

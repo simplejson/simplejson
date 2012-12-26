@@ -1,8 +1,8 @@
 from unittest import TestCase
+import textwrap
 
 import simplejson as json
-import textwrap
-from StringIO import StringIO
+from simplejson.compat import StringIO
 
 class TestIndent(TestCase):
     def test_indent(self):

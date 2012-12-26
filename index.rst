@@ -14,7 +14,7 @@ syntax (ECMA-262 3rd edition) used as a lightweight data interchange format.
 version of the :mod:`json` library contained in Python 2.6, but maintains
 compatibility with Python 2.5 and (currently) has
 significant performance advantages, even without using the optional C
-extension for speedups.
+extension for speedups. :mod:`simplejson` is also supported on Python 3.3+.
 
 Development of simplejson happens on Github:
 http://github.com/simplejson/simplejson
@@ -24,15 +24,15 @@ Encoding basic Python object hierarchies::
     >>> import simplejson as json
     >>> json.dumps(['foo', {'bar': ('baz', None, 1.0, 2)}])
     '["foo", {"bar": ["baz", null, 1.0, 2]}]'
-    >>> print json.dumps("\"foo\bar")
+    >>> print(json.dumps("\"foo\bar"))
     "\"foo\bar"
-    >>> print json.dumps(u'\u1234')
+    >>> print(json.dumps(u'\u1234'))
     "\u1234"
-    >>> print json.dumps('\\')
+    >>> print(json.dumps('\\'))
     "\\"
-    >>> print json.dumps({"c": 0, "b": 0, "a": 0}, sort_keys=True)
+    >>> print(json.dumps({"c": 0, "b": 0, "a": 0}, sort_keys=True))
     {"a": 0, "b": 0, "c": 0}
-    >>> from StringIO import StringIO
+    >>> from simplejson.compat import StringIO
     >>> io = StringIO()
     >>> json.dump(['streaming API'], io)
     >>> io.getvalue()
@@ -41,14 +41,15 @@ Encoding basic Python object hierarchies::
 Compact encoding::
 
     >>> import simplejson as json
-    >>> json.dumps([1,2,3,{'4': 5, '6': 7}], separators=(',', ':'))
+    >>> obj = [1,2,3,{'4': 5, '6': 7}]
+    >>> json.dumps(obj, separators=(',', ':'), sort_keys=True)
     '[1,2,3,{"4":5,"6":7}]'
 
 Pretty printing::
 
     >>> import simplejson as json
     >>> s = json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4 * ' ')
-    >>> print '\n'.join([l.rstrip() for l in  s.splitlines()])
+    >>> print('\n'.join([l.rstrip() for l in  s.splitlines()]))
     {
         "4": 5,
         "6": 7
@@ -62,7 +63,7 @@ Decoding JSON::
     True
     >>> json.loads('"\\"foo\\bar"') == u'"foo\x08ar'
     True
-    >>> from StringIO import StringIO
+    >>> from simplejson.compat import StringIO
     >>> io = StringIO('["streaming API"]')
     >>> json.load(io)[0] == 'streaming API'
     True
@@ -218,6 +219,11 @@ Basic Usage
    will be sorted by key; this is useful for regression tests to ensure that
    JSON serializations can be compared on a day-to-day basis.
 
+   .. versionchanged:: 3.0.0
+      Sorting now happens after the keys have been coerced to
+      strings, to avoid comparison of heterogeneously typed objects
+      (since this does not work in Python 3.3+)
+
    If *item_sort_key* is a callable (not the default), then the output of
    dictionaries will be sorted with it. The callable will be used like this:
    ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
@@ -225,6 +231,11 @@ Basic Usage
 
    .. versionchanged:: 2.5.0
       *item_sort_key* is new in 2.5.0.
+
+   .. versionchanged:: 3.0.0
+      Sorting now happens after the keys have been coerced to
+      strings, to avoid comparison of heterogeneously typed objects
+      (since this does not work in Python 3.3+)
 
     .. note::
 
@@ -487,6 +498,11 @@ Encoders and decoders
    will be sorted by key; this is useful for regression tests to ensure that
    JSON serializations can be compared on a day-to-day basis.
 
+   .. versionchanged:: 3.0.0
+      Sorting now happens after the keys have been coerced to
+      strings, to avoid comparison of heterogeneously typed objects
+      (since this does not work in Python 3.3+)
+
    If *item_sort_key* is a callable (not the default), then the output of
    dictionaries will be sorted with it. The callable will be used like this:
    ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
@@ -494,6 +510,11 @@ Encoders and decoders
 
    .. versionchanged:: 2.5.0
       *item_sort_key* is new in 2.5.0.
+
+   .. versionchanged:: 3.0.0
+      Sorting now happens after the keys have been coerced to
+      strings, to avoid comparison of heterogeneously typed objects
+      (since this does not work in Python 3.3+)
 
    If *indent* is a string, then JSON array elements and object members
    will be pretty-printed with a newline followed by that string repeated

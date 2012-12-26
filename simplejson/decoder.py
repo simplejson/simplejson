@@ -1,13 +1,14 @@
 """Implementation of JSONDecoder
 """
+from __future__ import absolute_import
 import re
 import sys
 import struct
-
-from simplejson.scanner import make_scanner
+from .compat import fromhex, b, u, text_type, binary_type, PY3, unichr
+from .scanner import make_scanner
 def _import_c_scanstring():
     try:
-        from simplejson._speedups import scanstring
+        from ._speedups import scanstring
         return scanstring
     except ImportError:
         return None
@@ -18,7 +19,7 @@ __all__ = ['JSONDecoder']
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 
 def _floatconstants():
-    _BYTES = '7FF80000000000007FF0000000000000'.decode('hex')
+    _BYTES = fromhex('7FF80000000000007FF0000000000000')
     # The struct module in Python 2.4 would get frexp() out of range here
     # when an endian is specified in the format string. Fixed in Python 2.5+
     if sys.byteorder != 'big':
@@ -87,14 +88,14 @@ _CONSTANTS = {
 
 STRINGCHUNK = re.compile(r'(.*?)(["\\\x00-\x1f])', FLAGS)
 BACKSLASH = {
-    '"': u'"', '\\': u'\\', '/': u'/',
-    'b': u'\b', 'f': u'\f', 'n': u'\n', 'r': u'\r', 't': u'\t',
+    '"': u('"'), '\\': u('\u005c'), '/': u('/'),
+    'b': u('\b'), 'f': u('\f'), 'n': u('\n'), 'r': u('\r'), 't': u('\t'),
 }
 
 DEFAULT_ENCODING = "utf-8"
 
 def py_scanstring(s, end, encoding=None, strict=True,
-        _b=BACKSLASH, _m=STRINGCHUNK.match):
+        _b=BACKSLASH, _m=STRINGCHUNK.match, _join=u('').join):
     """Scan the string s for a JSON string. End is the index of the
     character in s after the quote that started the JSON string.
     Unescapes all valid JSON string escape sequences and raises ValueError
@@ -117,8 +118,8 @@ def py_scanstring(s, end, encoding=None, strict=True,
         content, terminator = chunk.groups()
         # Content is contains zero or more unescaped string characters
         if content:
-            if not isinstance(content, unicode):
-                content = unicode(content, encoding)
+            if not isinstance(content, text_type):
+                content = text_type(content, encoding)
             _append(content)
         # Terminator is the end of string, a literal control character,
         # or a backslash denoting that an escape sequence follows
@@ -168,7 +169,7 @@ def py_scanstring(s, end, encoding=None, strict=True,
             end = next_end
         # Append the unescaped character
         _append(char)
-    return u''.join(chunks), end
+    return _join(chunks), end
 
 
 # Use speedup if available
@@ -177,9 +178,10 @@ scanstring = c_scanstring or py_scanstring
 WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 WHITESPACE_STR = ' \t\n\r'
 
-def JSONObject((s, end), encoding, strict, scan_once, object_hook,
+def JSONObject(state, encoding, strict, scan_once, object_hook,
         object_pairs_hook, memo=None,
         _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+    (s, end) = state
     # Backwards compatibility
     if memo is None:
         memo = {}
@@ -273,7 +275,8 @@ def JSONObject((s, end), encoding, strict, scan_once, object_hook,
         pairs = object_hook(pairs)
     return pairs, end
 
-def JSONArray((s, end), scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+def JSONArray(state, scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+    (s, end) = state
     values = []
     nextchar = s[end:end + 1]
     if nextchar in _ws:
@@ -398,11 +401,13 @@ class JSONDecoder(object):
         self.memo = {}
         self.scan_once = make_scanner(self)
 
-    def decode(self, s, _w=WHITESPACE.match):
+    def decode(self, s, _w=WHITESPACE.match, _PY3=PY3):
         """Return the Python representation of ``s`` (a ``str`` or ``unicode``
         instance containing a JSON document)
 
         """
+        if _PY3 and isinstance(s, binary_type):
+            s = s.decode('utf-8')
         obj, end = self.raw_decode(s)
         end = _w(s, end).end()
         if end != len(s):

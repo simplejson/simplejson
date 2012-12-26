@@ -1,6 +1,6 @@
+from __future__ import absolute_import
 import unittest
 import doctest
-
 
 class OptionalExtensionTestSuite(unittest.TestSuite):
     def run(self, result):

@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import simplejson as json
+from simplejson.compat import unichr, text_type, b, u
 
 class TestUnicode(TestCase):
     def test_encoding1(self):
@@ -76,21 +77,21 @@ class TestUnicode(TestCase):
             {'a': u'\xe9'})
 
     def test_unicode_preservation(self):
-        self.assertEquals(type(json.loads(u'""')), unicode)
-        self.assertEquals(type(json.loads(u'"a"')), unicode)
-        self.assertEquals(type(json.loads(u'["a"]')[0]), unicode)
+        self.assertEquals(type(json.loads(u'""')), text_type)
+        self.assertEquals(type(json.loads(u'"a"')), text_type)
+        self.assertEquals(type(json.loads(u'["a"]')[0]), text_type)
 
     def test_ensure_ascii_false_returns_unicode(self):
         # http://code.google.com/p/simplejson/issues/detail?id=48
-        self.assertEquals(type(json.dumps([], ensure_ascii=False)), unicode)
-        self.assertEquals(type(json.dumps(0, ensure_ascii=False)), unicode)
-        self.assertEquals(type(json.dumps({}, ensure_ascii=False)), unicode)
-        self.assertEquals(type(json.dumps("", ensure_ascii=False)), unicode)
+        self.assertEquals(type(json.dumps([], ensure_ascii=False)), text_type)
+        self.assertEquals(type(json.dumps(0, ensure_ascii=False)), text_type)
+        self.assertEquals(type(json.dumps({}, ensure_ascii=False)), text_type)
+        self.assertEquals(type(json.dumps("", ensure_ascii=False)), text_type)
 
     def test_ensure_ascii_false_bytestring_encoding(self):
         # http://code.google.com/p/simplejson/issues/detail?id=48
-        doc1 = {u'quux': 'Arr\xc3\xaat sur images'}
-        doc2 = {u'quux': u'Arr\xeat sur images'}
+        doc1 = {u'quux': b('Arr\xc3\xaat sur images')}
+        doc2 = {u'quux': u('Arr\xeat sur images')}
         doc_ascii = '{"quux": "Arr\\u00eat sur images"}'
         doc_unicode = u'{"quux": "Arr\xeat sur images"}'
         self.assertEquals(json.dumps(doc1), doc_ascii)
