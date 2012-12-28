@@ -112,6 +112,7 @@ class TestScanString(TestCase):
 
     def test_overflow(self):
         # Python 2.5 does not have maxsize, Python 3 does not have maxint
-        maxsize = getattr(sys, 'maxsize') or getattr(sys, 'maxint')
+        maxsize = getattr(sys, 'maxsize', getattr(sys, 'maxint', None))
+        assert maxsize is not None
         self.assertRaises(OverflowError, json.decoder.scanstring, "xxx",
                           maxsize + 1)
