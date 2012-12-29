@@ -3,7 +3,7 @@ from unittest import TestCase
 
 import simplejson as json
 import simplejson.decoder
-from simplejson.compat import b
+from simplejson.compat import b, PY3
 
 class TestScanString(TestCase):
     # The bytes type is intentionally not used in most of these tests
@@ -111,6 +111,27 @@ class TestScanString(TestCase):
         self.assertEquals(
             scanstring('["Bad value", truth]', 2, None, True),
             (u'Bad value', 12))
+
+        for c in map(chr, range(0x00, 0x1f)):
+            self.assertEquals(
+                scanstring(c + '"', 0, None, False),
+                (c, 2))
+            self.assertRaises(
+                ValueError,
+                scanstring, c + '"', 0, None, True)
+
+        self.assertRaises(ValueError, scanstring, '', 0, None, True)
+        self.assertRaises(ValueError, scanstring, 'a', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u0', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u01', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u012', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u0123', 0, None, True)
+        if sys.maxunicode > 65535:
+            self.assertRaises(ValueError, scanstring, '\\ud834"', 0, None, True),
+            self.assertRaises(ValueError, scanstring, '\\ud834\\u"', 0, None, True),
+            self.assertRaises(ValueError, scanstring, '\\ud834\\x0123"', 0, None, True),
 
     def test_issue3623(self):
         self.assertRaises(ValueError, json.decoder.scanstring, "xxx", 1,
