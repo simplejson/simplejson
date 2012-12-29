@@ -30,7 +30,8 @@
 static double
 json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exception);
 static double
-json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exception) {
+json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exception)
+{
     double x;
     assert(endptr == NULL);
     assert(overflow_exception == NULL);
@@ -652,7 +653,8 @@ join_list_string(PyObject *lst)
 #endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
-_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
+_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx)
+{
     /* return (rval, idx) tuple, stealing reference to rval */
     PyObject *tpl;
     PyObject *pyidx;
@@ -1808,7 +1810,8 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
 #endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
-_match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr) {
+_match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr)
+{
     /* Read a JSON number from PyUnicode pystr.
     idx is the index of the first character of the number
     *next_idx_ptr is a return-by-reference index to the first character after
