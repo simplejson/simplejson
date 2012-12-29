@@ -155,8 +155,16 @@ static PyObject *
 ascii_escape_str(PyObject *pystr);
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
+#if PY_MAJOR_VERSION < 3
 static PyObject *
 scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
+static PyObject *
+scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_ssize_t *next_end_ptr);
+static PyObject *
+_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
+#endif
+static PyObject *
+scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr);
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
@@ -684,6 +692,7 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx) {
         Py_CLEAR(chunk); \
     }
 
+#if PY_MAJOR_VERSION < 3
 static PyObject *
 scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_ssize_t *next_end_ptr)
 {
@@ -916,7 +925,7 @@ bail:
     Py_XDECREF(chunks);
     return NULL;
 }
-
+#endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
 scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr)
@@ -1127,12 +1136,16 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
     if (encoding == NULL) {
         encoding = DEFAULT_ENCODING;
     }
-    if (PyString_Check(pystr)) {
-        rval = scanstring_str(pystr, end, encoding, strict, &next_end);
-    }
-    else if (PyUnicode_Check(pystr)) {
+    if (PyUnicode_Check(pystr)) {
         rval = scanstring_unicode(pystr, end, strict, &next_end);
     }
+#if PY_MAJOR_VERSION < 3
+    /* Using a bytes input is unsupported for scanning in Python 3.
+       It is coerced to str in the decoder before it gets here. */
+    else if (PyString_Check(pystr)) {
+        rval = scanstring_str(pystr, end, encoding, strict, &next_end);
+    }
+#endif
     else {
         PyErr_Format(PyExc_TypeError,
                      "first argument must be a string, not %.80s",
@@ -1209,8 +1222,10 @@ scanner_clear(PyObject *self)
     return 0;
 }
 
+#if PY_MAJOR_VERSION < 3
 static PyObject *
-_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+{
     /* Read a JSON object from PyString pystr.
     idx is the index of the first character after the opening curly brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1357,9 +1372,11 @@ bail:
     Py_XDECREF(pairs);
     return NULL;
 }
+#endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
-_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+{
     /* Read a JSON object from PyUnicode pystr.
     idx is the index of the first character after the opening curly brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1509,8 +1526,10 @@ bail:
     return NULL;
 }
 
+#if PY_MAJOR_VERSION < 3
 static PyObject *
-_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+{
     /* Read a JSON array from PyString pystr.
     idx is the index of the first character after the opening brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1580,9 +1599,11 @@ bail:
     Py_DECREF(rval);
     return NULL;
 }
+#endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
-_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+{
     /* Read a JSON array from PyString pystr.
     idx is the index of the first character after the opening brace.
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1654,7 +1675,8 @@ bail:
 }
 
 static PyObject *
-_parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx, Py_ssize_t *next_idx_ptr) {
+_parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+{
     /* Read a JSON constant from PyString pystr.
     constant is the constant string that was found
         ("NaN", "Infinity", "-Infinity").
@@ -1679,8 +1701,10 @@ _parse_constant(PyScannerObject *s, char *constant, Py_ssize_t idx, Py_ssize_t *
     return rval;
 }
 
+#if PY_MAJOR_VERSION < 3
 static PyObject *
-_match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr) {
+_match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr)
+{
     /* Read a JSON number from PyString pystr.
     idx is the index of the first character of the number
     *next_idx_ptr is a return-by-reference index to the first character after
@@ -1781,6 +1805,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     *next_idx_ptr = idx;
     return rval;
 }
+#endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
 _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr) {
@@ -1877,6 +1902,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     return rval;
 }
 
+#if PY_MAJOR_VERSION < 3
 static PyObject *
 scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
 {
@@ -1976,6 +2002,8 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     Py_LeaveRecursiveCall();
     return rval;
 }
+#endif /* PY_MAJOR_VERSION < 3 */
+
 
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
@@ -2091,12 +2119,14 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:scan_once", kwlist, &pystr, _convertPyInt_AsSsize_t, &idx))
         return NULL;
 
-    if (PyString_Check(pystr)) {
-        rval = scan_once_str(s, pystr, idx, &next_idx);
-    }
-    else if (PyUnicode_Check(pystr)) {
+    if (PyUnicode_Check(pystr)) {
         rval = scan_once_unicode(s, pystr, idx, &next_idx);
     }
+#if PY_MAJOR_VERSION < 3
+    else if (PyString_Check(pystr)) {
+        rval = scan_once_str(s, pystr, idx, &next_idx);
+    }
+#endif /* PY_MAJOR_VERSION < 3 */
     else {
         PyErr_Format(PyExc_TypeError,
                  "first argument must be a string, not %.80s",

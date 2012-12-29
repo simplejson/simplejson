@@ -95,7 +95,8 @@ BACKSLASH = {
 DEFAULT_ENCODING = "utf-8"
 
 def py_scanstring(s, end, encoding=None, strict=True,
-        _b=BACKSLASH, _m=STRINGCHUNK.match, _join=u('').join):
+        _b=BACKSLASH, _m=STRINGCHUNK.match, _join=u('').join,
+        _PY3=PY3, _maxunicode=sys.maxunicode):
     """Scan the string s for a JSON string. End is the index of the
     character in s after the quote that started the JSON string.
     Unescapes all valid JSON string escape sequences and raises ValueError
@@ -118,7 +119,7 @@ def py_scanstring(s, end, encoding=None, strict=True,
         content, terminator = chunk.groups()
         # Content is contains zero or more unescaped string characters
         if content:
-            if not isinstance(content, text_type):
+            if not _PY3 and not isinstance(content, text_type):
                 content = text_type(content, encoding)
             _append(content)
         # Terminator is the end of string, a literal control character,
@@ -155,7 +156,7 @@ def py_scanstring(s, end, encoding=None, strict=True,
                 raise JSONDecodeError(msg, s, end)
             uni = int(esc, 16)
             # Check for surrogate pair on UCS-4 systems
-            if 0xd800 <= uni <= 0xdbff and sys.maxunicode > 65535:
+            if 0xd800 <= uni <= 0xdbff and _maxunicode > 65535:
                 msg = "Invalid \\uXXXX\\uXXXX surrogate pair"
                 if not s[end + 5:end + 7] == '\\u':
                     raise JSONDecodeError(msg, s, end)
@@ -388,6 +389,8 @@ class JSONDecoder(object):
         ``False`` then control characters will be allowed in strings.
 
         """
+        if encoding is None:
+            encoding = DEFAULT_ENCODING
         self.encoding = encoding
         self.object_hook = object_hook
         self.object_pairs_hook = object_pairs_hook
@@ -407,14 +410,14 @@ class JSONDecoder(object):
 
         """
         if _PY3 and isinstance(s, binary_type):
-            s = s.decode('utf-8')
+            s = s.decode(self.encoding)
         obj, end = self.raw_decode(s)
         end = _w(s, end).end()
         if end != len(s):
             raise JSONDecodeError("Extra data", s, end, len(s))
         return obj
 
-    def raw_decode(self, s, idx=0, _w=WHITESPACE.match):
+    def raw_decode(self, s, idx=0, _w=WHITESPACE.match, _PY3=PY3):
         """Decode a JSON document from ``s`` (a ``str`` or ``unicode``
         beginning with a JSON document) and return a 2-tuple of the Python
         representation and the index in ``s`` where the document ended.
@@ -425,6 +428,8 @@ class JSONDecoder(object):
         have extraneous data at the end.
 
         """
+        if _PY3 and not isinstance(s, text_type):
+            raise TypeError("Input string must be text, not bytes")
         try:
             obj, end = self.scan_once(s, idx=_w(s, idx).end())
         except StopIteration:

@@ -6,6 +6,14 @@ import simplejson.decoder
 from simplejson.compat import b
 
 class TestScanString(TestCase):
+    # The bytes type is intentionally not used in most of these tests
+    # under Python 3 because the decoder immediately coerces to str before
+    # calling scanstring. In Python 2 we are testing the code paths
+    # for both unicode and str.
+    #
+    # The reason this is done is because Python 3 would require
+    # entirely different code paths for parsing bytes and str.
+    #
     def test_py_scanstring(self):
         self._test_scanstring(simplejson.decoder.py_scanstring)
 

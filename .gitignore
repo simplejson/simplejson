@@ -5,6 +5,7 @@
 /MANIFEST
 /.coverage
 /coverage.xml
+/htmlcov
 /build
 /dist
 /docs
