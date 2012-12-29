@@ -440,7 +440,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             del markers[markerid]
 
     def _stringify_key(key):
-        if isinstance(key, string_types):
+        if isinstance(key, string_types): # pragma: no cover
             pass
         elif isinstance(key, binary_type):
             key = key.decode(_encoding)
@@ -453,6 +453,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif key is None:
             key = 'null'
         elif isinstance(key, integer_types):
+            key = str(key)
+        elif _use_decimal and isinstance(key, Decimal):
             key = str(key)
         elif _skipkeys:
             key = None

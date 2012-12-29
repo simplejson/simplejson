@@ -1,5 +1,5 @@
 from unittest import TestCase
-from simplejson.compat import StringIO, long_type
+from simplejson.compat import StringIO, long_type, b
 import simplejson as json
 
 class TestDump(TestCase):
@@ -7,6 +7,29 @@ class TestDump(TestCase):
         sio = StringIO()
         json.dump({}, sio)
         self.assertEquals(sio.getvalue(), '{}')
+
+    def test_constants(self):
+        for c in [None, True, False]:
+            self.assert_(json.loads(json.dumps(c)) is c)
+            self.assert_(json.loads(json.dumps([c]))[0] is c)
+            self.assert_(json.loads(json.dumps({'a': c}))['a'] is c)
+
+    def test_stringify_key(self):
+        items = [(b('bytes'), 'bytes'),
+                 (1.0, '1.0'),
+                 (10, '10'),
+                 (True, 'true'),
+                 (False, 'false'),
+                 (None, 'null'),
+                 (long_type(100), '100')]
+        for k, expect in items:
+            self.assertEquals(
+                json.loads(json.dumps({k: expect})),
+                {expect: expect})
+        self.assertRaises(TypeError, json.dumps, {json: 1})
+        self.assertEquals(
+            json.loads(json.dumps({json: 1}, skipkeys=True)),
+            {})
 
     def test_dumps(self):
         self.assertEquals(json.dumps({}), '{}')

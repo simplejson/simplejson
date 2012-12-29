@@ -2739,6 +2739,11 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
             if (kstr == NULL)
                 goto bail;
         }
+        else if (s->use_decimal && PyObject_TypeCheck(key, (PyTypeObject *)s->Decimal)) {
+            kstr = PyObject_Str(key);
+            if (kstr == NULL)
+                goto bail;
+        }
         else if (skipkeys) {
             Py_DECREF(item);
             continue;

@@ -5,6 +5,8 @@ Version 3.0.0 released 201X-XX-XX
   key, rather than the original object. This ensures that the sort
   only compares string types and makes the behavior consistent between
   Python 2.x and Python 3.x.
+* Like other number types, Decimal instances used as keys are now
+  coerced to strings when use_decimal is True.
 
 Version 2.6.2 released 2012-09-21
 
