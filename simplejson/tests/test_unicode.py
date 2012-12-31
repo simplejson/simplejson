@@ -1,6 +1,8 @@
+import sys
 from unittest import TestCase
 
 import simplejson as json
+from simplejson.compat import unichr, text_type, b, u
 
 class TestUnicode(TestCase):
     def test_encoding1(self):
@@ -76,21 +78,21 @@ class TestUnicode(TestCase):
             {'a': u'\xe9'})
 
     def test_unicode_preservation(self):
-        self.assertEquals(type(json.loads(u'""')), unicode)
-        self.assertEquals(type(json.loads(u'"a"')), unicode)
-        self.assertEquals(type(json.loads(u'["a"]')[0]), unicode)
+        self.assertEquals(type(json.loads(u'""')), text_type)
+        self.assertEquals(type(json.loads(u'"a"')), text_type)
+        self.assertEquals(type(json.loads(u'["a"]')[0]), text_type)
 
     def test_ensure_ascii_false_returns_unicode(self):
         # http://code.google.com/p/simplejson/issues/detail?id=48
-        self.assertEquals(type(json.dumps([], ensure_ascii=False)), unicode)
-        self.assertEquals(type(json.dumps(0, ensure_ascii=False)), unicode)
-        self.assertEquals(type(json.dumps({}, ensure_ascii=False)), unicode)
-        self.assertEquals(type(json.dumps("", ensure_ascii=False)), unicode)
+        self.assertEquals(type(json.dumps([], ensure_ascii=False)), text_type)
+        self.assertEquals(type(json.dumps(0, ensure_ascii=False)), text_type)
+        self.assertEquals(type(json.dumps({}, ensure_ascii=False)), text_type)
+        self.assertEquals(type(json.dumps("", ensure_ascii=False)), text_type)
 
     def test_ensure_ascii_false_bytestring_encoding(self):
         # http://code.google.com/p/simplejson/issues/detail?id=48
-        doc1 = {u'quux': 'Arr\xc3\xaat sur images'}
-        doc2 = {u'quux': u'Arr\xeat sur images'}
+        doc1 = {u'quux': b('Arr\xc3\xaat sur images')}
+        doc2 = {u'quux': u('Arr\xeat sur images')}
         doc_ascii = '{"quux": "Arr\\u00eat sur images"}'
         doc_unicode = u'{"quux": "Arr\xeat sur images"}'
         self.assertEquals(json.dumps(doc1), doc_ascii)
@@ -107,3 +109,37 @@ class TestUnicode(TestCase):
         self.assertEquals(json.dumps(s2), expect)
         self.assertEquals(json.dumps(s1, ensure_ascii=False), expect)
         self.assertEquals(json.dumps(s2, ensure_ascii=False), expect)
+
+    def test_invalid_escape_sequences(self):
+        # incomplete escape sequence
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u')
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u1')
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u12')
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u123')
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u1234')
+        # invalid escape sequence
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u123x"')
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u12x4"')
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\u1x34"')
+        self.assertRaises(json.JSONDecodeError, json.loads, '"\\ux234"')
+        if sys.maxunicode > 65535:
+            # unpaired low surrogate
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\udc00"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\udcff"')
+            # unpaired high surrogate
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800x"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800xx"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800xxxxxx"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u0"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u00"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u000"')
+            # invalid escape sequence for low surrogate
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u000x"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u00x0"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u0x00"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\ux000"')
+            # invalid value for low surrogate
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u0000"')
+            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\ufc00"')

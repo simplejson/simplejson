@@ -1,6 +1,7 @@
+from __future__ import absolute_import
 import unittest
 import simplejson as json
-from StringIO import StringIO
+from simplejson.compat import StringIO
 
 try:
     from collections import namedtuple

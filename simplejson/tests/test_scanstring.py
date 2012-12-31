@@ -3,8 +3,17 @@ from unittest import TestCase
 
 import simplejson as json
 import simplejson.decoder
+from simplejson.compat import b, PY3
 
 class TestScanString(TestCase):
+    # The bytes type is intentionally not used in most of these tests
+    # under Python 3 because the decoder immediately coerces to str before
+    # calling scanstring. In Python 2 we are testing the code paths
+    # for both unicode and str.
+    #
+    # The reason this is done is because Python 3 would require
+    # entirely different code paths for parsing bytes and str.
+    #
     def test_py_scanstring(self):
         self._test_scanstring(simplejson.decoder.py_scanstring)
 
@@ -103,15 +112,36 @@ class TestScanString(TestCase):
             scanstring('["Bad value", truth]', 2, None, True),
             (u'Bad value', 12))
 
+        for c in map(chr, range(0x00, 0x1f)):
+            self.assertEquals(
+                scanstring(c + '"', 0, None, False),
+                (c, 2))
+            self.assertRaises(
+                ValueError,
+                scanstring, c + '"', 0, None, True)
+
+        self.assertRaises(ValueError, scanstring, '', 0, None, True)
+        self.assertRaises(ValueError, scanstring, 'a', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u0', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u01', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u012', 0, None, True)
+        self.assertRaises(ValueError, scanstring, '\\u0123', 0, None, True)
+        if sys.maxunicode > 65535:
+            self.assertRaises(ValueError, scanstring, '\\ud834"', 0, None, True),
+            self.assertRaises(ValueError, scanstring, '\\ud834\\u"', 0, None, True),
+            self.assertRaises(ValueError, scanstring, '\\ud834\\x0123"', 0, None, True),
+
     def test_issue3623(self):
         self.assertRaises(ValueError, json.decoder.scanstring, "xxx", 1,
                           "xxx")
         self.assertRaises(UnicodeDecodeError,
-                          json.encoder.encode_basestring_ascii, "xx\xff")
+                          json.encoder.encode_basestring_ascii, b("xx\xff"))
 
     def test_overflow(self):
-        # Python 2.5 does not have maxsize
-        maxsize = getattr(sys, 'maxsize', sys.maxint)
+        # Python 2.5 does not have maxsize, Python 3 does not have maxint
+        maxsize = getattr(sys, 'maxsize', getattr(sys, 'maxint', None))
+        assert maxsize is not None
         self.assertRaises(OverflowError, json.decoder.scanstring, "xxx",
                           maxsize + 1)
-

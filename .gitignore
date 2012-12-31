@@ -2,9 +2,11 @@
 *.egg
 *.pyc
 *.so
+.DS_Store
 /MANIFEST
 /.coverage
 /coverage.xml
+/htmlcov
 /build
 /dist
 /docs
