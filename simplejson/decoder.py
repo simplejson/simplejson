@@ -154,18 +154,33 @@ def py_scanstring(s, end, encoding=None, strict=True,
             if len(esc) != 4:
                 msg = "Invalid \\uXXXX escape"
                 raise JSONDecodeError(msg, s, end)
-            uni = int(esc, 16)
+            try:
+                uni = int(esc, 16)
+            except ValueError:
+                msg = "Invalid \\uXXXX escape"
+                raise JSONDecodeError(msg, s, end)
             # Check for surrogate pair on UCS-4 systems
-            if 0xd800 <= uni <= 0xdbff and _maxunicode > 65535:
-                msg = "Invalid \\uXXXX\\uXXXX surrogate pair"
-                if not s[end + 5:end + 7] == '\\u':
+            if _maxunicode > 65535:
+                unimask = uni & 0xfc00
+                if unimask == 0xd800:
+                    msg = "Invalid \\uXXXX\\uXXXX surrogate pair"
+                    if not s[end + 5:end + 7] == '\\u':
+                        raise JSONDecodeError(msg, s, end)
+                    esc2 = s[end + 7:end + 11]
+                    if len(esc2) != 4:
+                        raise JSONDecodeError(msg, s, end)
+                    try:
+                        uni2 = int(esc2, 16)
+                    except ValueError:
+                        raise JSONDecodeError(msg, s, end)
+                    if uni2 & 0xfc00 != 0xdc00:
+                        msg = "Unpaired high surrogate"
+                        raise JSONDecodeError(msg, s, end)
+                    uni = 0x10000 + (((uni - 0xd800) << 10) | (uni2 - 0xdc00))
+                    next_end += 6
+                elif unimask == 0xdc00:
+                    msg = "Unpaired low surrogate"
                     raise JSONDecodeError(msg, s, end)
-                esc2 = s[end + 7:end + 11]
-                if len(esc2) != 4:
-                    raise JSONDecodeError(msg, s, end)
-                uni2 = int(esc2, 16)
-                uni = 0x10000 + (((uni - 0xd800) << 10) | (uni2 - 0xdc00))
-                next_end += 6
             char = unichr(uni)
             end = next_end
         # Append the unescaped character
