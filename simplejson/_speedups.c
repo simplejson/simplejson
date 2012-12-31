@@ -127,9 +127,10 @@ typedef struct _PyEncoderObject {
     PyObject *key_separator;
     PyObject *item_separator;
     PyObject *sort_keys;
-    PyObject *skipkeys;
     PyObject *key_memo;
+    PyObject *encoding;
     PyObject *Decimal;
+    char skipkeys;
     int fast_encode;
     int allow_nan;
     int use_decimal;
@@ -144,21 +145,23 @@ static PyMemberDef encoder_members[] = {
     {"markers", T_OBJECT, offsetof(PyEncoderObject, markers), READONLY, "markers"},
     {"default", T_OBJECT, offsetof(PyEncoderObject, defaultfn), READONLY, "default"},
     {"encoder", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoder"},
+    {"encoding", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoding"},
     {"indent", T_OBJECT, offsetof(PyEncoderObject, indent), READONLY, "indent"},
     {"key_separator", T_OBJECT, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
     {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
     {"sort_keys", T_OBJECT, offsetof(PyEncoderObject, sort_keys), READONLY, "sort_keys"},
-    {"skipkeys", T_OBJECT, offsetof(PyEncoderObject, skipkeys), READONLY, "skipkeys"},
+    {"skipkeys", T_BOOL, offsetof(PyEncoderObject, skipkeys), READONLY, "skipkeys"},
     {"key_memo", T_OBJECT, offsetof(PyEncoderObject, key_memo), READONLY, "key_memo"},
     {"item_sort_key", T_OBJECT, offsetof(PyEncoderObject, item_sort_key), READONLY, "item_sort_key"},
     {NULL}
 };
 
 static PyObject *
+JSON_ParseEncoding(PyObject *encoding);
+static PyObject *
 JSON_UnicodeFromChar(JSON_UNICHR c);
 static PyObject *
 maybe_quote_bigint(PyObject *encoded, PyObject *obj);
-
 static Py_ssize_t
 ascii_char_size(JSON_UNICHR c);
 static Py_ssize_t
@@ -199,6 +202,8 @@ static void
 encoder_dealloc(PyObject *self);
 static int
 encoder_clear(PyObject *self);
+static PyObject *
+encoder_stringify_key(PyEncoderObject *s, PyObject *key);
 static int
 encoder_listencode_list(PyEncoderObject *s, PyObject *rval, PyObject *seq, Py_ssize_t indent_level);
 static int
@@ -490,6 +495,47 @@ ascii_escape_str(PyObject *pystr)
 #endif /* PY_MAJOR_VERSION < 3 */
 
 static PyObject *
+encoder_stringify_key(PyEncoderObject *s, PyObject *key)
+{
+    if (PyUnicode_Check(key)) {
+        Py_INCREF(key);
+        return key;
+    }
+    else if (PyString_Check(key)) {
+#if PY_MAJOR_VERSION >= 3
+        return PyUnicode_Decode(
+            PyString_AS_STRING(key),
+            PyString_GET_SIZE(key),
+            JSON_ASCII_AS_STRING(s->encoding),
+            NULL);
+#else /* PY_MAJOR_VERSION >= 3 */
+        Py_INCREF(key);
+        return key;
+#endif /* PY_MAJOR_VERSION < 3 */
+    }
+    else if (PyFloat_Check(key)) {
+        return encoder_encode_float(s, key);
+    }
+    else if (key == Py_True || key == Py_False || key == Py_None) {
+        /* This must come before the PyInt_Check because
+           True and False are also 1 and 0.*/
+        return _encoded_const(key);
+    }
+    else if (PyInt_Check(key) || PyLong_Check(key)) {
+        return PyObject_Str(key);
+    }
+    else if (s->use_decimal && PyObject_TypeCheck(key, (PyTypeObject *)s->Decimal)) {
+        return PyObject_Str(key);
+    }
+    else if (s->skipkeys) {
+        Py_INCREF(Py_None);
+        return Py_None;
+    }
+    PyErr_SetString(PyExc_TypeError, "keys must be a string");
+    return NULL;
+}
+
+static PyObject *
 encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 {
     PyObject *items;
@@ -499,7 +545,6 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     PyObject *kstr = NULL;
     static PyObject *sortfun = NULL;
     static PyObject *sortargs = NULL;
-    int skipkeys;
 
     if (sortargs == NULL) {
         sortargs = PyTuple_New(0);
@@ -519,7 +564,6 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
         return NULL;
     if (s->item_sort_kw == Py_None)
         return iter;
-    skipkeys = PyObject_IsTrue(s->skipkeys);
     lst = PyList_New(0);
     if (lst == NULL)
         goto bail;
@@ -532,32 +576,23 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
         key = PyTuple_GET_ITEM(item, 0);
         if (key == NULL)
             goto bail;
-        if (PyString_Check(key) || PyUnicode_Check(key)) {
+#if PY_MAJOR_VERSION < 3
+        else if (PyString_Check(key)) {
+            // item can be added as-is
+        }
+#endif /* PY_MAJOR_VERSION < 3 */
+        else if (PyUnicode_Check(key)) {
             // item can be added as-is
         }
         else {
-            if (PyFloat_Check(key)) {
-                kstr = encoder_encode_float(s, key);
-            }
-            else if (key == Py_True || key == Py_False || key == Py_None) {
-                /* This must come before the PyInt_Check because
-                   True and False are also 1 and 0.*/
-                kstr = _encoded_const(key);
-            }
-            else if (PyInt_Check(key) || PyLong_Check(key)) {
-                kstr = PyObject_Str(key);
-            }
-            else if (skipkeys) {
-                Py_DECREF(item);
-                continue;
-            }
-            else {
-                /* TODO: include repr of key */
-                PyErr_SetString(PyExc_TypeError, "keys must be a string");
-                goto bail;
-            }
+            kstr = encoder_stringify_key(s, key);
             if (kstr == NULL)
                 goto bail;
+            else if (kstr == Py_None) {
+                // skipkeys
+                Py_DECREF(kstr);
+                continue;
+            }
             value = PyTuple_GET_ITEM(item, 1);
             if (value == NULL)
                 goto bail;
@@ -722,6 +757,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
 
     if (len == end) {
         raise_errmsg("Unterminated string starting at", pystr, begin);
+        goto bail;
     }
     else if (end < 0 || len < end) {
         PyErr_SetString(PyExc_ValueError, "end is out of bounds");
@@ -950,6 +986,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
 
     if (len == end) {
         raise_errmsg("Unterminated string starting at", pystr, begin);
+        goto bail;
     }
     else if (end < 0 || len < end) {
         PyErr_SetString(PyExc_ValueError, "end is out of bounds");
@@ -2207,6 +2244,25 @@ scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)s;
 }
 
+static PyObject *
+JSON_ParseEncoding(PyObject *encoding)
+{
+    if (encoding == NULL)
+        return NULL;
+    if (encoding == Py_None)
+        return JSON_InternFromString(DEFAULT_ENCODING);
+#if PY_MAJOR_VERSION < 3
+    if (PyUnicode_Check(encoding))
+        return PyUnicode_AsEncodedString(encoding, NULL, NULL);
+#endif
+    if (JSON_ASCII_Check(encoding)) {
+        Py_INCREF(encoding);
+        return encoding;
+    }
+    PyErr_SetString(PyExc_TypeError, "encoding must be a string");
+    return NULL;
+}
+
 static int
 scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -2214,6 +2270,7 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject *ctx;
     static char *kwlist[] = {"context", NULL};
     PyScannerObject *s;
+    PyObject *encoding;
 
     assert(PyScanner_Check(self));
     s = (PyScannerObject *)self;
@@ -2228,21 +2285,10 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     }
 
     /* JSON_ASCII_AS_STRING is used on encoding */
-    s->encoding = PyObject_GetAttrString(ctx, "encoding");
+    encoding = PyObject_GetAttrString(ctx, "encoding");
+    s->encoding = JSON_ParseEncoding(encoding);
+    Py_XDECREF(encoding);
     if (s->encoding == NULL)
-        goto bail;
-    if (s->encoding == Py_None) {
-        Py_DECREF(Py_None);
-        s->encoding = JSON_InternFromString(DEFAULT_ENCODING);
-    }
-#if PY_MAJOR_VERSION < 3
-    else if (PyUnicode_Check(s->encoding)) {
-        PyObject *tmp = PyUnicode_AsEncodedString(s->encoding, NULL, NULL);
-        Py_DECREF(s->encoding);
-        s->encoding = tmp;
-    }
-#endif
-    if (s->encoding == NULL || !JSON_ASCII_Check(s->encoding))
         goto bail;
 
     /* All of these will fail "gracefully" so we don't need to verify them */
@@ -2332,10 +2378,10 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         s->markers = NULL;
         s->defaultfn = NULL;
         s->encoder = NULL;
+        s->encoding = NULL;
         s->indent = NULL;
         s->key_separator = NULL;
         s->item_separator = NULL;
-        s->skipkeys = NULL;
         s->key_memo = NULL;
         s->sort_keys = NULL;
         s->item_sort_key = NULL;
@@ -2349,31 +2395,34 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "Decimal", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "Decimal", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
     PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
     PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array;
-    PyObject *bigint_as_string, *item_sort_key, *Decimal;
+    PyObject *bigint_as_string, *item_sort_key, *encoding, *Decimal;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array, &bigint_as_string,
-        &item_sort_key, &Decimal))
+        &item_sort_key, &encoding, &Decimal))
         return -1;
 
     s->markers = markers;
     s->defaultfn = defaultfn;
     s->encoder = encoder;
+    s->encoding = JSON_ParseEncoding(encoding);
+    if (s->encoding == NULL)
+        return -1;
     s->indent = indent;
     s->key_separator = key_separator;
     s->item_separator = item_separator;
-    s->skipkeys = skipkeys;
+    s->skipkeys = (char)PyObject_IsTrue(skipkeys);
     s->key_memo = key_memo;
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
     s->allow_nan = PyObject_IsTrue(allow_nan);
@@ -2419,7 +2468,6 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(s->indent);
     Py_INCREF(s->key_separator);
     Py_INCREF(s->item_separator);
-    Py_INCREF(s->skipkeys);
     Py_INCREF(s->key_memo);
     Py_INCREF(s->sort_keys);
     Py_INCREF(s->item_sort_key);
@@ -2653,7 +2701,6 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     PyObject *item = NULL;
     PyObject *items = NULL;
     PyObject *encoded = NULL;
-    int skipkeys;
     Py_ssize_t idx;
 
     if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
@@ -2699,7 +2746,6 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
     if (iter == NULL)
         goto bail;
 
-    skipkeys = PyObject_IsTrue(s->skipkeys);
     idx = 0;
     while ((item = PyIter_Next(iter))) {
         PyObject *encoded, *key, *value;
@@ -2717,48 +2763,21 @@ encoder_listencode_dict(PyEncoderObject *s, PyObject *rval, PyObject *dct, Py_ss
         encoded = PyDict_GetItem(s->key_memo, key);
         if (encoded != NULL) {
             Py_INCREF(encoded);
-        }
-        else if (PyString_Check(key) || PyUnicode_Check(key)) {
-            Py_INCREF(key);
-            kstr = key;
-        }
-        else if (PyFloat_Check(key)) {
-            kstr = encoder_encode_float(s, key);
+        } else {
+            kstr = encoder_stringify_key(s, key);
             if (kstr == NULL)
                 goto bail;
+            else if (kstr == Py_None) {
+                // skipkeys
+                Py_DECREF(item);
+                Py_DECREF(kstr);
+                continue;
+            }
         }
-        else if (key == Py_True || key == Py_False || key == Py_None) {
-            /* This must come before the PyInt_Check because
-               True and False are also 1 and 0.*/
-            kstr = _encoded_const(key);
-            if (kstr == NULL)
-                goto bail;
-        }
-        else if (PyInt_Check(key) || PyLong_Check(key)) {
-            kstr = PyObject_Str(key);
-            if (kstr == NULL)
-                goto bail;
-        }
-        else if (s->use_decimal && PyObject_TypeCheck(key, (PyTypeObject *)s->Decimal)) {
-            kstr = PyObject_Str(key);
-            if (kstr == NULL)
-                goto bail;
-        }
-        else if (skipkeys) {
-            Py_DECREF(item);
-            continue;
-        }
-        else {
-            /* TODO: include repr of key */
-            PyErr_SetString(PyExc_TypeError, "keys must be a string");
-            goto bail;
-        }
-
         if (idx) {
             if (PyList_Append(rval, s->item_separator))
                 goto bail;
         }
-
         if (encoded == NULL) {
             encoded = encoder_encode_string(s, kstr);
             Py_CLEAR(kstr);
@@ -2918,10 +2937,10 @@ encoder_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(s->markers);
     Py_VISIT(s->defaultfn);
     Py_VISIT(s->encoder);
+    Py_VISIT(s->encoding);
     Py_VISIT(s->indent);
     Py_VISIT(s->key_separator);
     Py_VISIT(s->item_separator);
-    Py_VISIT(s->skipkeys);
     Py_VISIT(s->key_memo);
     Py_VISIT(s->sort_keys);
     Py_VISIT(s->item_sort_kw);
@@ -2940,10 +2959,10 @@ encoder_clear(PyObject *self)
     Py_CLEAR(s->markers);
     Py_CLEAR(s->defaultfn);
     Py_CLEAR(s->encoder);
+    Py_CLEAR(s->encoding);
     Py_CLEAR(s->indent);
     Py_CLEAR(s->key_separator);
     Py_CLEAR(s->item_separator);
-    Py_CLEAR(s->skipkeys);
     Py_CLEAR(s->key_memo);
     Py_CLEAR(s->sort_keys);
     Py_CLEAR(s->item_sort_kw);
