@@ -55,6 +55,31 @@ JSONDOCS = [
     "['single quote']",
     # http://code.google.com/p/simplejson/issues/detail?id=3
     u'["A\u001FZ control characters in string"]',
+    # misc based on coverage
+    '{',
+    '{]',
+    '{"foo": "bar"]',
+    '{"foo": "bar"',
+    'nul',
+    'nulx',
+    '-',
+    '-x',
+    '-e',
+    '-e0',
+    '-Infinite',
+    '-Inf',
+    'Infinit',
+    'Infinite',
+    'NaM',
+    'NuN',
+    'falsy',
+    'fal',
+    'trug',
+    'tru',
+    '1e',
+    '1ex',
+    '1e-',
+    '1e-x',
 ]
 
 SKIPS = {
