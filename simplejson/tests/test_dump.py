@@ -1,6 +1,11 @@
 from unittest import TestCase
-from simplejson.compat import StringIO, long_type, b
+from simplejson.compat import StringIO, long_type, b, binary_type, PY3
 import simplejson as json
+
+def as_text_type(s):
+    if PY3 and isinstance(s, binary_type):
+        return s.decode('ascii')
+    return s
 
 class TestDump(TestCase):
     def test_dump(self):
@@ -26,10 +31,24 @@ class TestDump(TestCase):
             self.assertEquals(
                 json.loads(json.dumps({k: expect})),
                 {expect: expect})
+            self.assertEquals(
+                json.loads(json.dumps({k: expect}, sort_keys=True)),
+                {expect: expect})
         self.assertRaises(TypeError, json.dumps, {json: 1})
-        self.assertEquals(
-            json.loads(json.dumps({json: 1}, skipkeys=True)),
-            {})
+        for v in [{}, {'other': 1}, {b('derp'): 1, 'herp': 2}]:
+            for sort_keys in [False, True]:
+                v0 = dict(v)
+                v0[json] = 1
+                v1 = dict((as_text_type(key), val) for (key, val) in v.items())
+                self.assertEquals(
+                    json.loads(json.dumps(v0, skipkeys=True, sort_keys=sort_keys)),
+                    v1)
+                self.assertEquals(
+                    json.loads(json.dumps({'': v0}, skipkeys=True, sort_keys=sort_keys)),
+                    {'': v1})
+                self.assertEquals(
+                    json.loads(json.dumps([v0], skipkeys=True, sort_keys=sort_keys)),
+                    [v1])
 
     def test_dumps(self):
         self.assertEquals(json.dumps({}), '{}')
