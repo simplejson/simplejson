@@ -1,4 +1,4 @@
-Version 3.0.0 released 201X-XX-XX
+Version 3.0.0 released 2012-12-30
 
 * Python 3.3 is now supported, thanks to Vinay Sajip #8
 * `sort_keys`/`item_sort_key` now sort on the stringified verison of the
