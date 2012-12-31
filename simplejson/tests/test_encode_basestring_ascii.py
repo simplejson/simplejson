@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import simplejson.encoder
+from simplejson.compat import b
 
 CASES = [
     (u'/\\"\ucafe\ubabe\uab98\ufcde\ubcda\uef4a\x08\x0c\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?', '"/\\\\\\"\\ucafe\\ubabe\\uab98\\ufcde\\ubcda\\uef4a\\b\\f\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?"'),
@@ -11,9 +12,9 @@ CASES = [
     (u' s p a c e d ', '" s p a c e d "'),
     (u'\U0001d120', '"\\ud834\\udd20"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
-    ('\xce\xb1\xce\xa9', '"\\u03b1\\u03a9"'),
+    (b('\xce\xb1\xce\xa9'), '"\\u03b1\\u03a9"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
-    ('\xce\xb1\xce\xa9', '"\\u03b1\\u03a9"'),
+    (b('\xce\xb1\xce\xa9'), '"\\u03b1\\u03a9"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
     (u"`1~!@#$%^&*()_+-={':[,]}|;.</>?", '"`1~!@#$%^&*()_+-={\':[,]}|;.</>?"'),

@@ -1,17 +1,27 @@
+from __future__ import absolute_import
 import unittest
 import doctest
-
+import sys
 
 class OptionalExtensionTestSuite(unittest.TestSuite):
     def run(self, result):
         import simplejson
         run = unittest.TestSuite.run
         run(self, result)
-        simplejson._toggle_speedups(False)
-        run(self, result)
-        simplejson._toggle_speedups(True)
+        if simplejson._import_c_make_encoder() is None:
+            TestMissingSpeedups().run(result)
+        else:
+            simplejson._toggle_speedups(False)
+            run(self, result)
+            simplejson._toggle_speedups(True)
         return result
 
+class TestMissingSpeedups(unittest.TestCase):
+    def runTest(self):
+        if hasattr(sys, 'pypy_translation_info'):
+            "PyPy doesn't need speedups! :)"
+        elif hasattr(self, 'skipTest'):
+            self.skipTest('_speedups.so is missing!')
 
 def additional_tests(suite=None):
     import simplejson
@@ -55,7 +65,7 @@ def all_tests_suite():
 
 
 def main():
-    runner = unittest.TextTestRunner()
+    runner = unittest.TextTestRunner(verbosity=1 + sys.argv.count('-v'))
     suite = all_tests_suite()
     raise SystemExit(not runner.run(suite).wasSuccessful())
 
