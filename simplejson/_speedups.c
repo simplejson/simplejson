@@ -698,6 +698,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
             // item can be added as-is
         }
         else {
+            PyObject *tpl;
             kstr = encoder_stringify_key(s, key);
             if (kstr == NULL)
                 goto bail;
@@ -709,7 +710,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
             value = PyTuple_GET_ITEM(item, 1);
             if (value == NULL)
                 goto bail;
-            PyObject *tpl = PyTuple_Pack(2, kstr, value);
+            tpl = PyTuple_Pack(2, kstr, value);
             if (tpl == NULL)
                 goto bail;
             Py_CLEAR(kstr);
@@ -867,6 +868,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
     char *buf = PyString_AS_STRING(pystr);
     PyObject *chunks = NULL;
     PyObject *chunk = NULL;
+    PyObject *strchunk = NULL;
 
     if (len == end) {
         raise_errmsg("Unterminated string starting at", pystr, begin);
@@ -910,7 +912,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                 goto bail;
             }
 #else /* PY_MAJOR_VERSION >= 3 */
-            PyObject *strchunk = PyString_FromStringAndSize(&buf[end], next - end);
+            strchunk = PyString_FromStringAndSize(&buf[end], next - end);
             if (strchunk == NULL) {
                 goto bail;
             }
@@ -2745,9 +2747,10 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
                 rv = _steal_accumulate(rval, encoded);
         }
         else if (s->namedtuple_as_object && _is_namedtuple(obj)) {
+            PyObject *newobj;
             if (Py_EnterRecursiveCall(" while encoding a JSON object"))
                 return rv;
-            PyObject *newobj = PyObject_CallMethod(obj, "_asdict", NULL);
+            newobj = PyObject_CallMethod(obj, "_asdict", NULL);
             if (newobj != NULL) {
                 rv = encoder_listencode_dict(s, rval, newobj, indent_level);
                 Py_DECREF(newobj);
