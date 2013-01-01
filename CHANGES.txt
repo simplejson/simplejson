@@ -1,3 +1,8 @@
+Version 3.0.2 released 2013-01-01
+
+* Missed a changeset to _speedups.c in the 3.0.1 branch cut, please
+  DO NOT install 3.0.1!
+
 Version 3.0.1 released 2013-01-01
 
 * Add accumulator optimization to encoder, equivalent to the usage of
