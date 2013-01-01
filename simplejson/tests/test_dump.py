@@ -114,3 +114,8 @@ class TestDump(TestCase):
 
         s = json.dumps([0, 1, 2], indent=AwesomeInt(3))
         self.assertEqual(s, '[\n   0,\n   1,\n   2\n]')
+
+    def test_accumulator(self):
+        # the C API uses an accumulator that collects after 100,000 appends
+        lst = [0] * 100000
+        self.assertEqual(json.loads(json.dumps(lst)), lst)
