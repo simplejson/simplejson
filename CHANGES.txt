@@ -1,10 +1,16 @@
+Version 3.0.3 released 2013-01-01
+
+* Fixes for bugs introduced in 3.0.2, MSVC compatibility, and
+  Python 2.5 compatibility
+  
 Version 3.0.2 released 2013-01-01
 
-* Missed a changeset to _speedups.c in the 3.0.1 branch cut, please
-  DO NOT install 3.0.1!
+* THIS VERSION HAS BEEN REMOVED
+* Missed a changeset to _speedups.c in the 3.0.1 branch cut
 
 Version 3.0.1 released 2013-01-01
 
+* THIS VERSION HAS BEEN REMOVED
 * Add accumulator optimization to encoder, equivalent to the usage of
   `_Py_Accu` in the Python 3.3 json library. Only relevant if encoding
   very large JSON documents.

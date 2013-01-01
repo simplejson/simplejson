@@ -95,13 +95,9 @@ typedef int Py_ssize_t;
 static PyTypeObject PyScannerType;
 static PyTypeObject PyEncoderType;
 
-#undef small /* defined by some Windows headers */
-
-typedef PyObject *(*joinerfunc)(PyObject *);
 typedef struct {
-    PyObject *large;  /* A list of previously accumulated large strings */
-    PyObject *small;  /* Pending small strings */
-    joinerfunc joiner;
+    PyObject *large_strings;  /* A list of previously accumulated large strings */
+    PyObject *small_strings;  /* Pending small strings */
 } JSON_Accu;
 
 static int
@@ -148,7 +144,8 @@ typedef struct _PyEncoderObject {
     PyObject *key_memo;
     PyObject *encoding;
     PyObject *Decimal;
-    char skipkeys;
+    PyObject *skipkeys_bool;
+    int skipkeys;
     int fast_encode;
     int allow_nan;
     int use_decimal;
@@ -168,7 +165,8 @@ static PyMemberDef encoder_members[] = {
     {"key_separator", T_OBJECT, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
     {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
     {"sort_keys", T_OBJECT, offsetof(PyEncoderObject, sort_keys), READONLY, "sort_keys"},
-    {"skipkeys", T_BOOL, offsetof(PyEncoderObject, skipkeys), READONLY, "skipkeys"},
+    /* Python 2.5 does not support T_BOOl */
+    {"skipkeys", T_OBJECT, offsetof(PyEncoderObject, skipkeys_bool), READONLY, "skipkeys"},
     {"key_memo", T_OBJECT, offsetof(PyEncoderObject, key_memo), READONLY, "key_memo"},
     {"item_sort_key", T_OBJECT, offsetof(PyEncoderObject, item_sort_key), READONLY, "item_sort_key"},
     {NULL}
@@ -258,38 +256,37 @@ static int
 JSON_Accu_Init(JSON_Accu *acc)
 {
     /* Lazily allocated */
-    acc->large = NULL;
-    acc->small = PyList_New(0);
-    if (acc->small == NULL)
+    acc->large_strings = NULL;
+    acc->small_strings = PyList_New(0);
+    if (acc->small_strings == NULL)
         return -1;
-#if PY_MAJOR_VERSION >= 3
-    acc->joiner = join_list_unicode;
-#else /* PY_MAJOR_VERSION >= 3 */
-    acc->joiner = join_list_string;
-#endif /* PY_MAJOR_VERSION < 3 */
     return 0;
 }
 
 static int
 flush_accumulator(JSON_Accu *acc)
 {
-    Py_ssize_t nsmall = PyList_GET_SIZE(acc->small);
+    Py_ssize_t nsmall = PyList_GET_SIZE(acc->small_strings);
     if (nsmall) {
         int ret;
         PyObject *joined;
-        if (acc->large == NULL) {
-            acc->large = PyList_New(0);
-            if (acc->large == NULL)
+        if (acc->large_strings == NULL) {
+            acc->large_strings = PyList_New(0);
+            if (acc->large_strings == NULL)
                 return -1;
         }
-        joined = acc->joiner(acc->small);
+#if PY_MAJOR_VERSION >= 3
+        joined = join_list_unicode(acc->small_strings);
+#else /* PY_MAJOR_VERSION >= 3 */
+        joined = join_list_string(acc->small_strings);
+#endif /* PY_MAJOR_VERSION < 3 */
         if (joined == NULL)
             return -1;
-        if (PyList_SetSlice(acc->small, 0, nsmall, NULL)) {
+        if (PyList_SetSlice(acc->small_strings, 0, nsmall, NULL)) {
             Py_DECREF(joined);
             return -1;
         }
-        ret = PyList_Append(acc->large, joined);
+        ret = PyList_Append(acc->large_strings, joined);
         Py_DECREF(joined);
         return ret;
     }
@@ -306,9 +303,9 @@ JSON_Accu_Accumulate(JSON_Accu *acc, PyObject *unicode)
     assert(JSON_ASCII_Check(unicode) || PyUnicode_Check(unicode));
 #endif /* PY_MAJOR_VERSION < 3 */
 
-    if (PyList_Append(acc->small, unicode))
+    if (PyList_Append(acc->small_strings, unicode))
         return -1;
-    nsmall = PyList_GET_SIZE(acc->small);
+    nsmall = PyList_GET_SIZE(acc->small_strings);
     /* Each item in a list of unicode objects has an overhead (in 64-bit
      * builds) of:
      *   - 8 bytes for the list slot
@@ -328,21 +325,23 @@ JSON_Accu_FinishAsList(JSON_Accu *acc)
     PyObject *res;
 
     ret = flush_accumulator(acc);
-    Py_CLEAR(acc->small);
+    Py_CLEAR(acc->small_strings);
     if (ret) {
-        Py_CLEAR(acc->large);
+        Py_CLEAR(acc->large_strings);
         return NULL;
     }
-    res = acc->large;
-    acc->large = NULL;
+    res = acc->large_strings;
+    acc->large_strings = NULL;
+    if (res == NULL)
+        return PyList_New(0);
     return res;
 }
 
 static void
 JSON_Accu_Destroy(JSON_Accu *acc)
 {
-    Py_CLEAR(acc->small);
-    Py_CLEAR(acc->large);
+    Py_CLEAR(acc->small_strings);
+    Py_CLEAR(acc->large_strings);
 }
 
 static int
@@ -503,7 +502,7 @@ ascii_escape_unicode(PyObject *pystr)
     Py_ssize_t input_chars;
     Py_ssize_t output_size;
     Py_ssize_t chars;
-    int kind;
+    PY2_UNUSED int kind;
     void *data;
     PyObject *rval;
     char *output;
@@ -815,6 +814,7 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx)
     steal a reference to rval, returns (rval, idx)
     */
     if (rval == NULL) {
+        assert(PyErr_Occurred());
         return NULL;
     }
     pyidx = PyInt_FromSsize_t(idx);
@@ -2217,6 +2217,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             /* object */
             if (Py_EnterRecursiveCall(" while decoding a JSON object "
                                       "from a unicode string"))
+                return NULL;
             rval = _parse_object_unicode(s, pystr, idx + 1, next_idx_ptr);
             Py_LeaveRecursiveCall();
             break;
@@ -2224,6 +2225,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             /* array */
             if (Py_EnterRecursiveCall(" while decoding a JSON array "
                                       "from a unicode string"))
+                return NULL;
             rval = _parse_array_unicode(s, pystr, idx + 1, next_idx_ptr);
             Py_LeaveRecursiveCall();
             break;
@@ -2545,7 +2547,8 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->indent = indent;
     s->key_separator = key_separator;
     s->item_separator = item_separator;
-    s->skipkeys = (char)PyObject_IsTrue(skipkeys);
+    s->skipkeys_bool = skipkeys;
+    s->skipkeys = PyObject_IsTrue(skipkeys);
     s->key_memo = key_memo;
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
     s->allow_nan = PyObject_IsTrue(allow_nan);
@@ -2592,6 +2595,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(s->key_separator);
     Py_INCREF(s->item_separator);
     Py_INCREF(s->key_memo);
+    Py_INCREF(s->skipkeys_bool);
     Py_INCREF(s->sort_keys);
     Py_INCREF(s->item_sort_key);
     Py_INCREF(s->Decimal);
@@ -2705,10 +2709,10 @@ encoder_encode_string(PyEncoderObject *s, PyObject *obj)
 }
 
 static int
-_steal_accumulate(JSON_Accu *lst, PyObject *stolen)
+_steal_accumulate(JSON_Accu *accu, PyObject *stolen)
 {
     /* Append stolen and then decrement its reference count */
-    int rval = JSON_Accu_Accumulate(lst, stolen);
+    int rval = JSON_Accu_Accumulate(accu, stolen);
     Py_DECREF(stolen);
     return rval;
 }
@@ -2799,6 +2803,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
             if (newobj == NULL) {
                 Py_XDECREF(ident);
+                Py_LeaveRecursiveCall();
                 break;
             }
             rv = encoder_listencode_obj(s, rval, newobj, indent_level);
@@ -3096,6 +3101,7 @@ encoder_clear(PyObject *self)
     Py_CLEAR(s->key_separator);
     Py_CLEAR(s->item_separator);
     Py_CLEAR(s->key_memo);
+    Py_CLEAR(s->skipkeys_bool);
     Py_CLEAR(s->sort_keys);
     Py_CLEAR(s->item_sort_kw);
     Py_CLEAR(s->item_sort_key);
