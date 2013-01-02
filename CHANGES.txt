@@ -1,8 +1,15 @@
+Version 3.0.4 released 2013-01-02
+
+* MSVC compatibility for Python 3.3
+  https://github.com/simplejson/simplejson/pull/47
+
 Version 3.0.3 released 2013-01-01
 
-* Fixes for bugs introduced in 3.0.2, MSVC compatibility, and
-  Python 2.5 compatibility
-  
+* Fixes for bugs introduced in 3.0.2
+* Fixes for Python 2.5 compatibility
+* MSVC compatibility for Python 2.x
+  https://github.com/simplejson/simplejson/pull/46
+
 Version 3.0.2 released 2013-01-01
 
 * THIS VERSION HAS BEEN REMOVED
