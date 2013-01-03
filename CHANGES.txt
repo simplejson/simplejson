@@ -1,3 +1,13 @@
+Version 3.0.5 released 2013-01-03
+
+* NOTE: this release only changes the tests, it is
+  not essential to upgrade
+* Tests now run with deprecation warnings printed
+* Fixed Python 3 syntax error in simplejson.tool
+  https://github.com/simplejson/simplejson/issues/49
+* Fixed Python 3.3 deprecation warnings in test suite
+  https://github.com/simplejson/simplejson/issues/48
+
 Version 3.0.4 released 2013-01-02
 
 * MSVC compatibility for Python 3.3
@@ -24,7 +34,8 @@ Version 3.0.1 released 2013-01-01
 
 Version 3.0.0 released 2012-12-30
 
-* Python 3.3 is now supported, thanks to Vinay Sajip #8
+* Python 3.3 is now supported, thanks to Vinay Sajip
+  https://github.com/simplejson/simplejson/issues/8
 * `sort_keys`/`item_sort_key` now sort on the stringified verison of the
   key, rather than the original object. This ensures that the sort
   only compares string types and makes the behavior consistent between

@@ -11,27 +11,27 @@ class TestDecimal(TestCase):
         sio = StringIO()
         json.dump(obj, sio, **kw)
         res = json.dumps(obj, **kw)
-        self.assertEquals(res, sio.getvalue())
+        self.assertEqual(res, sio.getvalue())
         return res
 
     def loads(self, s, **kw):
         sio = StringIO(s)
         res = json.loads(s, **kw)
-        self.assertEquals(res, json.load(sio, **kw))
+        self.assertEqual(res, json.load(sio, **kw))
         return res
 
     def test_decimal_encode(self):
         for d in map(Decimal, self.NUMS):
-            self.assertEquals(self.dumps(d, use_decimal=True), str(d))
+            self.assertEqual(self.dumps(d, use_decimal=True), str(d))
 
     def test_decimal_decode(self):
         for s in self.NUMS:
-            self.assertEquals(self.loads(s, parse_float=Decimal), Decimal(s))
+            self.assertEqual(self.loads(s, parse_float=Decimal), Decimal(s))
 
     def test_stringify_key(self):
         for d in map(Decimal, self.NUMS):
             v = {d: d}
-            self.assertEquals(
+            self.assertEqual(
                 self.loads(
                     self.dumps(v, use_decimal=True), parse_float=Decimal),
                 {str(d): d})
@@ -41,7 +41,7 @@ class TestDecimal(TestCase):
             # The type might not be the same (int and Decimal) but they
             # should still compare equal.
             for v in [d, [d], {'': d}]:
-                self.assertEquals(
+                self.assertEqual(
                     self.loads(
                         self.dumps(v, use_decimal=True), parse_float=Decimal),
                     v)

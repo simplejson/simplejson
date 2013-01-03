@@ -1,23 +1,26 @@
 from unittest import TestCase
 
 import simplejson as json
+from simplejson.compat import long_type
 
 class TestBigintAsString(TestCase):
+    # Python 2.5, at least the one that ships on Mac OS X, calculates
+    # 2 ** 53 as 0! It manages to calculate 1 << 53 correctly.
     values = [(200, 200),
-              ((2 ** 53) - 1, 9007199254740991),
-              ((2 ** 53), '9007199254740992'),
-              ((2 ** 53) + 1, '9007199254740993'),
+              ((1 << 53) - 1, 9007199254740991),
+              ((1 << 53), '9007199254740992'),
+              ((1 << 53) + 1, '9007199254740993'),
               (-100, -100),
-              ((-2 ** 53), '-9007199254740992'),
-              ((-2 ** 53) - 1, '-9007199254740993'),
-              ((-2 ** 53) + 1, -9007199254740991)]
+              ((-1 << 53), '-9007199254740992'),
+              ((-1 << 53) - 1, '-9007199254740993'),
+              ((-1 << 53) + 1, -9007199254740991)]
 
     def test_ints(self):
         for val, expect in self.values:
-            self.assertEquals(
+            self.assertEqual(
                 val,
                 json.loads(json.dumps(val)))
-            self.assertEquals(
+            self.assertEqual(
                 expect,
                 json.loads(json.dumps(val, bigint_as_string=True)))
 
@@ -25,10 +28,10 @@ class TestBigintAsString(TestCase):
         for val, expect in self.values:
             val = [val, val]
             expect = [expect, expect]
-            self.assertEquals(
+            self.assertEqual(
                 val,
                 json.loads(json.dumps(val)))
-            self.assertEquals(
+            self.assertEqual(
                 expect,
                 json.loads(json.dumps(val, bigint_as_string=True)))
 
@@ -36,10 +39,10 @@ class TestBigintAsString(TestCase):
         for val, expect in self.values:
             val = {'k': val}
             expect = {'k': expect}
-            self.assertEquals(
+            self.assertEqual(
                 val,
                 json.loads(json.dumps(val)))
-            self.assertEquals(
+            self.assertEqual(
                 expect,
                 json.loads(json.dumps(val, bigint_as_string=True)))
 
@@ -47,9 +50,9 @@ class TestBigintAsString(TestCase):
         for val, _ in self.values:
             expect = {str(val): 'value'}
             val = {val: 'value'}
-            self.assertEquals(
+            self.assertEqual(
                 expect,
                 json.loads(json.dumps(val)))
-            self.assertEquals(
+            self.assertEqual(
                 expect,
                 json.loads(json.dumps(val, bigint_as_string=True)))

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import with_statement
 
 import sys
 from distutils.core import setup, Extension, Command
@@ -7,9 +8,11 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '3.0.4'
+VERSION = '3.0.5'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
-LONG_DESCRIPTION = open('README.rst', 'r').read()
+
+with open('README.rst', 'r') as f:
+   LONG_DESCRIPTION = f.read()
 
 CLASSIFIERS = filter(None, map(str.strip,
 """
@@ -67,7 +70,10 @@ class TestCommand(Command):
     def run(self):
         import sys, subprocess
         raise SystemExit(
-            subprocess.call([sys.executable, 'simplejson/tests/__init__.py']))
+            subprocess.call([sys.executable,
+                             # Turn on deprecation warnings
+                             '-Wd',
+                             'simplejson/tests/__init__.py']))
 
 def run_setup(with_binary):
     cmdclass = dict(test=TestCommand)

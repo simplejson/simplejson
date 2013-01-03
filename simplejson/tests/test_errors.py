@@ -17,10 +17,10 @@ class TestErrors(TestCase):
             err = sys.exc_info()[1]
         else:
             self.fail('Expected JSONDecodeError')
-        self.assertEquals(err.lineno, 2)
-        self.assertEquals(err.colno, 1)
-        self.assertEquals(err.endlineno, 3)
-        self.assertEquals(err.endcolno, 2)
+        self.assertEqual(err.lineno, 2)
+        self.assertEqual(err.colno, 1)
+        self.assertEqual(err.endlineno, 3)
+        self.assertEqual(err.endcolno, 2)
 
     def test_scan_error(self):
         err = None
@@ -31,5 +31,5 @@ class TestErrors(TestCase):
                 err = sys.exc_info()[1]
             else:
                 self.fail('Expected JSONDecodeError')
-            self.assertEquals(err.lineno, 1)
-            self.assertEquals(err.colno, 9)
+            self.assertEqual(err.lineno, 1)
+            self.assertEqual(err.colno, 9)

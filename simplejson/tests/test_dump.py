@@ -11,13 +11,13 @@ class TestDump(TestCase):
     def test_dump(self):
         sio = StringIO()
         json.dump({}, sio)
-        self.assertEquals(sio.getvalue(), '{}')
+        self.assertEqual(sio.getvalue(), '{}')
 
     def test_constants(self):
         for c in [None, True, False]:
-            self.assert_(json.loads(json.dumps(c)) is c)
-            self.assert_(json.loads(json.dumps([c]))[0] is c)
-            self.assert_(json.loads(json.dumps({'a': c}))['a'] is c)
+            self.assertTrue(json.loads(json.dumps(c)) is c)
+            self.assertTrue(json.loads(json.dumps([c]))[0] is c)
+            self.assertTrue(json.loads(json.dumps({'a': c}))['a'] is c)
 
     def test_stringify_key(self):
         items = [(b('bytes'), 'bytes'),
@@ -28,10 +28,10 @@ class TestDump(TestCase):
                  (None, 'null'),
                  (long_type(100), '100')]
         for k, expect in items:
-            self.assertEquals(
+            self.assertEqual(
                 json.loads(json.dumps({k: expect})),
                 {expect: expect})
-            self.assertEquals(
+            self.assertEqual(
                 json.loads(json.dumps({k: expect}, sort_keys=True)),
                 {expect: expect})
         self.assertRaises(TypeError, json.dumps, {json: 1})
@@ -40,24 +40,24 @@ class TestDump(TestCase):
                 v0 = dict(v)
                 v0[json] = 1
                 v1 = dict((as_text_type(key), val) for (key, val) in v.items())
-                self.assertEquals(
+                self.assertEqual(
                     json.loads(json.dumps(v0, skipkeys=True, sort_keys=sort_keys)),
                     v1)
-                self.assertEquals(
+                self.assertEqual(
                     json.loads(json.dumps({'': v0}, skipkeys=True, sort_keys=sort_keys)),
                     {'': v1})
-                self.assertEquals(
+                self.assertEqual(
                     json.loads(json.dumps([v0], skipkeys=True, sort_keys=sort_keys)),
                     [v1])
 
     def test_dumps(self):
-        self.assertEquals(json.dumps({}), '{}')
+        self.assertEqual(json.dumps({}), '{}')
 
     def test_encode_truefalse(self):
-        self.assertEquals(json.dumps(
+        self.assertEqual(json.dumps(
                  {True: False, False: True}, sort_keys=True),
                  '{"false": true, "true": false}')
-        self.assertEquals(
+        self.assertEqual(
             json.dumps(
                 {2: 3.0,
                  4.0: long_type(5),
