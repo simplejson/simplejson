@@ -1,7 +1,9 @@
 Version 3.0.7 released 2013-10-11
 
 * NOTE: this release only changes the license.
-* simplejson is now dual-licensed software, MIT or AFL v2.1.
+* simplejson is now dual-licensed software, MIT or AFL v2.1. It is
+  also made explicit that this code is also licensed to the PSF under
+  a Contributor Agreement.
 
 Version 3.0.6 released 2013-01-11
 
