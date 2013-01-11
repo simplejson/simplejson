@@ -143,3 +143,14 @@ class TestUnicode(TestCase):
             # invalid value for low surrogate
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u0000"')
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\ufc00"')
+
+    def test_ensure_ascii_still_works(self):
+        # in the ascii range, ensure that everything is the same
+        for c in map(unichr, range(0, 127)):
+            self.assertEqual(
+                json.dumps(c, ensure_ascii=False),
+                json.dumps(c))
+        snowman = u'\N{SNOWMAN}'
+        self.assertEqual(
+            json.dumps(c, ensure_ascii=False),
+            '"' + c + '"')

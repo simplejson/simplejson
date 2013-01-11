@@ -1,3 +1,10 @@
+Version 3.0.6 released 2013-01-11
+
+* Fix for major Python 2.x ensure_ascii=False encoding regression
+  introduced in simplejson 3.0.0. If you use this setting, please
+  upgrade immediately.
+  https://github.com/simplejson/simplejson/issues/50
+
 Version 3.0.5 released 2013-01-03
 
 * NOTE: this release only changes the tests, it is

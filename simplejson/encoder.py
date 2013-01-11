@@ -15,7 +15,10 @@ c_encode_basestring_ascii, c_make_encoder = _import_speedups()
 
 from simplejson.decoder import PosInf
 
-ESCAPE = re.compile(u(r'[\x00-\x1f\\"\b\f\n\r\t\u2028\u2029]'))
+#ESCAPE = re.compile(ur'[\x00-\x1f\\"\b\f\n\r\t\u2028\u2029]')
+# This is required because u() will mangle the string and ur'' isn't valid
+# python3 syntax
+ESCAPE = re.compile(u'[\\x00-\\x1f\\\\"\\b\\f\\n\\r\\t\u2028\u2029]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 ESCAPE_DCT = {
