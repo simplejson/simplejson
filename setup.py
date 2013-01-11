@@ -8,7 +8,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '3.0.6'
+VERSION = '3.0.7'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
 with open('README.rst', 'r') as f:
@@ -19,6 +19,7 @@ CLASSIFIERS = filter(None, map(str.strip,
 Development Status :: 5 - Production/Stable
 Intended Audience :: Developers
 License :: OSI Approved :: MIT License
+License :: OSI Approved :: Academic Free License (AFL)
 Programming Language :: Python
 Programming Language :: Python :: 2
 Programming Language :: Python :: 2.5
