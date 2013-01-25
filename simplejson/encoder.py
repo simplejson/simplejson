@@ -121,7 +121,7 @@ class JSONEncoder(object):
             indent=None, separators=None, encoding='utf-8', default=None,
             use_decimal=True, namedtuple_as_object=True,
             tuple_as_array=True, bigint_as_string=False,
-            item_sort_key=None):
+            item_sort_key=None, use_json_attr=True):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -194,6 +194,7 @@ class JSONEncoder(object):
         self.tuple_as_array = tuple_as_array
         self.bigint_as_string = bigint_as_string
         self.item_sort_key = item_sort_key
+        self.use_json_attr = use_json_attr
         if indent is not None and not isinstance(indent, string_types):
             indent = indent * ' '
         self.indent = indent
@@ -310,7 +311,7 @@ class JSONEncoder(object):
                 self.skipkeys, self.allow_nan, key_memo, self.use_decimal,
                 self.namedtuple_as_object, self.tuple_as_array,
                 self.bigint_as_string, self.item_sort_key,
-                self.encoding,
+                self.encoding, self.use_json_attr,
                 Decimal)
         else:
             _iterencode = _make_iterencode(
@@ -319,7 +320,7 @@ class JSONEncoder(object):
                 self.skipkeys, _one_shot, self.use_decimal,
                 self.namedtuple_as_object, self.tuple_as_array,
                 self.bigint_as_string, self.item_sort_key,
-                self.encoding,
+                self.encoding, self.use_json_attr,
                 Decimal=Decimal)
         try:
             return _iterencode(o, 0)
@@ -357,7 +358,7 @@ class JSONEncoderForHTML(JSONEncoder):
 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
         _use_decimal, _namedtuple_as_object, _tuple_as_array,
-        _bigint_as_string, _item_sort_key, _encoding,
+        _bigint_as_string, _item_sort_key, _encoding, _use_json_attr,
         ## HACK: hand-optimized bytecode; turn globals into locals
         _PY3=PY3,
         ValueError=ValueError,
@@ -419,6 +420,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 yield buf + _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
                 yield buf + str(value)
+            elif _use_json_attr and getattr(value, '__json__', None):
+                yield str(value.__json__())
             else:
                 yield buf
                 if isinstance(value, list):
@@ -530,6 +533,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 yield _floatstr(value)
             elif _use_decimal and isinstance(value, Decimal):
                 yield str(value)
+            elif _use_json_attr and getattr(value, '__json__', None):
+                yield str(value.__json__())
             else:
                 if isinstance(value, list):
                     chunks = _iterencode_list(value, _current_indent_level)
@@ -586,6 +591,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     yield chunk
             elif _use_decimal and isinstance(o, Decimal):
                 yield str(o)
+            elif _use_json_attr and getattr(o, '__json__', None):
+                yield str(o.__json__())
             else:
                 if markers is not None:
                     markerid = id(o)
