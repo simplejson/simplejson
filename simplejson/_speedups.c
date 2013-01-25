@@ -152,6 +152,7 @@ typedef struct _PyEncoderObject {
     int namedtuple_as_object;
     int tuple_as_array;
     int bigint_as_string;
+    int use_json_attr;
     PyObject *item_sort_key;
     PyObject *item_sort_kw;
 } PyEncoderObject;
@@ -2520,13 +2521,13 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "Decimal", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "use_json_attr" "Decimal", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
     PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
     PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array;
-    PyObject *bigint_as_string, *item_sort_key, *encoding, *Decimal;
+    PyObject *bigint_as_string, *item_sort_key, *encoding, *use_json_attr, *Decimal;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
@@ -2535,7 +2536,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array, &bigint_as_string,
-        &item_sort_key, &encoding, &Decimal))
+        &item_sort_key, &encoding, &use_json_attr, &Decimal))
         return -1;
 
     s->markers = markers;
@@ -2556,6 +2557,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
     s->bigint_as_string = PyObject_IsTrue(bigint_as_string);
+    s->use_json_attr = PyObject_IsTrue(use_json_attr);
     if (item_sort_key != Py_None) {
         if (!PyCallable_Check(item_sort_key))
             PyErr_SetString(PyExc_TypeError, "item_sort_key must be None or callable");
@@ -2777,6 +2779,14 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             PyObject *encoded = PyObject_Str(obj);
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
+        }
+        else if (s->use_json_attr) {
+            PyObject *newobj;
+            if (Py_EnterRecurisveCall(" while encoding a JSON object"))
+                return rv;
+            newobj = PyObject_Str(PyObject_CallMethod(obj, "__json__", NULL));
+            if (newobj != NULL)
+                rv = _steal_accumlate(rval, newobj);
         }
         else {
             PyObject *ident = NULL;
