@@ -1,4 +1,4 @@
-Version 3.0.7 released 2013-10-11
+Version 3.0.7 released 2013-01-11
 
 * NOTE: this release only changes the license.
 * simplejson is now dual-licensed software, MIT or AFL v2.1. It is
