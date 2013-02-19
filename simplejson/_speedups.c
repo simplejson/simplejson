@@ -486,11 +486,13 @@ ascii_char_size(JSON_UNICHR c)
                c == '\t') {
         return 2;
     }
-    else if (c < 0x10000U) {
-        return MIN_EXPANSION;
-    }
-    else {
+#if defined(Py_UNICODE_WIDE) || PY_MAJOR_VERSION >= 3
+    else if (c >= 0x10000U) {
         return 2 * MIN_EXPANSION;
+    }
+#endif
+    else {
+        return MIN_EXPANSION;
     }
 }
 
