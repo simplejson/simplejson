@@ -1,3 +1,9 @@
+Version 3.0.9 released 2013-02-21
+
+* Fix an off-by-one error in the colno property of JSONDecodeError
+  (when lineno == 1)
+  http://bugs.python.org/issue17225
+
 Version 3.0.8 released 2013-02-19
 
 * Fix a Python 2.x compiler warning for narrow unicode builds

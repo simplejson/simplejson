@@ -111,7 +111,7 @@ class TestFail(TestCase):
                 e = sys.exc_info()[1]
                 self.assertEqual(e.pos, 1)
                 self.assertEqual(e.lineno, 1)
-                self.assertEqual(e.colno, 1)
+                self.assertEqual(e.colno, 2)
             except Exception:
                 e = sys.exc_info()[1]
                 self.fail("Unexpected exception raised %r %s" % (e, e))

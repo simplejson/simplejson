@@ -32,4 +32,4 @@ class TestErrors(TestCase):
             else:
                 self.fail('Expected JSONDecodeError')
             self.assertEqual(err.lineno, 1)
-            self.assertEqual(err.colno, 9)
+            self.assertEqual(err.colno, 10)
