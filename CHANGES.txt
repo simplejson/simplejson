@@ -1,4 +1,4 @@
-Version 3.1.0 released XXXX-XX-XX
+Version 3.1.0 released 2013-02-21
 
 * Updated JSON conformance test suite
   http://bugs.python.org/issue16559
