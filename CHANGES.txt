@@ -1,5 +1,7 @@
 Version 3.1.0 released XXXX-XX-XX
 
+* simplejson.tool tests and bugfix for Python 3.x
+  http://bugs.python.org/issue16549
 * Improve error messages for certain kinds of truncated input
   http://bugs.python.org/issue16009
 * Moved JSONDecodeError to json.scanner (still available for import
