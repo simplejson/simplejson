@@ -99,7 +99,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     Expecting property name: line 1 column 3 (char 2)
 """
 from __future__ import absolute_import
-__version__ = '3.0.9'
+__version__ = '3.1.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -110,7 +110,8 @@ __author__ = 'Bob Ippolito <bob@redivi.com>'
 
 from decimal import Decimal
 
-from .decoder import JSONDecoder, JSONDecodeError
+from .scanner import JSONDecodeError
+from .decoder import JSONDecoder
 from .encoder import JSONEncoder, JSONEncoderForHTML
 def _import_OrderedDict():
     import collections

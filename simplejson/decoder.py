@@ -5,7 +5,8 @@ import re
 import sys
 import struct
 from .compat import fromhex, b, u, text_type, binary_type, PY3, unichr
-from .scanner import make_scanner
+from .scanner import make_scanner, JSONDecodeError
+
 def _import_c_scanstring():
     try:
         from ._speedups import scanstring
@@ -14,6 +15,8 @@ def _import_c_scanstring():
         return None
 c_scanstring = _import_c_scanstring()
 
+# NOTE (3.1.0): JSONDecodeError may still be imported from this module for
+# compatibility, but it was never in the __all__
 __all__ = ['JSONDecoder']
 
 FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
@@ -28,57 +31,6 @@ def _floatconstants():
     return nan, inf, -inf
 
 NaN, PosInf, NegInf = _floatconstants()
-
-
-class JSONDecodeError(ValueError):
-    """Subclass of ValueError with the following additional properties:
-
-    msg: The unformatted error message
-    doc: The JSON document being parsed
-    pos: The start index of doc where parsing failed
-    end: The end index of doc where parsing failed (may be None)
-    lineno: The line corresponding to pos
-    colno: The column corresponding to pos
-    endlineno: The line corresponding to end (may be None)
-    endcolno: The column corresponding to end (may be None)
-
-    """
-    def __init__(self, msg, doc, pos, end=None):
-        ValueError.__init__(self, errmsg(msg, doc, pos, end=end))
-        self.msg = msg
-        self.doc = doc
-        self.pos = pos
-        self.end = end
-        self.lineno, self.colno = linecol(doc, pos)
-        if end is not None:
-            self.endlineno, self.endcolno = linecol(doc, end)
-        else:
-            self.endlineno, self.endcolno = None, None
-
-
-def linecol(doc, pos):
-    lineno = doc.count('\n', 0, pos) + 1
-    if lineno == 1:
-        colno = pos + 1
-    else:
-        colno = pos - doc.rindex('\n', 0, pos)
-    return lineno, colno
-
-
-def errmsg(msg, doc, pos, end=None):
-    # Note that this function is called from _speedups
-    lineno, colno = linecol(doc, pos)
-    if end is None:
-        #fmt = '{0}: line {1} column {2} (char {3})'
-        #return fmt.format(msg, lineno, colno, pos)
-        fmt = '%s: line %d column %d (char %d)'
-        return fmt % (msg, lineno, colno, pos)
-    endlineno, endcolno = linecol(doc, end)
-    #fmt = '{0}: line {1} column {2} - line {3} column {4} (char {5} - {6})'
-    #return fmt.format(msg, lineno, colno, endlineno, endcolno, pos, end)
-    fmt = '%s: line %d column %d - line %d column %d (char %d - %d)'
-    return fmt % (msg, lineno, colno, endlineno, endcolno, pos, end)
-
 
 _CONSTANTS = {
     '-Infinity': NegInf,
@@ -128,8 +80,7 @@ def py_scanstring(s, end, encoding=None, strict=True,
             break
         elif terminator != '\\':
             if strict:
-                msg = "Invalid control character %r at" % (terminator,)
-                #msg = "Invalid control character {0!r} at".format(terminator)
+                msg = "Invalid control character %r at"
                 raise JSONDecodeError(msg, s, end)
             else:
                 _append(terminator)
@@ -144,26 +95,25 @@ def py_scanstring(s, end, encoding=None, strict=True,
             try:
                 char = _b[esc]
             except KeyError:
-                msg = "Invalid \\escape: " + repr(esc)
+                msg = "Invalid \\X escape sequence %r"
                 raise JSONDecodeError(msg, s, end)
             end += 1
         else:
             # Unicode escape sequence
+            msg = "Invalid \\uXXXX escape sequence"
             esc = s[end + 1:end + 5]
             next_end = end + 5
             if len(esc) != 4:
-                msg = "Invalid \\uXXXX escape"
                 raise JSONDecodeError(msg, s, end)
             try:
                 uni = int(esc, 16)
             except ValueError:
-                msg = "Invalid \\uXXXX escape"
                 raise JSONDecodeError(msg, s, end)
             # Check for surrogate pair on UCS-4 systems
             if _maxunicode > 65535:
                 unimask = uni & 0xfc00
                 if unimask == 0xd800:
-                    msg = "Invalid \\uXXXX\\uXXXX surrogate pair"
+                    msg = "Unpaired high surrogate"
                     if not s[end + 5:end + 7] == '\\u':
                         raise JSONDecodeError(msg, s, end)
                     esc2 = s[end + 7:end + 11]
@@ -174,7 +124,6 @@ def py_scanstring(s, end, encoding=None, strict=True,
                     except ValueError:
                         raise JSONDecodeError(msg, s, end)
                     if uni2 & 0xfc00 != 0xdc00:
-                        msg = "Unpaired high surrogate"
                         raise JSONDecodeError(msg, s, end)
                     uni = 0x10000 + (((uni - 0xd800) << 10) | (uni2 - 0xdc00))
                     next_end += 6
@@ -246,10 +195,7 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
         except IndexError:
             pass
 
-        try:
-            value, end = scan_once(s, end)
-        except StopIteration:
-            raise JSONDecodeError("Expecting object", s, end)
+        value, end = scan_once(s, end)
         pairs.append((key, value))
 
         try:
@@ -264,7 +210,7 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
         if nextchar == '}':
             break
         elif nextchar != ',':
-            raise JSONDecodeError("Expecting ',' delimiter", s, end - 1)
+            raise JSONDecodeError("Expecting ',' delimiter or '}'", s, end - 1)
 
         try:
             nextchar = s[end]
@@ -301,12 +247,11 @@ def JSONArray(state, scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     # Look-ahead for trivial empty array
     if nextchar == ']':
         return values, end + 1
+    elif nextchar == '':
+        raise JSONDecodeError("Expecting value or ']'", s, end)
     _append = values.append
     while True:
-        try:
-            value, end = scan_once(s, end)
-        except StopIteration:
-            raise JSONDecodeError("Expecting object", s, end)
+        value, end = scan_once(s, end)
         _append(value)
         nextchar = s[end:end + 1]
         if nextchar in _ws:
@@ -316,7 +261,7 @@ def JSONArray(state, scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
         if nextchar == ']':
             break
         elif nextchar != ',':
-            raise JSONDecodeError("Expecting ',' delimiter", s, end)
+            raise JSONDecodeError("Expecting ',' delimiter or ']'", s, end - 1)
 
         try:
             if s[end] in _ws:
@@ -445,8 +390,4 @@ class JSONDecoder(object):
         """
         if _PY3 and not isinstance(s, text_type):
             raise TypeError("Input string must be text, not bytes")
-        try:
-            obj, end = self.scan_once(s, idx=_w(s, idx).end())
-        except StopIteration:
-            raise JSONDecodeError("No JSON object could be decoded", s, idx)
-        return obj, end
+        return self.scan_once(s, idx=_w(s, idx).end())

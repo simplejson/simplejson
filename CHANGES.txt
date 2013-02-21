@@ -1,3 +1,12 @@
+Version 3.1.0 released XXXX-XX-XX
+
+* Improve error messages for certain kinds of truncated input
+  http://bugs.python.org/issue16009
+* Moved JSONDecodeError to json.scanner (still available for import
+  from json.decoder)
+* Changed scanner to use JSONDecodeError directly rather than
+  StopIteration to improve error messages
+
 Version 3.0.9 released 2013-02-21
 
 * Fix an off-by-one error in the colno property of JSONDecodeError
