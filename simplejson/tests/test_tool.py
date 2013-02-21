@@ -1,3 +1,4 @@
+from __future__ import with_statement
 import os
 import sys
 import textwrap
@@ -45,7 +46,7 @@ class TestTool(unittest.TestCase):
                                 stderr=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         out, err = proc.communicate(data)
-        self.assertEqual(len(err), 0)
+        self.assertEqual(err, ''.encode())
         self.assertEqual(proc.returncode, 0)
         return out
 
@@ -68,7 +69,7 @@ class TestTool(unittest.TestCase):
             infile.flush()
             # outfile will get overwritten by tool, so the delete
             # may not work on some platforms. Do it manually.
-            outfile = tempfile.NamedTemporaryFile(delete=0)
+            outfile = tempfile.NamedTemporaryFile()
             try:
                 self.assertEqual(
                     self.runTool(args=[infile.name, outfile.name]),
@@ -77,4 +78,5 @@ class TestTool(unittest.TestCase):
                     self.assertEqual(f.read(), self.expect.encode())
             finally:
                 outfile.close()
-                os.unlink(outfile.name)
+                if os.path.exists(outfile.name):
+                    os.unlink(outfile.name)
