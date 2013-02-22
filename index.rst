@@ -48,8 +48,7 @@ Compact encoding::
 Pretty printing::
 
     >>> import simplejson as json
-    >>> s = json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4 * ' ')
-    >>> print('\n'.join([l.rstrip() for l in  s.splitlines()]))
+    >>> print(json.dumps({'4': 5, '6': 7}, sort_keys=True, indent=4 * ' '))
     {
         "4": 5,
         "6": 7
@@ -167,9 +166,13 @@ Basic Usage
    .. versionchanged:: 2.1.0
       Changed *indent* from an integer number of spaces to a string.
 
-   If specified, *separators* should be an ``(item_separator, dict_separator)``
-   tuple.  By default, ``(', ', ': ')`` are used.  To get the most compact JSON
-   representation, you should specify ``(',', ':')`` to eliminate whitespace.
+   If specified, *separators* should be an ``(item_separator, key_separator)``
+   tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
+   ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
+   you should specify ``(',', ':')`` to eliminate whitespace.
+
+   .. versionchanged:: 2.1.4
+      Use ``(',', ': ')`` as default if *indent* is not ``None``.
 
    *encoding* is the character encoding for str instances, default is
    ``'utf-8'``.
@@ -527,8 +530,14 @@ Encoders and decoders
       Changed *indent* from an integer number of spaces to a string.
 
    If specified, *separators* should be an ``(item_separator, key_separator)``
-   tuple.  By default, ``(', ', ': ')`` are used.  To get the most compact JSON
+   tuple.  The default is ``(', ', ': ')``.  To get the most compact JSON
    representation, you should specify ``(',', ':')`` to eliminate whitespace.
+   tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
+   ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
+   you should specify ``(',', ':')`` to eliminate whitespace.
+
+   .. versionchanged:: 2.1.4
+      Use ``(',', ': ')`` as default if *indent* is not ``None``.
 
    If specified, *default* should be a function that gets called for objects
    that can't otherwise be serialized.  It should return a JSON encodable

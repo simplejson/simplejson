@@ -153,9 +153,10 @@ class JSONEncoder(object):
         versions of simplejson earlier than 2.1.0, an integer is also accepted
         and is converted to a string with that many spaces.
 
-        If specified, separators should be a (item_separator, key_separator)
-        tuple.  The default is (', ', ': ').  To get the most compact JSON
-        representation you should specify (',', ':') to eliminate whitespace.
+        If specified, separators should be an (item_separator, key_separator)
+        tuple.  The default is (', ', ': ') if *indent* is ``None`` and
+        (',', ': ') otherwise.  To get the most compact JSON representation,
+        you should specify (',', ':') to eliminate whitespace.
 
         If specified, default is a function that gets called for objects
         that can't otherwise be serialized.  It should return a JSON encodable

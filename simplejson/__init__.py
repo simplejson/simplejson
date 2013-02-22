@@ -38,8 +38,7 @@ Compact encoding::
 Pretty printing::
 
     >>> import simplejson as json
-    >>> s = json.dumps({'4': 5, '6': 7}, sort_keys=True, indent='    ')
-    >>> print('\n'.join([l.rstrip() for l in  s.splitlines()]))
+    >>> print(json.dumps({'4': 5, '6': 7}, sort_keys=True, indent='    '))
     {
         "4": 5,
         "6": 7
@@ -99,7 +98,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     Expecting property name: line 1 column 3 (char 2)
 """
 from __future__ import absolute_import
-__version__ = '3.1.1'
+__version__ = '3.1.2'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -180,9 +179,10 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     versions of simplejson earlier than 2.1.0, an integer is also accepted
     and is converted to a string with that many spaces.
 
-    If ``separators`` is an ``(item_separator, dict_separator)`` tuple
-    then it will be used instead of the default ``(', ', ': ')`` separators.
-    ``(',', ':')`` is the most compact JSON representation.
+    If specified, ``separators`` should be an ``(item_separator, key_separator)``
+    tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
+    ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
+    you should specify ``(',', ':')`` to eliminate whitespace.
 
     ``encoding`` is the character encoding for str instances, default is UTF-8.
 
@@ -277,9 +277,10 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     versions of simplejson earlier than 2.1.0, an integer is also accepted
     and is converted to a string with that many spaces.
 
-    If ``separators`` is an ``(item_separator, dict_separator)`` tuple
-    then it will be used instead of the default ``(', ', ': ')`` separators.
-    ``(',', ':')`` is the most compact JSON representation.
+    If specified, ``separators`` should be an ``(item_separator, key_separator)``
+    tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
+    ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
+    you should specify ``(',', ':')`` to eliminate whitespace.
 
     ``encoding`` is the character encoding for str instances, default is UTF-8.
 

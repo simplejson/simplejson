@@ -1,3 +1,9 @@
+Version 3.1.2 released XXXX-XX-XX
+
+* Updated documentation to reflect separators behavior when indent is
+  not None
+  https://github.com/simplejson/simplejson/issues/59
+
 Version 3.1.1 released 2013-02-21
 
 * setup.py now has another workaround for Windows machines without
