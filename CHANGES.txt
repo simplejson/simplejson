@@ -1,4 +1,4 @@
-Version 3.1.1 released XXXX-XX-XX
+Version 3.1.1 released 2013-02-21
 
 * setup.py now has another workaround for Windows machines without
   MSVC installed
