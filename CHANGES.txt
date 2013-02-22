@@ -1,3 +1,9 @@
+Version 3.1.1 released XXXX-XX-XX
+
+* setup.py now has another workaround for Windows machines without
+  MSVC installed
+  http://bugs.python.org/issue7511
+
 Version 3.1.0 released 2013-02-21
 
 * Updated JSON conformance test suite
