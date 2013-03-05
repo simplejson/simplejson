@@ -121,7 +121,7 @@ class JSONEncoder(object):
             indent=None, separators=None, encoding='utf-8', default=None,
             use_decimal=True, namedtuple_as_object=True,
             tuple_as_array=True, bigint_as_string=False,
-            item_sort_key=None):
+            item_sort_key=None, encode_nan=False):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -137,10 +137,11 @@ class JSONEncoder(object):
         prevent an infinite recursion (which would cause an OverflowError).
         Otherwise, no such check takes place.
 
-        If allow_nan is true, then NaN, Infinity, and -Infinity will be
+        If encode_nan is true, then NaN, Infinity, and -Infinity will be
         encoded as such.  This behavior is not JSON specification compliant,
         but is consistent with most JavaScript based encoders and decoders.
-        Otherwise, such floats will be encoded as null.
+        Otherwise, such floats will be encoded as null. This parameter will 
+        replace allow_nan. 
 
         If sort_keys is true, then the output of dictionaries will be
         sorted by key; this is useful for regression tests to ensure
@@ -279,7 +280,7 @@ class JSONEncoder(object):
                     o = o.decode(_encoding)
                 return _orig_encoder(o)
 
-        def floatstr(o, allow_nan=self.allow_nan,
+        def floatstr(o, encode_nan=self.encode_nan,
                 _repr=FLOAT_REPR, _inf=PosInf, _neginf=-PosInf):
             # Check for specials. Note that this type of test is processor
             # and/or platform-specific, so do tests which don't depend on
@@ -294,7 +295,7 @@ class JSONEncoder(object):
             else:
                 return _repr(o)
 
-            if not allow_nan:
+            if not encode_nan:
                 return 'null'
 
             return text
