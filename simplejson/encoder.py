@@ -140,7 +140,7 @@ class JSONEncoder(object):
         If allow_nan is true, then NaN, Infinity, and -Infinity will be
         encoded as such.  This behavior is not JSON specification compliant,
         but is consistent with most JavaScript based encoders and decoders.
-        Otherwise, it will be a ValueError to encode such floats.
+        Otherwise, such floats will be encoded as null.
 
         If sort_keys is true, then the output of dictionaries will be
         sorted by key; this is useful for regression tests to ensure
@@ -295,9 +295,7 @@ class JSONEncoder(object):
                 return _repr(o)
 
             if not allow_nan:
-                raise ValueError(
-                    "Out of range float values are not JSON compliant: " +
-                    repr(o))
+                return 'null'
 
             return text
 
