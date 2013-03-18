@@ -6,6 +6,12 @@ import unittest
 import subprocess
 import tempfile
 
+try:
+    from test.support import strip_python_stderr
+except ImportError:  # Python 2.X
+    from test.test_support import strip_python_stderr
+
+
 class TestTool(unittest.TestCase):
     data = """
 
@@ -46,6 +52,7 @@ class TestTool(unittest.TestCase):
                                 stderr=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         out, err = proc.communicate(data)
+        err = strip_python_stderr(err)
         self.assertEqual(err, ''.encode())
         self.assertEqual(proc.returncode, 0)
         return out
