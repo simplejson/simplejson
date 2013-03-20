@@ -5,6 +5,21 @@ import textwrap
 import unittest
 import subprocess
 import tempfile
+try:
+    # Python 3.x
+    from test.support import strip_python_stderr
+except ImportError:
+    # Python 2.6+
+    try:
+        from test.test_support import strip_python_stderr
+    except ImportError:
+        # Python 2.5
+        import re
+        def strip_python_stderr(stderr):
+            return re.sub(
+                r"\[\d+ refs\]\r?\n?$".encode(),
+                "".encode(),
+                stderr).strip()
 
 class TestTool(unittest.TestCase):
     data = """
@@ -46,7 +61,7 @@ class TestTool(unittest.TestCase):
                                 stderr=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         out, err = proc.communicate(data)
-        self.assertEqual(err, ''.encode())
+        self.assertEqual(strip_python_stderr(err), ''.encode())
         self.assertEqual(proc.returncode, 0)
         return out
 
