@@ -1,4 +1,4 @@
-Version 3.1.2 released XXXX-XX-XX
+Version 3.1.2 released 2013-03-20
 
 * Updated documentation to reflect separators behavior when indent is
   not None
