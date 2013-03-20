@@ -4,6 +4,7 @@ Version 3.1.2 released XXXX-XX-XX
   not None
   https://github.com/simplejson/simplejson/issues/59
 * Test suite should be compatible with debug builds of Python 2.x and 3.x
+  https://github.com/simplejson/simplejson/pull/65
 
 Version 3.1.1 released 2013-02-21
 
