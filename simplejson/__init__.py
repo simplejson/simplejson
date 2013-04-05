@@ -98,7 +98,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     Expecting property name: line 1 column 3 (char 2)
 """
 from __future__ import absolute_import
-__version__ = '3.1.2'
+__version__ = '3.1.3'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -179,10 +179,11 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     versions of simplejson earlier than 2.1.0, an integer is also accepted
     and is converted to a string with that many spaces.
 
-    If specified, ``separators`` should be an ``(item_separator, key_separator)``
-    tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
-    ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
-    you should specify ``(',', ':')`` to eliminate whitespace.
+    If specified, ``separators`` should be an
+    ``(item_separator, key_separator)`` tuple.  The default is ``(', ', ': ')``
+    if *indent* is ``None`` and ``(',', ': ')`` otherwise.  To get the most
+    compact JSON representation, you should specify ``(',', ':')`` to eliminate
+    whitespace.
 
     ``encoding`` is the character encoding for str instances, default is UTF-8.
 
@@ -215,7 +216,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
-    the ``cls`` kwarg.
+    the ``cls`` kwarg. NOTE: You should use *default* instead of subclassing
+    whenever possible.
 
     """
     # cached encoder
@@ -277,10 +279,11 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     versions of simplejson earlier than 2.1.0, an integer is also accepted
     and is converted to a string with that many spaces.
 
-    If specified, ``separators`` should be an ``(item_separator, key_separator)``
-    tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
-    ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
-    you should specify ``(',', ':')`` to eliminate whitespace.
+    If specified, ``separators`` should be an
+    ``(item_separator, key_separator)`` tuple.  The default is ``(', ', ': ')``
+    if *indent* is ``None`` and ``(',', ': ')`` otherwise.  To get the most
+    compact JSON representation, you should specify ``(',', ':')`` to eliminate
+    whitespace.
 
     ``encoding`` is the character encoding for str instances, default is UTF-8.
 
@@ -311,7 +314,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
 
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
-    the ``cls`` kwarg.
+    the ``cls`` kwarg. NOTE: You should use *default* instead of subclassing
+    whenever possible.
 
     """
     # cached encoder
@@ -389,7 +393,8 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
     parse_float=decimal.Decimal for parity with ``dump``.
 
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
-    kwarg.
+    kwarg. NOTE: You should use *object_hook* or *object_pairs_hook* instead
+    of subclassing whenever possible.
 
     """
     return loads(fp.read(),
@@ -445,7 +450,8 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
     parse_float=decimal.Decimal for parity with ``dump``.
 
     To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
-    kwarg.
+    kwarg. NOTE: You should use *object_hook* or *object_pairs_hook* instead
+    of subclassing whenever possible.
 
     """
     if (cls is None and encoding is None and object_hook is None and

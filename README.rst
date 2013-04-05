@@ -10,10 +10,14 @@ simplejson is the externally maintained development version of the
 json library included with Python 2.6 and Python 3.0, but maintains
 backwards compatibility with Python 2.5.
 
-The encoder may be subclassed to provide serialization in any kind of
+The encoder can be specialized to provide serialization in any kind of
 situation, without any special support by the objects to be serialized
-(somewhat like pickle).
+(somewhat like pickle). This is best done with the ``default`` kwarg
+to dumps.
 
 The decoder can handle incoming JSON strings of any specified encoding
-(UTF-8 by default).
+(UTF-8 by default). It can also be specialized to post-process JSON
+objects with the ``object_hook`` or ``object_pairs_hook`` kwargs. This
+is particularly useful for implementing protocols such as JSON-RPC
+that have a richer type system than JSON itself.
 

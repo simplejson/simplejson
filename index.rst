@@ -184,6 +184,11 @@ Basic Usage
    :meth:`default` method to serialize additional types), specify it with the
    *cls* kwarg.
 
+   .. note::
+
+        Subclassing is not recommended. Use the *default* kwarg
+        instead. This is faster and more portable.
+
    If *use_decimal* is true (default: ``True``) then :class:`decimal.Decimal`
    will be natively serialized to JSON with full precision.
 
@@ -314,7 +319,12 @@ Basic Usage
 
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
    kwarg.  Additional keyword arguments will be passed to the constructor of the
-   class.
+   class. You probably shouldn't do this.
+
+    .. note::
+
+        Subclassing is not recommended. You should use *object_hook* or
+        *object_pairs_hook*. This is faster and more portable than subclassing.
 
     .. note::
 
@@ -478,6 +488,11 @@ Encoders and decoders
    for ``o`` if possible, otherwise it should call the superclass implementation
    (to raise :exc:`TypeError`).
 
+    .. note::
+
+        Subclassing is not recommended. You should use the *default*
+        kwarg. This is faster and more portable than subclassing.
+
    If *skipkeys* is false (the default), then it is a :exc:`TypeError` to
    attempt encoding of keys that are not str, int, long, float or None.  If
    *skipkeys* is true, such items are simply skipped.
@@ -591,6 +606,13 @@ Encoders and decoders
                 return list(iterable)
             return JSONEncoder.default(self, o)
 
+    .. note::
+
+        Subclassing is not recommended. You should implement this
+        as a function and pass it to the *default* kwarg of :func:`dumps`.
+        This is faster and more portable than subclassing. The
+        semantics are the same, but without the self argument or the
+        call to the super implementation.
 
    .. method:: encode(o)
 
