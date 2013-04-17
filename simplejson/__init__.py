@@ -142,6 +142,7 @@ _default_encoder = JSONEncoder(
     tuple_as_array=True,
     bigint_as_string=False,
     item_sort_key=None,
+    for_json=False,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
@@ -149,7 +150,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True, tuple_as_array=True,
         bigint_as_string=False, sort_keys=False, item_sort_key=None,
-        **kw):
+        for_json=False, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
@@ -214,6 +215,10 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *sort_keys* is true (default: ``False``), the output of dictionaries
     will be sorted by item.
 
+    If *for_json* is true (default: ``False``), objects with a ``for_json()``
+    method will use the return value of that method for encoding as JSON
+    instead of the object.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg. NOTE: You should use *default* instead of subclassing
@@ -226,7 +231,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         cls is None and indent is None and separators is None and
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array
-        and not bigint_as_string and not item_sort_key and not kw):
+        and not bigint_as_string and not item_sort_key
+        and not for_json and not kw):
         iterable = _default_encoder.iterencode(obj)
     else:
         if cls is None:
@@ -240,6 +246,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             bigint_as_string=bigint_as_string,
             sort_keys=sort_keys,
             item_sort_key=item_sort_key,
+            for_json=for_json,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -252,7 +259,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True, tuple_as_array=True,
         bigint_as_string=False, sort_keys=False, item_sort_key=None,
-        **kw):
+        for_json=False, **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
     If ``skipkeys`` is false then ``dict`` keys that are not basic types
@@ -312,6 +319,10 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     If *sort_keys* is true (default: ``False``), the output of dictionaries
     will be sorted by item.
 
+    If *for_json* is true (default: ``False``), objects with a ``for_json()``
+    method will use the return value of that method for encoding as JSON
+    instead of the object.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg. NOTE: You should use *default* instead of subclassing
@@ -325,7 +336,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array
         and not bigint_as_string and not sort_keys
-        and not item_sort_key and not kw):
+        and not item_sort_key and not for_json and not kw):
         return _default_encoder.encode(obj)
     if cls is None:
         cls = JSONEncoder
@@ -339,6 +350,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         bigint_as_string=bigint_as_string,
         sort_keys=sort_keys,
         item_sort_key=item_sort_key,
+        for_json=for_json,
         **kw).encode(obj)
 
 
