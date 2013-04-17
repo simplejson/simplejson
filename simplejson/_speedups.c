@@ -260,6 +260,8 @@ static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 static int
 _is_namedtuple(PyObject *obj);
+static int
+_has_for_json_hook(PyObject *obj);
 static PyObject *
 moduleinit(void);
 
@@ -423,6 +425,20 @@ _is_namedtuple(PyObject *obj)
     }
     rval = PyCallable_Check(_asdict);
     Py_DECREF(_asdict);
+    return rval;
+}
+
+static int
+_has_for_json_hook(PyObject *obj)
+{
+    int rval = 0;
+    PyObject *for_json = PyObject_GetAttrString(obj, "for_json");
+    if (for_json == NULL) {
+        PyErr_Clear();
+        return 0;
+    }
+    rval = PyCallable_Check(for_json);
+    Py_DECREF(for_json);
     return rval;
 }
 
@@ -2800,6 +2816,17 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             PyObject *encoded = encoder_encode_float(s, obj);
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
+        }
+        else if (_has_for_json_hook(obj)) {
+            PyObject *newobj;
+            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
+                return rv;
+            newobj = PyObject_CallMethod(obj, "for_json", NULL);
+            if (newobj != NULL) {
+                rv = encoder_listencode_obj(s, rval, newobj, indent_level);
+                Py_DECREF(newobj);
+            }
+            Py_LeaveRecursiveCall();
         }
         else if (s->namedtuple_as_object && _is_namedtuple(obj)) {
             PyObject *newobj;
