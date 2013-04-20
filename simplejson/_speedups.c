@@ -170,6 +170,7 @@ typedef struct _PyEncoderObject {
     int bigint_as_string;
     PyObject *item_sort_key;
     PyObject *item_sort_kw;
+    int for_json;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -260,6 +261,8 @@ static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 static int
 _is_namedtuple(PyObject *obj);
+static int
+_has_for_json_hook(PyObject *obj);
 static PyObject *
 moduleinit(void);
 
@@ -423,6 +426,20 @@ _is_namedtuple(PyObject *obj)
     }
     rval = PyCallable_Check(_asdict);
     Py_DECREF(_asdict);
+    return rval;
+}
+
+static int
+_has_for_json_hook(PyObject *obj)
+{
+    int rval = 0;
+    PyObject *for_json = PyObject_GetAttrString(obj, "for_json");
+    if (for_json == NULL) {
+        PyErr_Clear();
+        return 0;
+    }
+    rval = PyCallable_Check(for_json);
+    Py_DECREF(for_json);
     return rval;
 }
 
@@ -2571,22 +2588,22 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "Decimal", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "Decimal", "for_json", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
     PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
     PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array;
-    PyObject *bigint_as_string, *item_sort_key, *encoding, *Decimal;
+    PyObject *bigint_as_string, *item_sort_key, *encoding, *Decimal, *for_json;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array, &bigint_as_string,
-        &item_sort_key, &encoding, &Decimal))
+        &item_sort_key, &encoding, &Decimal, &for_json))
         return -1;
 
     s->markers = markers;
@@ -2638,6 +2655,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->sort_keys = sort_keys;
     s->item_sort_key = item_sort_key;
     s->Decimal = Decimal;
+    s->for_json = PyObject_IsTrue(for_json);
 
     Py_INCREF(s->markers);
     Py_INCREF(s->defaultfn);
@@ -2800,6 +2818,17 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             PyObject *encoded = encoder_encode_float(s, obj);
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
+        }
+        else if (s->for_json && _has_for_json_hook(obj)) {
+            PyObject *newobj;
+            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
+                return rv;
+            newobj = PyObject_CallMethod(obj, "for_json", NULL);
+            if (newobj != NULL) {
+                rv = encoder_listencode_obj(s, rval, newobj, indent_level);
+                Py_DECREF(newobj);
+            }
+            Py_LeaveRecursiveCall();
         }
         else if (s->namedtuple_as_object && _is_namedtuple(obj)) {
             PyObject *newobj;

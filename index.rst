@@ -245,6 +245,13 @@ Basic Usage
       strings, to avoid comparison of heterogeneously typed objects
       (since this does not work in Python 3.3+)
 
+   If *for_json* is true (not the default), objects with a ``for_json()``
+   method will use the return value of that method for encoding as JSON instead
+   of the object.
+
+   .. versionchanged:: 3.2.0
+      *for_json* is new in 3.2.0.
+
     .. note::
 
         JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
@@ -252,7 +259,7 @@ Basic Usage
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, **kw]]]]]]]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, for_json[, **kw]]]]]]]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -456,7 +463,7 @@ Encoders and decoders
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
 
-.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key]]]]]]]]]]]]])
+.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key[, for_json]]]]]]]]]]]]]])
 
    Extensible JSON encoder for Python data structures.
 
@@ -587,6 +594,12 @@ Encoders and decoders
    .. versionchanged:: 2.4.0
      *bigint_as_string* is new in 2.4.0.
 
+   If *for_json* is true (default: ``False``), objects with a ``for_json()``
+   method will use the return value of that method for encoding as JSON instead
+   of the object.
+
+   .. versionchanged:: 3.2.0
+     *for_json* is new in 3.2.0.
 
    .. method:: default(o)
 
