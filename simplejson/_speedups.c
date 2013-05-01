@@ -93,6 +93,9 @@ typedef int Py_ssize_t;
 #define PyEncoder_Check(op) PyObject_TypeCheck(op, &PyEncoderType)
 #define PyEncoder_CheckExact(op) (Py_TYPE(op) == &PyEncoderType)
 
+#define JSON_ALLOW_NAN 1
+#define JSON_IGNORE_NAN 2
+
 static PyTypeObject PyScannerType;
 static PyTypeObject PyEncoderType;
 
@@ -163,7 +166,8 @@ typedef struct _PyEncoderObject {
     PyObject *skipkeys_bool;
     int skipkeys;
     int fast_encode;
-    int allow_nan;
+    /* 0, JSON_ALLOW_NAN, JSON_IGNORE_NAN */
+    int allow_or_ignore_nan;
     int use_decimal;
     int namedtuple_as_object;
     int tuple_as_array;
@@ -725,11 +729,11 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
             goto bail;
 #if PY_MAJOR_VERSION < 3
         else if (PyString_Check(key)) {
-            // item can be added as-is
+            /* item can be added as-is */
         }
 #endif /* PY_MAJOR_VERSION < 3 */
         else if (PyUnicode_Check(key)) {
-            // item can be added as-is
+            /* item can be added as-is */
         }
         else {
             PyObject *tpl;
@@ -737,7 +741,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
             if (kstr == NULL)
                 goto bail;
             else if (kstr == Py_None) {
-                // skipkeys
+                /* skipkeys */
                 Py_DECREF(kstr);
                 continue;
             }
@@ -2588,22 +2592,23 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "for_json", "Decimal", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "for_json", "ignore_nan", "Decimal", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
     PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
     PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array;
-    PyObject *bigint_as_string, *item_sort_key, *encoding, *Decimal, *for_json;
+    PyObject *bigint_as_string, *item_sort_key, *encoding, *for_json;
+    PyObject *ignore_nan, *Decimal;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array, &bigint_as_string,
-        &item_sort_key, &encoding, &for_json, &Decimal))
+        &item_sort_key, &encoding, &for_json, &ignore_nan, &Decimal))
         return -1;
 
     s->markers = markers;
@@ -2619,7 +2624,9 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->skipkeys = PyObject_IsTrue(skipkeys);
     s->key_memo = key_memo;
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
-    s->allow_nan = PyObject_IsTrue(allow_nan);
+    s->allow_or_ignore_nan = (
+        (PyObject_IsTrue(ignore_nan) ? JSON_IGNORE_NAN : 0) |
+        (PyObject_IsTrue(allow_nan) ? JSON_ALLOW_NAN : 0));
     s->use_decimal = PyObject_IsTrue(use_decimal);
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
@@ -2734,11 +2741,15 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
     /* Return the JSON representation of a PyFloat */
     double i = PyFloat_AS_DOUBLE(obj);
     if (!Py_IS_FINITE(i)) {
-        if (!s->allow_nan) {
+        if (!s->allow_or_ignore_nan) {
             PyErr_SetString(PyExc_ValueError, "Out of range float values are not JSON compliant");
             return NULL;
         }
-        if (i > 0) {
+        if (s->allow_or_ignore_nan & JSON_IGNORE_NAN) {
+            return _encoded_const(Py_None);
+        }
+        /* JSON_ALLOW_NAN is set */
+        else if (i > 0) {
             static PyObject *sInfinity = NULL;
             if (sInfinity == NULL)
                 sInfinity = JSON_InternFromString("Infinity");
@@ -2985,7 +2996,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             if (kstr == NULL)
                 goto bail;
             else if (kstr == Py_None) {
-                // skipkeys
+                /* skipkeys */
                 Py_DECREF(item);
                 Py_DECREF(kstr);
                 continue;

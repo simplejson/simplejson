@@ -121,7 +121,7 @@ class JSONEncoder(object):
             indent=None, separators=None, encoding='utf-8', default=None,
             use_decimal=True, namedtuple_as_object=True,
             tuple_as_array=True, bigint_as_string=False,
-            item_sort_key=None, for_json=False):
+            item_sort_key=None, for_json=False, ignore_nan=False):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -188,6 +188,11 @@ class JSONEncoder(object):
         method will use the return value of that method for encoding as JSON
         instead of the object.
 
+        If *ignore_nan* is true (default: ``False``), then out of range
+        :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized
+        as ``null`` in compliance with the ECMA-262 specification. If true,
+        this will override *allow_nan*.
+
         """
 
         self.skipkeys = skipkeys
@@ -201,6 +206,7 @@ class JSONEncoder(object):
         self.bigint_as_string = bigint_as_string
         self.item_sort_key = item_sort_key
         self.for_json = for_json
+        self.ignore_nan = ignore_nan
         if indent is not None and not isinstance(indent, string_types):
             indent = indent * ' '
         self.indent = indent
@@ -285,7 +291,7 @@ class JSONEncoder(object):
                     o = o.decode(_encoding)
                 return _orig_encoder(o)
 
-        def floatstr(o, allow_nan=self.allow_nan,
+        def floatstr(o, allow_nan=self.allow_nan, ignore_nan=self.ignore_nan,
                 _repr=FLOAT_REPR, _inf=PosInf, _neginf=-PosInf):
             # Check for specials. Note that this type of test is processor
             # and/or platform-specific, so do tests which don't depend on
@@ -300,7 +306,9 @@ class JSONEncoder(object):
             else:
                 return _repr(o)
 
-            if not allow_nan:
+            if ignore_nan:
+                text = 'null'
+            elif not allow_nan:
                 raise ValueError(
                     "Out of range float values are not JSON compliant: " +
                     repr(o))
@@ -317,7 +325,7 @@ class JSONEncoder(object):
                 self.skipkeys, self.allow_nan, key_memo, self.use_decimal,
                 self.namedtuple_as_object, self.tuple_as_array,
                 self.bigint_as_string, self.item_sort_key,
-                self.encoding, self.for_json,
+                self.encoding, self.for_json, self.ignore_nan,
                 Decimal)
         else:
             _iterencode = _make_iterencode(

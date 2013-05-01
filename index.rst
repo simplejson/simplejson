@@ -129,7 +129,7 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 Basic Usage
 -----------
 
-.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, **kw]]]]]]]]]]]]]]]])
+.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, [for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]]])
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
    file-like object).
@@ -152,9 +152,10 @@ Basic Usage
 
    If *allow_nan* is false (default: ``True``), then it will be a
    :exc:`ValueError` to serialize out of range :class:`float` values (``nan``,
-   ``inf``, ``-inf``) in strict compliance of the JSON specification.
+   ``inf``, ``-inf``) in strict compliance of the original JSON specification.
    If *allow_nan* is true, their JavaScript equivalents will be used
-   (``NaN``, ``Infinity``, ``-Infinity``).
+   (``NaN``, ``Infinity``, ``-Infinity``). See also *ignore_nan* for ECMA-262
+   compliant behavior.
 
    If *indent* is a string, then JSON array elements and object members
    will be pretty-printed with a newline followed by that string repeated
@@ -187,7 +188,7 @@ Basic Usage
    .. note::
 
         Subclassing is not recommended. Use the *default* kwarg
-        instead. This is faster and more portable.
+        or *for_json* instead. This is faster and more portable.
 
    If *use_decimal* is true (default: ``True``) then :class:`decimal.Decimal`
    will be natively serialized to JSON with full precision.
@@ -252,14 +253,22 @@ Basic Usage
    .. versionchanged:: 3.2.0
       *for_json* is new in 3.2.0.
 
-    .. note::
+   If *ignore_nan* is true (default: ``False``), then out of range
+   :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
+   ``null`` in compliance with the ECMA-262 specification. If true, this will
+   override *allow_nan*.
+
+   .. versionchanged:: 3.2.0
+      *ignore_nan* is new in 3.2.0.
+
+  .. note::
 
         JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
         does not make sense to serialize more than one JSON document without some
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, for_json[, **kw]]]]]]]]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -267,6 +276,8 @@ Basic Usage
    :class:`unicode` instance.  The other arguments have the same meaning as in
    :func:`dump`. Note that the default *ensure_ascii* setting has much
    better performance.
+
+   The other options have the same meaning as in :func:`dump`.
 
 
 .. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, **kw]]]]]]]]])
@@ -463,7 +474,7 @@ Encoders and decoders
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
 
-.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key[, for_json]]]]]]]]]]]]]])
+.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key[, for_json[, ignore_nan]]]]]]]]]]]]]]]])
 
    Extensible JSON encoder for Python data structures.
 
@@ -498,7 +509,7 @@ Encoders and decoders
     .. note::
 
         Subclassing is not recommended. You should use the *default*
-        kwarg. This is faster and more portable than subclassing.
+        or *for_json* kwarg. This is faster and more portable than subclassing.
 
    If *skipkeys* is false (the default), then it is a :exc:`TypeError` to
    attempt encoding of keys that are not str, int, long, float or None.  If
@@ -514,10 +525,10 @@ Encoders and decoders
    Otherwise, no such check takes place.
 
    If *allow_nan* is true (the default), then ``NaN``, ``Infinity``, and
-   ``-Infinity`` will be encoded as such.  This behavior is not JSON
+   ``-Infinity`` will be encoded as such. This behavior is not JSON
    specification compliant, but is consistent with most JavaScript based
    encoders and decoders.  Otherwise, it will be a :exc:`ValueError` to encode
-   such floats.
+   such floats. See also *ignore_nan* for ECMA-262 compliant behavior.
 
    If *sort_keys* is true (not the default), then the output of dictionaries
    will be sorted by key; this is useful for regression tests to ensure that
@@ -601,6 +612,14 @@ Encoders and decoders
    .. versionchanged:: 3.2.0
      *for_json* is new in 3.2.0.
 
+   If *ignore_nan* is true (default: ``False``), then out of range
+   :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
+   ``null`` in compliance with the ECMA-262 specification. If true, this will
+   override *allow_nan*.
+
+   .. versionchanged:: 3.2.0
+      *ignore_nan* is new in 3.2.0.
+
    .. method:: default(o)
 
       Implement this method in a subclass such that it returns a serializable
@@ -648,7 +667,7 @@ Encoders and decoders
       Note that :meth:`encode` has much better performance than
       :meth:`iterencode`.
 
-.. class:: JSONEncoderForHTML([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key]]]]]]]]]]]]])
+.. class:: JSONEncoderForHTML([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key[, for_json[, ignore_nan]]]]]]]]]]]]]]]])
 
    Subclass of :class:`JSONEncoder` that escapes &, <, and > for embedding in HTML.
 

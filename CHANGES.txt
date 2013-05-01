@@ -1,5 +1,9 @@
 Version 3.2.0 released 2013-05-XX
 
+* New ignore_nan kwarg in encoder that serializes out
+  of range floats (Infinity, -Infinity, NaN) as null for ECMA-262
+  compliance.
+  https://github.com/simplejson/simplejson/pull/63
 * New for_json kwarg in encoder to make it possible to for
   subclasses of dict and list to be specialized.
   https://github.com/simplejson/simplejson/pull/69

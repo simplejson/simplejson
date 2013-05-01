@@ -98,7 +98,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     Expecting property name: line 1 column 3 (char 2)
 """
 from __future__ import absolute_import
-__version__ = '3.1.3'
+__version__ = '3.2.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -143,6 +143,7 @@ _default_encoder = JSONEncoder(
     bigint_as_string=False,
     item_sort_key=None,
     for_json=False,
+    ignore_nan=False,
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
@@ -150,28 +151,29 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True, tuple_as_array=True,
         bigint_as_string=False, sort_keys=False, item_sort_key=None,
-        for_json=False, **kw):
+        for_json=False, ignore_nan=False, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
-    If ``skipkeys`` is true then ``dict`` keys that are not basic types
+    If *skipkeys* is true then ``dict`` keys that are not basic types
     (``str``, ``unicode``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
 
-    If ``ensure_ascii`` is false, then the some chunks written to ``fp``
+    If *ensure_ascii* is false, then the some chunks written to ``fp``
     may be ``unicode`` instances, subject to normal Python ``str`` to
     ``unicode`` coercion rules. Unless ``fp.write()`` explicitly
     understands ``unicode`` (as in ``codecs.getwriter()``) this is likely
     to cause an error.
 
-    If ``check_circular`` is false, then the circular reference check
+    If *check_circular* is false, then the circular reference check
     for container types will be skipped and a circular reference will
     result in an ``OverflowError`` (or worse).
 
-    If ``allow_nan`` is false, then it will be a ``ValueError`` to
+    If *allow_nan* is false, then it will be a ``ValueError`` to
     serialize out of range ``float`` values (``nan``, ``inf``, ``-inf``)
-    in strict compliance of the JSON specification, instead of using the
-    JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``).
+    in strict compliance of the original JSON specification, instead of using
+    the JavaScript equivalents (``NaN``, ``Infinity``, ``-Infinity``). See
+    *ignore_nan* for ECMA-262 compliant behavior.
 
     If *indent* is a string, then JSON array elements and object members
     will be pretty-printed with a newline followed by that string repeated
@@ -180,16 +182,16 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     versions of simplejson earlier than 2.1.0, an integer is also accepted
     and is converted to a string with that many spaces.
 
-    If specified, ``separators`` should be an
+    If specified, *separators* should be an
     ``(item_separator, key_separator)`` tuple.  The default is ``(', ', ': ')``
     if *indent* is ``None`` and ``(',', ': ')`` otherwise.  To get the most
     compact JSON representation, you should specify ``(',', ':')`` to eliminate
     whitespace.
 
-    ``encoding`` is the character encoding for str instances, default is UTF-8.
+    *encoding* is the character encoding for str instances, default is UTF-8.
 
-    ``default(obj)`` is a function that should return a serializable version
-    of obj or raise TypeError. The default simply raises TypeError.
+    *default(obj)* is a function that should return a serializable version
+    of obj or raise ``TypeError``. The default simply raises ``TypeError``.
 
     If *use_decimal* is true (default: ``True``) then decimal.Decimal
     will be natively serialized to JSON with full precision.
@@ -219,10 +221,15 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     method will use the return value of that method for encoding as JSON
     instead of the object.
 
+    If *ignore_nan* is true (default: ``False``), then out of range
+    :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
+    ``null`` in compliance with the ECMA-262 specification. If true, this will
+    override *allow_nan*.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
-    the ``cls`` kwarg. NOTE: You should use *default* instead of subclassing
-    whenever possible.
+    the ``cls`` kwarg. NOTE: You should use *default* or *for_json* instead
+    of subclassing whenever possible.
 
     """
     # cached encoder
@@ -232,7 +239,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array
         and not bigint_as_string and not item_sort_key
-        and not for_json and not kw):
+        and not for_json and not ignore_nan and not kw):
         iterable = _default_encoder.iterencode(obj)
     else:
         if cls is None:
@@ -247,6 +254,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             sort_keys=sort_keys,
             item_sort_key=item_sort_key,
             for_json=for_json,
+            ignore_nan=ignore_nan,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -259,7 +267,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding='utf-8', default=None, use_decimal=True,
         namedtuple_as_object=True, tuple_as_array=True,
         bigint_as_string=False, sort_keys=False, item_sort_key=None,
-        for_json=False, **kw):
+        for_json=False, ignore_nan=False, **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
     If ``skipkeys`` is false then ``dict`` keys that are not basic types
@@ -323,6 +331,11 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     method will use the return value of that method for encoding as JSON
     instead of the object.
 
+    If *ignore_nan* is true (default: ``False``), then out of range
+    :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
+    ``null`` in compliance with the ECMA-262 specification. If true, this will
+    override *allow_nan*.
+
     To use a custom ``JSONEncoder`` subclass (e.g. one that overrides the
     ``.default()`` method to serialize additional types), specify it with
     the ``cls`` kwarg. NOTE: You should use *default* instead of subclassing
@@ -336,7 +349,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array
         and not bigint_as_string and not sort_keys
-        and not item_sort_key and not for_json and not kw):
+        and not item_sort_key and not for_json
+        and not ignore_nan and not kw):
         return _default_encoder.encode(obj)
     if cls is None:
         cls = JSONEncoder
@@ -351,6 +365,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         sort_keys=sort_keys,
         item_sort_key=item_sort_key,
         for_json=for_json,
+        ignore_nan=ignore_nan,
         **kw).encode(obj)
 
 
