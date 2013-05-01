@@ -27,100 +27,71 @@ class ListForJson(list):
         return ['list']
 
 
-class TestForJsonWithSpeedups(unittest.TestCase):
-    def setUp(self):
-        if not json.encoder.c_make_encoder:
-            raise unittest.SkipTest("No speedups.")
-
-    @staticmethod
-    def _dump(obj):
-        return json.dumps(obj, for_json=True)
+class TestForJson(unittest.TestCase):
+    def assertRoundTrip(self, obj, other, for_json=True):
+        if for_json is None:
+            # None will use the default
+            s = json.dumps(obj)
+        else:
+            s = json.dumps(obj, for_json=for_json)
+        self.assertEqual(
+            json.loads(s),
+            other)
 
     def test_for_json_encodes_stand_alone_object(self):
-        self.assertEqual(self._dump(ForJson()), '{"for_json": 1}')
+        self.assertRoundTrip(
+            ForJson(),
+            ForJson().for_json())
 
     def test_for_json_encodes_object_nested_in_dict(self):
-        self.assertEqual(self._dump({'hooray': ForJson()}), '{"hooray": '
-                '{"for_json": 1}}')
+        self.assertRoundTrip(
+            {'hooray': ForJson()},
+            {'hooray': ForJson().for_json()})
 
     def test_for_json_encodes_object_nested_in_list_within_dict(self):
-        self.assertEqual(self._dump({'list': [0, ForJson(), 2, 3]}),
-                '{"list": [0, {"for_json": 1}, 2, 3]}')
+        self.assertRoundTrip(
+            {'list': [0, ForJson(), 2, 3]},
+            {'list': [0, ForJson().for_json(), 2, 3]})
 
     def test_for_json_encodes_object_nested_within_object(self):
-        self.assertEqual(self._dump(NestedForJson()),
-                '{"nested": {"for_json": 1}}')
+        self.assertRoundTrip(
+            NestedForJson(),
+            {'nested': {'for_json': 1}})
 
     def test_for_json_encodes_list(self):
-        self.assertEqual(self._dump(ForJsonList()), '["list"]')
+        self.assertRoundTrip(
+            ForJsonList(),
+            ForJsonList().for_json())
 
     def test_for_json_encodes_list_within_object(self):
-        self.assertEqual(self._dump({'nested': ForJsonList()}),
-                '{"nested": ["list"]}')
+        self.assertRoundTrip(
+            {'nested': ForJsonList()},
+            {'nested': ForJsonList().for_json()})
 
     def test_for_json_encodes_dict_subclass(self):
-        self.assertEqual(self._dump(DictForJson(a=1)), '{"alpha": 1}')
+        self.assertRoundTrip(
+            DictForJson(a=1),
+            DictForJson(a=1).for_json())
 
     def test_for_json_encodes_list_subclass(self):
-        self.assertEqual(self._dump(ListForJson(['l'])), '["list"]')
+        self.assertRoundTrip(
+            ListForJson(['l']),
+            ListForJson(['l']).for_json())
 
-    def tset_for_json_ignored_if_not_true_with_dict_subclass(self):
-        self.assertEqual(json.dumps(DictForJson(a=1)), '{"a": 1}')
+    def test_for_json_ignored_if_not_true_with_dict_subclass(self):
+        for for_json in (None, False):
+            self.assertRoundTrip(
+                DictForJson(a=1),
+                {'a': 1},
+                for_json=for_json)
 
     def test_for_json_ignored_if_not_true_with_list_subclass(self):
-        self.assertEqual(json.dumps(ListForJson(['l'])), '["l"]')
+        for for_json in (None, False):
+            self.assertRoundTrip(
+                ListForJson(['l']),
+                ['l'],
+                for_json=for_json)
 
     def test_raises_typeerror_if_for_json_not_true_with_object(self):
         self.assertRaises(TypeError, json.dumps, ForJson())
-
-
-class TestForJsonWithoutSpeedups(unittest.TestCase):
-    def setUp(self):
-        if json.encoder.c_make_encoder:
-            json._toggle_speedups(False)
-
-    def tearDown(self):
-        if json.encoder.c_make_encoder:
-            json._toggle_speedups(True)
-
-    @staticmethod
-    def _dump(obj):
-        return json.dumps(obj, for_json=True)
-
-    def test_for_json_encodes_stand_alone_object(self):
-        self.assertEqual(self._dump(ForJson()), '{"for_json": 1}')
-
-    def test_for_json_encodes_object_nested_in_dict(self):
-        self.assertEqual(self._dump({'hooray': ForJson()}), '{"hooray": '
-                '{"for_json": 1}}')
-
-    def test_for_json_encodes_object_nested_in_list_within_dict(self):
-        self.assertEqual(self._dump({'list': [0, ForJson(), 2, 3]}),
-                '{"list": [0, {"for_json": 1}, 2, 3]}')
-
-    def test_for_json_encodes_object_nested_within_object(self):
-        self.assertEqual(self._dump(NestedForJson()),
-                '{"nested": {"for_json": 1}}')
-
-    def test_for_json_encodes_list(self):
-        self.assertEqual(self._dump(ForJsonList()), '["list"]')
-
-    def test_for_json_encodes_list_within_object(self):
-        self.assertEqual(self._dump({'nested': ForJsonList()}),
-                '{"nested": ["list"]}')
-
-    def test_for_json_encodes_dict_subclass(self):
-        self.assertEqual(self._dump(DictForJson(a=1)), '{"alpha": 1}')
-
-    def test_for_json_encodes_list_subclass(self):
-        self.assertEqual(self._dump(ListForJson(['l'])), '["list"]')
-
-    def tset_for_json_ignored_if_not_true_with_dict_subclass(self):
-        self.assertEqual(json.dumps(DictForJson(a=1)), '{"a": 1}')
-
-    def test_for_json_ignored_if_not_true_with_list_subclass(self):
-        self.assertEqual(json.dumps(ListForJson(['l'])), '["l"]')
-
-    def test_raises_typeerror_if_for_json_not_true_with_object(self):
-        self.assertRaises(TypeError, json.dumps, ForJson())
-
+        self.assertRaises(TypeError, json.dumps, ForJson(), for_json=False)
