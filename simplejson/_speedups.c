@@ -2588,7 +2588,7 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "Decimal", "for_json", NULL};
+    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "for_json", "Decimal", NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
@@ -2603,7 +2603,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array, &bigint_as_string,
-        &item_sort_key, &encoding, &Decimal, &for_json))
+        &item_sort_key, &encoding, &for_json, &Decimal))
         return -1;
 
     s->markers = markers;

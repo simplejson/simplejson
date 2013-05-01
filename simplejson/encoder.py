@@ -317,8 +317,8 @@ class JSONEncoder(object):
                 self.skipkeys, self.allow_nan, key_memo, self.use_decimal,
                 self.namedtuple_as_object, self.tuple_as_array,
                 self.bigint_as_string, self.item_sort_key,
-                self.encoding,
-                Decimal, self.for_json)
+                self.encoding, self.for_json,
+                Decimal)
         else:
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
