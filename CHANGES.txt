@@ -1,4 +1,4 @@
-Version 3.2.0 released 2013-05-XX
+Version 3.2.0 released 2013-05-01
 
 * New ignore_nan kwarg in encoder that serializes out
   of range floats (Infinity, -Infinity, NaN) as null for ECMA-262
