@@ -124,9 +124,6 @@ JSON_Accu_Destroy(JSON_Accu *acc);
 #define ERR_STRING_CONTROL "Invalid control character %r at"
 #define ERR_STRING_ESC1 "Invalid \\X escape sequence %r"
 #define ERR_STRING_ESC4 "Invalid \\uXXXX escape sequence"
-#define ERR_STRING_SURROGATE "Invalid \\uXXXX\\uXXXX surrogate pair"
-#define ERR_STRING_HIGH_SURROGATE "Unpaired high surrogate"
-#define ERR_STRING_LOW_SURROGATE "Unpaired low surrogate"
 
 typedef struct _PyScannerObject {
     PyObject_HEAD
@@ -1025,21 +1022,14 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
 #if (PY_MAJOR_VERSION >= 3 || defined(Py_UNICODE_WIDE))
             /* Surrogate pair */
             if ((c & 0xfc00) == 0xd800) {
-                JSON_UNICHR c2 = 0;
-                if (end + 6 >= len) {
-                    raise_errmsg(ERR_STRING_HIGH_SURROGATE, pystr, end - 5);
-                    goto bail;
-                }
-                if (buf[next++] != '\\' || buf[next++] != 'u') {
-                    raise_errmsg(ERR_STRING_HIGH_SURROGATE, pystr, end - 5);
-                    goto bail;
-                }
-                end += 6;
-                /* Decode 4 hex digits */
-                for (; next < end; next++) {
-                    c2 <<= 4;
-                    JSON_UNICHR digit = buf[next];
-                    switch (digit) {
+                if (end + 6 < len && buf[next] == '\\' && buf[next+1] == 'u') {
+		    JSON_UNICHR c2 = 0;
+		    end += 6;
+		    /* Decode 4 hex digits */
+		    for (next += 2; next < end; next++) {
+			c2 <<= 4;
+			JSON_UNICHR digit = buf[next];
+			switch (digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
                             c2 |= (digit - '0'); break;
@@ -1052,18 +1042,18 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
                         default:
                             raise_errmsg(ERR_STRING_ESC4, pystr, end - 5);
                             goto bail;
-                    }
-                }
-                if ((c2 & 0xfc00) != 0xdc00) {
-                    raise_errmsg(ERR_STRING_HIGH_SURROGATE, pystr, end - 5);
-                    goto bail;
-                }
-                c = 0x10000 + (((c - 0xd800) << 10) | (c2 - 0xdc00));
-            }
-            else if ((c & 0xfc00) == 0xdc00) {
-                raise_errmsg(ERR_STRING_LOW_SURROGATE, pystr, end - 5);
-                goto bail;
-            }
+			}
+		    }
+		    if ((c2 & 0xfc00) != 0xdc00) {
+			/* not a low surrogate, rewind */
+			end -= 6;
+			next = end;
+		    }
+		    else {
+			c = 0x10000 + (((c - 0xd800) << 10) | (c2 - 0xdc00));
+		    }
+		}
+	    }
 #endif /* PY_MAJOR_VERSION >= 3 || Py_UNICODE_WIDE */
         }
         if (c > 0x7f) {
@@ -1234,21 +1224,15 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
             /* Surrogate pair */
             if ((c & 0xfc00) == 0xd800) {
                 JSON_UNICHR c2 = 0;
-                if (end + 6 >= len) {
-                    raise_errmsg(ERR_STRING_HIGH_SURROGATE, pystr, end - 5);
-                    goto bail;
-                }
-                if (PyUnicode_READ(kind, buf, next++) != '\\' ||
-                    PyUnicode_READ(kind, buf, next++) != 'u') {
-                    raise_errmsg(ERR_STRING_HIGH_SURROGATE, pystr, end - 5);
-                    goto bail;
-                }
-                end += 6;
-                /* Decode 4 hex digits */
-                for (; next < end; next++) {
-                    JSON_UNICHR digit = PyUnicode_READ(kind, buf, next);
-                    c2 <<= 4;
-                    switch (digit) {
+		if (end + 6 < len &&
+		    PyUnicode_READ(kind, buf, next) == '\\' &&
+		    PyUnicode_READ(kind, buf, next + 1) == 'u') {
+		    end += 6;
+		    /* Decode 4 hex digits */
+		    for (next += 2; next < end; next++) {
+			JSON_UNICHR digit = PyUnicode_READ(kind, buf, next);
+			c2 <<= 4;
+			switch (digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
                             c2 |= (digit - '0'); break;
@@ -1261,18 +1245,18 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                         default:
                             raise_errmsg(ERR_STRING_ESC4, pystr, end - 5);
                             goto bail;
-                    }
-                }
-                if ((c2 & 0xfc00) != 0xdc00) {
-                    raise_errmsg(ERR_STRING_HIGH_SURROGATE, pystr, end - 5);
-                    goto bail;
-                }
-                c = 0x10000 + (((c - 0xd800) << 10) | (c2 - 0xdc00));
-            }
-            else if ((c & 0xfc00) == 0xdc00) {
-                raise_errmsg(ERR_STRING_LOW_SURROGATE, pystr, end - 5);
-                goto bail;
-            }
+			}
+		    }
+		    if ((c2 & 0xfc00) != 0xdc00) {
+			/* not a low surrogate, rewind */
+			end -= 6;
+			next = end;
+		    }
+		    else {
+			c = 0x10000 + (((c - 0xd800) << 10) | (c2 - 0xdc00));
+		    }
+		}
+	    }
 #endif
         }
         APPEND_OLD_CHUNK

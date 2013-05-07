@@ -1,3 +1,9 @@
+Version 3.3.0 released 2013-05-07
+
+* Unpaired surrogates once again pass through the decoder, to match older
+  behavior and the RFC-4627 spec.
+  https://github.com/simplejson/simplejson/issues/62
+
 Version 3.2.0 released 2013-05-01
 
 * New ignore_nan kwarg in encoder that serializes out

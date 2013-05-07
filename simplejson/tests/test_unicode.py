@@ -123,26 +123,15 @@ class TestUnicode(TestCase):
         self.assertRaises(json.JSONDecodeError, json.loads, '"\\u1x34"')
         self.assertRaises(json.JSONDecodeError, json.loads, '"\\ux234"')
         if sys.maxunicode > 65535:
-            # unpaired low surrogate
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\udc00"')
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\udcff"')
-            # unpaired high surrogate
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800"')
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800x"')
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800xx"')
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800xxxxxx"')
+            # invalid escape sequence for low surrogate
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u"')
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u0"')
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u00"')
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u000"')
-            # invalid escape sequence for low surrogate
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u000x"')
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u00x0"')
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u0x00"')
             self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\ux000"')
-            # invalid value for low surrogate
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\u0000"')
-            self.assertRaises(json.JSONDecodeError, json.loads, '"\\ud800\\ufc00"')
 
     def test_ensure_ascii_still_works(self):
         # in the ascii range, ensure that everything is the same

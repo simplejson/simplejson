@@ -102,36 +102,32 @@ def py_scanstring(s, end, encoding=None, strict=True,
             # Unicode escape sequence
             msg = "Invalid \\uXXXX escape sequence"
             esc = s[end + 1:end + 5]
-            next_end = end + 5
-            if len(esc) != 4:
-                raise JSONDecodeError(msg, s, end)
+            escX = esc[1:2]
+            if len(esc) != 4 or escX == 'x' or escX == 'X':
+                raise JSONDecodeError(msg, s, end - 1)
             try:
                 uni = int(esc, 16)
             except ValueError:
-                raise JSONDecodeError(msg, s, end)
+                raise JSONDecodeError(msg, s, end - 1)
+            end += 5
             # Check for surrogate pair on UCS-4 systems
-            if _maxunicode > 65535:
-                unimask = uni & 0xfc00
-                if unimask == 0xd800:
-                    msg = "Unpaired high surrogate"
-                    if not s[end + 5:end + 7] == '\\u':
-                        raise JSONDecodeError(msg, s, end)
-                    esc2 = s[end + 7:end + 11]
-                    if len(esc2) != 4:
-                        raise JSONDecodeError(msg, s, end)
+            # Note that this will join high/low surrogate pairs
+            # but will also pass unpaired surrogates through
+            if (_maxunicode > 65535 and
+                uni & 0xfc00 == 0xd800 and
+                s[end:end + 2] == '\\u'):
+                esc2 = s[end + 2:end + 6]
+                escX = esc2[1:2]
+                if len(esc2) == 4 and not (escX == 'x' or escX == 'X'):
                     try:
                         uni2 = int(esc2, 16)
                     except ValueError:
                         raise JSONDecodeError(msg, s, end)
-                    if uni2 & 0xfc00 != 0xdc00:
-                        raise JSONDecodeError(msg, s, end)
-                    uni = 0x10000 + (((uni - 0xd800) << 10) | (uni2 - 0xdc00))
-                    next_end += 6
-                elif unimask == 0xdc00:
-                    msg = "Unpaired low surrogate"
-                    raise JSONDecodeError(msg, s, end)
+                    if uni2 & 0xfc00 == 0xdc00:
+                        uni = 0x10000 + (((uni - 0xd800) << 10) |
+                                         (uni2 - 0xdc00))
+                        end += 6
             char = unichr(uni)
-            end = next_end
         # Append the unescaped character
         _append(char)
     return _join(chunks), end

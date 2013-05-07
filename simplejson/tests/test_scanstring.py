@@ -23,10 +23,6 @@ class TestScanString(TestCase):
         self._test_scanstring(simplejson.decoder.c_scanstring)
 
     def _test_scanstring(self, scanstring):
-        self.assertEqual(
-            scanstring('"z\\ud834\\udd20x"', 1, None, True),
-            (u'z\U0001d120x', 16))
-
         if sys.maxunicode == 65535:
             self.assertEqual(
                 scanstring(u'"z\U0001d120x"', 1, None, True),
@@ -129,9 +125,10 @@ class TestScanString(TestCase):
         self.assertRaises(ValueError, scanstring, '\\u012', 0, None, True)
         self.assertRaises(ValueError, scanstring, '\\u0123', 0, None, True)
         if sys.maxunicode > 65535:
-            self.assertRaises(ValueError, scanstring, '\\ud834"', 0, None, True),
-            self.assertRaises(ValueError, scanstring, '\\ud834\\u"', 0, None, True),
-            self.assertRaises(ValueError, scanstring, '\\ud834\\x0123"', 0, None, True),
+            self.assertRaises(ValueError,
+                              scanstring, '\\ud834\\u"', 0, None, True)
+            self.assertRaises(ValueError,
+                              scanstring, '\\ud834\\x0123"', 0, None, True)
 
     def test_issue3623(self):
         self.assertRaises(ValueError, json.decoder.scanstring, "xxx", 1,
@@ -145,3 +142,53 @@ class TestScanString(TestCase):
         assert maxsize is not None
         self.assertRaises(OverflowError, json.decoder.scanstring, "xxx",
                           maxsize + 1)
+
+    def test_surrogates(self):
+        scanstring = json.decoder.scanstring
+
+        def assertScan(given, expect, test_utf8=True):
+            givens = [given]
+            if not PY3 and test_utf8:
+                givens.append(given.encode('utf8'))
+            for given in givens:
+                (res, count) = scanstring(given, 1, None, True)
+                self.assertEqual(len(given), count)
+                self.assertEqual(res, expect)
+
+        assertScan(
+            u'"z\\ud834\\u0079x"',
+            u'z\ud834yx')
+        assertScan(
+            u'"z\\ud834\\udd20x"',
+            u'z\U0001d120x')
+        assertScan(
+            u'"z\\ud834\\ud834\\udd20x"',
+            u'z\ud834\U0001d120x')
+        assertScan(
+            u'"z\\ud834x"',
+            u'z\ud834x')
+        assertScan(
+            u'"z\\udd20x"',
+            u'z\udd20x')
+        assertScan(
+            u'"z\ud834x"',
+            u'z\ud834x')
+        # It may look strange to join strings together, but Python is drunk.
+        # https://gist.github.com/etrepum/5538443
+        assertScan(
+            u'"z\\ud834\udd20x12345"',
+            u''.join([u'z\ud834', u'\udd20x12345']))
+        assertScan(
+            u'"z\ud834\\udd20x"',
+            u''.join([u'z\ud834', u'\udd20x']))
+        # these have different behavior given UTF8 input, because the surrogate
+        # pair may be joined (in maxunicode > 65535 builds)
+        assertScan(
+            u''.join([u'"z\ud834', u'\udd20x"']),
+            u''.join([u'z\ud834', u'\udd20x']),
+            test_utf8=False)
+
+        self.assertRaises(ValueError,
+                          scanstring, u'"z\\ud83x"', 1, None, True)
+        self.assertRaises(ValueError,
+                          scanstring, u'"z\\ud834\\udd2x"', 1, None, True)
