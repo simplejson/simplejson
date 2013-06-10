@@ -3030,8 +3030,11 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 
 bail:
     Py_XDECREF(encoded);
-    Py_XDECREF(items);
     Py_XDECREF(iter);
+    // "iter" may hold the last reference to "items"
+    if (items && items->ob_refcnt > 0) {
+        Py_XDECREF(items);
+    }
     Py_XDECREF(kstr);
     Py_XDECREF(ident);
     return -1;
