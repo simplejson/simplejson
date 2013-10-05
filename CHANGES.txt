@@ -1,3 +1,8 @@
+Version 3.3.1 released 2013-10-05
+
+* JSONDecodeError exceptions can now be pickled
+  https://github.com/simplejson/simplejson/pull/78
+
 Version 3.3.0 released 2013-05-07
 
 * Unpaired surrogates once again pass through the decoder, to match older
