@@ -1,3 +1,8 @@
+Version 3.3.2 released 2014-01-06
+
+* Docstring fix for decoded string types
+  https://github.com/simplejson/simplejson/pull/82
+
 Version 3.3.1 released 2013-10-05
 
 * JSONDecodeError exceptions can now be pickled
