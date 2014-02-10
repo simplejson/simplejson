@@ -2,7 +2,10 @@
 from __future__ import with_statement
 
 import sys
-from distutils.core import setup, Extension, Command
+if 'bdist_egg' in sys.argv or 'bdist_wheel' in sys.argv:
+    from setuptools import setup, Extension, Command
+else:
+    from distutils.core import setup, Extension, Command
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
