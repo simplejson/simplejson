@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 from __future__ import with_statement
 
+#
+# To use setuptools commands such as bdist_egg, execute like this:
+#
+#   python -c 'import setuptools; execfile("setup.py")' bdist_egg
+#
 import sys
 from distutils.core import setup, Extension, Command
 from distutils.command.build_ext import build_ext
