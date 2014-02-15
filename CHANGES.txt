@@ -1,3 +1,8 @@
+Version 3.3.3 released 2014-02-14
+
+* Improve test suite's Python 3.4 compatibility
+  https://github.com/simplejson/simplejson/issues/87
+
 Version 3.3.2 released 2014-01-06
 
 * Docstring fix for decoded string types
