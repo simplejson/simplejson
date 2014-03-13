@@ -57,6 +57,7 @@ def all_tests_suite():
         'simplejson.tests.test_speedups',
         'simplejson.tests.test_unicode',
         'simplejson.tests.test_decimal',
+        'simplejson.tests.test_datetime',
         'simplejson.tests.test_tuple',
         'simplejson.tests.test_namedtuple',
         'simplejson.tests.test_tool',
