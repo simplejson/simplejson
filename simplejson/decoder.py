@@ -46,7 +46,72 @@ BACKSLASH = {
 
 DEFAULT_ENCODING = "utf-8"
 
-def py_scanstring(s, end, encoding=None, strict=True,
+def _datetime_or_string(string):
+    from datetime import date, datetime, time
+
+    l = len(string)
+
+    # Maybe a date
+    if l == 10:
+        chunks = string.split('-')
+        if len(chunks) == 3:
+            try:
+                y, m, d = map(int, chunks)
+            except ValueError:
+                pass
+            else:
+                return date(y, m, d)
+
+    # Maybe a datetime
+    if l == 19 or l == 20 or l == 23 or l == 24 or l == 26 or l == 27:
+        if 'T' in string:
+            pieces = string.split('T')
+        else:
+            pieces = string.split(' ')
+        if len(pieces) == 2:
+            chunks = pieces[0].split('-')
+            if len(chunks) == 3:
+                chunks.extend(pieces[1].split(':'))
+                if len(chunks) == 6:
+                    if chunks[-1].endswith('Z'):
+                        chunks[-1] = chunks[-1][:-1]
+                    if '.' in chunks[-1]:
+                        chunks[-1:] = chunks[-1].split('.')
+                    else:
+                        chunks.append('0')
+                    if len(chunks) == 7:
+                        if len(chunks[-1]) == 3:
+                            chunks[-1] += '000'
+                        try:
+                            y, mo, d, h, m, s, ms = map(int, chunks)
+                        except ValueError:
+                            pass
+                        else:
+                            return datetime(y, mo, d, h, m, s, ms)
+
+    # Maybe a time
+    if l == 8 or l == 9 or l == 12 or l == 13 or l == 15 or l == 16:
+        chunks = string.split(':')
+        if len(chunks) == 3:
+            if chunks[-1].endswith('Z'):
+                chunks[-1] = chunks[-1][:-1]
+            if '.' in chunks[-1]:
+                chunks[-1:] = chunks[-1].split('.')
+            else:
+                chunks.append('0')
+            if len(chunks) == 4:
+                if len(chunks[-1]) == 3:
+                    chunks[-1] += '000'
+                try:
+                    h, m, s, ms = map(int, chunks)
+                except ValueError:
+                    pass
+                else:
+                    return time(h, m, s, ms)
+
+    return string
+
+def py_scanstring(s, end, encoding=None, strict=True, iso_datetime=False,
         _b=BACKSLASH, _m=STRINGCHUNK.match, _join=u('').join,
         _PY3=PY3, _maxunicode=sys.maxunicode):
     """Scan the string s for a JSON string. End is the index of the
@@ -130,7 +195,11 @@ def py_scanstring(s, end, encoding=None, strict=True,
             char = unichr(uni)
         # Append the unescaped character
         _append(char)
-    return _join(chunks), end
+
+    s = _join(chunks)
+    if iso_datetime:
+        s = _datetime_or_string(s)
+    return s, end
 
 
 # Use speedup if available
@@ -140,7 +209,7 @@ WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 WHITESPACE_STR = ' \t\n\r'
 
 def JSONObject(state, encoding, strict, scan_once, object_hook,
-        object_pairs_hook, memo=None,
+        object_pairs_hook, iso_datetime, memo=None,
         _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     (s, end) = state
     # Backwards compatibility
@@ -171,7 +240,7 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
                 s, end)
     end += 1
     while True:
-        key, end = scanstring(s, end, encoding, strict)
+        key, end = scanstring(s, end, encoding, strict, iso_datetime)
         key = memo_get(key, key)
 
         # To skip some function call overhead we optimize the fast paths where
@@ -301,7 +370,7 @@ class JSONDecoder(object):
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
             parse_int=None, parse_constant=None, strict=True,
-            object_pairs_hook=None):
+            object_pairs_hook=None, iso_datetime=False):
         """
         *encoding* determines the encoding used to interpret any
         :class:`str` objects decoded by this instance (``'utf-8'`` by
@@ -339,6 +408,10 @@ class JSONDecoder(object):
         can be used to raise an exception if invalid JSON numbers are
         encountered.
 
+        *iso_datetime*, if true (by default it's false), means that the parse
+        will recognize ISO formatted date and datetimes and will return
+        :class:`datetime.date` and :class:`datetime.datetime` respectively.
+
         *strict* controls the parser's behavior when it encounters an
         invalid control character in a string. The default setting of
         ``True`` means that unescaped control characters are parse errors, if
@@ -357,6 +430,7 @@ class JSONDecoder(object):
         self.parse_object = JSONObject
         self.parse_array = JSONArray
         self.parse_string = scanstring
+        self.iso_datetime = iso_datetime
         self.memo = {}
         self.scan_once = make_scanner(self)
 
