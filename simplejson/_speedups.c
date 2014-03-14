@@ -1090,23 +1090,9 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, int 
         /* Pick up this chunk if it's not zero length */
         if (next != end) {
             APPEND_OLD_CHUNK
-#if PY_MAJOR_VERSION >= 3
-            if (!has_unicode) {
-                if (handle_datetime && c == '"' && chunks == NULL
-                    && _is_datetime_or_date_or_time(&buf[end], next - end)) {
-                    goto datetime_or_date_or_time;
-                }
-                chunk = PyUnicode_DecodeASCII(&buf[end], next - end, NULL);
-            }
-            else {
-                chunk = PyUnicode_Decode(&buf[end], next - end, encoding, NULL);
-            }
-            if (chunk == NULL) {
-                goto bail;
-            }
-#else /* PY_MAJOR_VERSION >= 3 */
-            if (!has_unicode && handle_datetime && c == '"' && chunks == NULL
-                && _is_datetime_or_date_or_time(&buf[end], next - end)) {
+            if (!has_unicode && iso_datetime && c == '"' && chunks == NULL
+                && (next - end) >= 8 && (next - end) < 28
+                && _is_datetime_str(&buf[end], next - end)) {
                 goto datetime_or_date_or_time;
             }
             strchunk = PyString_FromStringAndSize(&buf[end], next - end);
@@ -1123,7 +1109,6 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, int 
             else {
                 chunk = strchunk;
             }
-#endif /* PY_MAJOR_VERSION < 3 */
         }
         next++;
         if (c == '"') {
@@ -1181,7 +1166,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, int 
                         goto bail;
                 }
             }
-#if (PY_MAJOR_VERSION >= 3 || defined(Py_UNICODE_WIDE))
+#if defined(Py_UNICODE_WIDE)
             /* Surrogate pair */
             if ((c & 0xfc00) == 0xd800) {
                 if (end + 6 < len && buf[next] == '\\' && buf[next+1] == 'u') {
@@ -1216,18 +1201,12 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, int 
 		    }
 		}
 	    }
-#endif /* PY_MAJOR_VERSION >= 3 || Py_UNICODE_WIDE */
+#endif /* Py_UNICODE_WIDE */
         }
         if (c > 0x7f) {
             has_unicode = 1;
         }
         APPEND_OLD_CHUNK
-#if PY_MAJOR_VERSION >= 3
-        chunk = JSON_UnicodeFromChar(c);
-        if (chunk == NULL) {
-            goto bail;
-        }
-#else /* PY_MAJOR_VERSION >= 3 */
         if (has_unicode) {
             chunk = JSON_UnicodeFromChar(c);
             if (chunk == NULL) {
@@ -1241,7 +1220,6 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, int 
                 goto bail;
             }
         }
-#endif
     }
 
     if (chunks == NULL) {
