@@ -113,14 +113,42 @@ Handling naive datetime.* objects::
     >>> date = born.date()
     >>> time = born.time()
     >>> import simplejson as json
-    >>> json.dumps([born, date, time], handle_datetime=True)
-    '["0001-12-25T10:20:30.123456", "0001-12-25", "10:20:30.123456"]'
-    >>> json.loads(json.dumps([born, date, time], handle_datetime=True),
-    ...            handle_datetime=True) == [born, date, time]
+    >>> json.dumps([born, date, time], iso_datetime=True)
+    '["0001-12-25T10:20:30.123456Z", "0001-12-25", "10:20:30.123456Z"]'
+    >>> json.loads(json.dumps([born, date, time], iso_datetime=True),
+    ...            iso_datetime=True) == [born, date, time]
     True
-    >>> json.dumps({date: time}, handle_datetime=True)
-    '{"0001-12-25": "10:20:30.123456"}'
+    >>> json.dumps({date: time}, iso_datetime=True)
+    '{"0001-12-25": "10:20:30.123456Z"}'
 
+The final "Z" (that stands for "Zulu" time zone, a.k.a. "UTC") is optional::
+
+    >>> json.loads('"10:20:30.123456"', iso_datetime=True) == time
+    True
+    >>> json.loads('"10:20:30"', iso_datetime=True) == time.replace(microsecond=0)
+    True
+
+For the sake of convenience, the alternative syntax with a space instead of "T"
+is supported too::
+
+    >>> json.loads('"0001-12-25 10:20:30"', iso_datetime=True) == born.replace(microsecond=0)
+    True
+    >>> json.loads('"0001-12-25 10:20:30.123456"', iso_datetime=True) == born
+    True
+    >>> json.loads('"0001-12-25 10:20:30.123456Z"', iso_datetime=True) == born
+    True
+
+Also, since common JavaScript engines does not handle microseconds but only milliseconds,
+the scanner recognizes also times and timestamps with only three digits after the dot::
+
+    >>> json.loads('"10:20:30.123"', iso_datetime=True)
+    datetime.time(10, 20, 30, 123000)
+    >>> json.loads('"10:20:30.123Z"', iso_datetime=True)
+    datetime.time(10, 20, 30, 123000)
+    >>> json.loads('"0001-12-25 10:20:30.123"', iso_datetime=True)
+    datetime.datetime(1, 12, 25, 10, 20, 30, 123000)
+    >>> json.loads('"0001-12-25 10:20:30.123Z"', iso_datetime=True)
+    datetime.datetime(1, 12, 25, 10, 20, 30, 123000)
 
 .. highlight:: none
 
@@ -144,7 +172,7 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 Basic Usage
 -----------
 
-.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, handle_datetime[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, [for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]]]])
+.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, iso_datetime[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, [for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]]]])
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
    file-like object).
@@ -214,12 +242,13 @@ Basic Usage
    .. versionchanged:: 2.2.0
       The default of *use_decimal* changed to ``True`` in 2.2.0.
 
-   If *handle_datetime* is true (default: ``False``) then :class:`datetime.datetime`,
+   If *iso_datetime* is true (default: ``False``) then :class:`datetime.datetime`,
    :class:`datetime.date` and :class:`datetime.time` will be serialized as JSON
-   strings containing their ISO formatted value.
+   strings containing their ISO formatted value. For ``datetime`` and ``time``
+   a "Z" character is appended to their ``isoformat()`` method.
 
    .. versionchanged:: 3.4.0
-      *handle_datetime* is new in 3.4.0.
+      *iso_datetime* is new in 3.4.0.
 
    If *namedtuple_as_object* is true (default: ``True``),
    objects with ``_asdict()`` methods will be encoded
@@ -290,7 +319,7 @@ Basic Usage
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, handle_datetime[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, iso_datetime[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -302,7 +331,7 @@ Basic Usage
    The other options have the same meaning as in :func:`dump`.
 
 
-.. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, handle_datetime[, **kw]]]]]]]]]])
+.. function:: load(fp[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, iso_datetime[, **kw]]]]]]]]]])
 
    Deserialize *fp* (a ``.read()``-supporting file-like object containing a JSON
    document) to a Python object. :exc:`JSONDecodeError` will be
@@ -357,12 +386,14 @@ Basic Usage
    .. versionchanged:: 2.1.0
       *use_decimal* is new in 2.1.0.
 
-   If *handle_datetime* is true (default: ``False``) then JSON strings containing
+   If *iso_datetime* is true (default: ``False``) then JSON strings containing
    standard ISO formatted timestamps, dates and times will be decoded respectively
    as :class:`datetime.datetime`, :class:`datetime.date` and :class:`datetime.time`.
+   For ``datetime`` and ``time`` the final "Z" character is optional, the resulting
+   value is always a `naive` instance.
 
    .. versionchanged:: 3.4.0
-      *handle_datetime* is new in 3.4.0.
+      *iso_datetime* is new in 3.4.0.
 
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
    kwarg.  Additional keyword arguments will be passed to the constructor of the
@@ -382,7 +413,7 @@ Basic Usage
         only one JSON document, it is recommended to use :func:`loads`.
 
 
-.. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, handle_datetime[, **kw]]]]]]]]]])
+.. function:: loads(s[, encoding[, cls[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, use_decimal[, iso_datetime[, **kw]]]]]]]]]])
 
    Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
    document) to a Python object. :exc:`JSONDecodeError` will be
@@ -404,7 +435,7 @@ Basic Usage
 Encoders and decoders
 ---------------------
 
-.. class:: JSONDecoder([encoding[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, strict[, handle_datetime]]]]]]]])
+.. class:: JSONDecoder([encoding[, object_hook[, parse_float[, parse_int[, parse_constant[, object_pairs_hook[, strict[, iso_datetime]]]]]]]])
 
    Simple JSON decoder.
 
@@ -475,13 +506,13 @@ Encoders and decoders
    unescaped control characters are parse errors, if ``False`` then control
    characters will be allowed in strings.
 
-   *handle_datetime* if specified with a true value will activate the
+   *iso_datetime* if specified with a true value will activate the
    recognition of JSON strings containing ISO formatted timestamps, dates and
    times that will be decoded as :class:`datetime.datetime`,
    :class:`datetime.date` and :class:`datetime.time` respectively.
 
    .. versionchanged:: 3.4.0
-      *handle_datetime* is new in 3.4.0.
+      *iso_datetime* is new in 3.4.0.
 
    .. method:: decode(s)
 
@@ -511,7 +542,7 @@ Encoders and decoders
       :exc:`JSONDecodeError` will be raised if the given JSON
       document is not valid.
 
-.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, handle_datetime[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key[, for_json[, ignore_nan]]]]]]]]]]]]]]]]])
+.. class:: JSONEncoder([skipkeys[, ensure_ascii[, check_circular[, allow_nan[, sort_keys[, indent[, separators[, encoding[, default[, use_decimal[, iso_datetime[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, item_sort_key[, for_json[, ignore_nan]]]]]]]]]]]]]]]]])
 
    Extensible JSON encoder for Python data structures.
 
@@ -657,12 +688,12 @@ Encoders and decoders
    .. versionchanged:: 3.2.0
       *ignore_nan* is new in 3.2.0.
 
-   If *handle_datetime* is true (default: ``False``) then :class:`datetime.datetime`,
+   If *iso_datetime* is true (default: ``False``) then :class:`datetime.datetime`,
    :class:`datetime.date` and :class:`datetime.time` will be serialized as JSON
    strings containing their ISO formatted value.
 
    .. versionchanged:: 3.4.0
-      *handle_datetime* is new in 3.4.0.
+      *iso_datetime* is new in 3.4.0.
 
    .. method:: default(o)
 

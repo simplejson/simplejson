@@ -111,7 +111,7 @@ def _datetime_or_string(string):
 
     return string
 
-def py_scanstring(s, end, encoding=None, strict=True, handle_datetime=False,
+def py_scanstring(s, end, encoding=None, strict=True, iso_datetime=False,
         _b=BACKSLASH, _m=STRINGCHUNK.match, _join=u('').join,
         _PY3=PY3, _maxunicode=sys.maxunicode):
     """Scan the string s for a JSON string. End is the index of the
@@ -197,7 +197,7 @@ def py_scanstring(s, end, encoding=None, strict=True, handle_datetime=False,
         _append(char)
 
     s = _join(chunks)
-    if handle_datetime:
+    if iso_datetime:
         s = _datetime_or_string(s)
     return s, end
 
@@ -209,7 +209,7 @@ WHITESPACE = re.compile(r'[ \t\n\r]*', FLAGS)
 WHITESPACE_STR = ' \t\n\r'
 
 def JSONObject(state, encoding, strict, scan_once, object_hook,
-        object_pairs_hook, handle_datetime, memo=None,
+        object_pairs_hook, iso_datetime, memo=None,
         _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     (s, end) = state
     # Backwards compatibility
@@ -240,7 +240,7 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
                 s, end)
     end += 1
     while True:
-        key, end = scanstring(s, end, encoding, strict, handle_datetime)
+        key, end = scanstring(s, end, encoding, strict, iso_datetime)
         key = memo_get(key, key)
 
         # To skip some function call overhead we optimize the fast paths where
@@ -370,7 +370,7 @@ class JSONDecoder(object):
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
             parse_int=None, parse_constant=None, strict=True,
-            object_pairs_hook=None, handle_datetime=False):
+            object_pairs_hook=None, iso_datetime=False):
         """
         *encoding* determines the encoding used to interpret any
         :class:`str` objects decoded by this instance (``'utf-8'`` by
@@ -408,7 +408,7 @@ class JSONDecoder(object):
         can be used to raise an exception if invalid JSON numbers are
         encountered.
 
-        *handle_datetime*, if true (by default it's false), means that the parse
+        *iso_datetime*, if true (by default it's false), means that the parse
         will recognize ISO formatted date and datetimes and will return
         :class:`datetime.date` and :class:`datetime.datetime` respectively.
 
@@ -430,7 +430,7 @@ class JSONDecoder(object):
         self.parse_object = JSONObject
         self.parse_array = JSONArray
         self.parse_string = scanstring
-        self.handle_datetime = handle_datetime
+        self.iso_datetime = iso_datetime
         self.memo = {}
         self.scan_once = make_scanner(self)
 

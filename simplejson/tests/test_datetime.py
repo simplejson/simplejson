@@ -23,18 +23,19 @@ class AbstractDatetimeTestSuite(object):
 
     def test_encode(self):
         for d in self.VALUES:
-            self.assertEqual(self.dumps(d, handle_datetime=True), '"%s"' % d.isoformat())
+            self.assertEqual(self.dumps(d, iso_datetime=True), '"%sZ"' % d.isoformat())
 
     def test_decode(self):
         for d in self.VALUES:
-            self.assertEqual(self.loads('"%s"' % d.isoformat(), handle_datetime=True), d)
+            self.assertEqual(self.loads('"%s"' % d.isoformat(), iso_datetime=True), d)
+            self.assertEqual(self.loads('"%sZ"' % d.isoformat(), iso_datetime=True), d)
 
     def test_stringify_key(self):
         for d in self.VALUES:
             v = {d: d}
             self.assertEqual(
                 self.loads(
-                    self.dumps(v, handle_datetime=True), handle_datetime=True),
+                    self.dumps(v, iso_datetime=True), iso_datetime=True),
                 v)
 
     def test_roundtrip(self):
@@ -42,18 +43,15 @@ class AbstractDatetimeTestSuite(object):
             for v in [d, [d], {'': d}]:
                 self.assertEqual(
                     self.loads(
-                        self.dumps(v, handle_datetime=True), handle_datetime=True),
+                        self.dumps(v, iso_datetime=True), iso_datetime=True),
                     v)
 
     def test_defaults(self):
         d = self.VALUES[0]
-        self.assertRaises(TypeError, json.dumps, d, handle_datetime=False)
-        self.assertEqual('"%s"' % d.isoformat(), json.dumps(d, handle_datetime=True))
-        self.assertRaises(TypeError, json.dump, d, StringIO(),
-                          handle_datetime=False)
-        sio = StringIO()
-        json.dump(d, sio, handle_datetime=True)
-        self.assertEqual('"%s"' % d.isoformat(), sio.getvalue())
+        self.assertRaises(TypeError, json.dumps, d)
+        self.assertRaises(TypeError, json.dumps, d, iso_datetime=False)
+        self.assertRaises(TypeError, json.dump, d, StringIO())
+        self.assertRaises(TypeError, json.dump, d, StringIO(), iso_datetime=False)
 
 
 class TestDatetime(TestCase, AbstractDatetimeTestSuite):
@@ -76,6 +74,14 @@ class TestDatetime(TestCase, AbstractDatetimeTestSuite):
 
 class TestDate(TestCase, AbstractDatetimeTestSuite):
     VALUES = (Date(2014, 3, 18), Date(1900, 1, 1), Date(1, 1, 1))
+
+    def test_encode(self):
+        for d in self.VALUES:
+            self.assertEqual(self.dumps(d, iso_datetime=True), '"%s"' % d.isoformat())
+
+    def test_decode(self):
+        for d in self.VALUES:
+            self.assertEqual(self.loads('"%s"' % d.isoformat(), iso_datetime=True), d)
 
     def test_reload(self):
         # Simulate a subinterpreter that reloads the Python modules but not
@@ -117,6 +123,6 @@ class TestTimezoneAware(TestCase):
     def test(self):
         d = DateTime.now()
         d = d.replace(tzinfo=utc)
-        self.assertRaises(TypeError, json.dumps, d, handle_datetime=True)
+        self.assertRaises(TypeError, json.dumps, d, iso_datetime=True)
         t = d.time().replace(tzinfo=utc)
-        self.assertRaises(TypeError, json.dumps, t, handle_datetime=True)
+        self.assertRaises(TypeError, json.dumps, t, iso_datetime=True)
