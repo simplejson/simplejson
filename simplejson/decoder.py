@@ -63,18 +63,25 @@ def _datetime_or_string(string):
                 return date(y, m, d)
 
     # Maybe a datetime
-    if l == 19 or l == 26:
-        pieces = string.split('T')
+    if l == 19 or l == 20 or l == 23 or l == 24 or l == 26 or l == 27:
+        if 'T' in string:
+            pieces = string.split('T')
+        else:
+            pieces = string.split(' ')
         if len(pieces) == 2:
             chunks = pieces[0].split('-')
             if len(chunks) == 3:
                 chunks.extend(pieces[1].split(':'))
                 if len(chunks) == 6:
+                    if chunks[-1].endswith('Z'):
+                        chunks[-1] = chunks[-1][:-1]
                     if '.' in chunks[-1]:
                         chunks[-1:] = chunks[-1].split('.')
                     else:
                         chunks.append('0')
                     if len(chunks) == 7:
+                        if len(chunks[-1]) == 3:
+                            chunks[-1] += '000'
                         try:
                             y, mo, d, h, m, s, ms = map(int, chunks)
                         except ValueError:
@@ -83,14 +90,18 @@ def _datetime_or_string(string):
                             return datetime(y, mo, d, h, m, s, ms)
 
     # Maybe a time
-    if l == 8 or l == 15:
+    if l == 8 or l == 9 or l == 12 or l == 13 or l == 15 or l == 16:
         chunks = string.split(':')
         if len(chunks) == 3:
+            if chunks[-1].endswith('Z'):
+                chunks[-1] = chunks[-1][:-1]
             if '.' in chunks[-1]:
                 chunks[-1:] = chunks[-1].split('.')
             else:
                 chunks.append('0')
             if len(chunks) == 4:
+                if len(chunks[-1]) == 3:
+                    chunks[-1] += '000'
                 try:
                     h, m, s, ms = map(int, chunks)
                 except ValueError:
