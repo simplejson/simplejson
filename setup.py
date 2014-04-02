@@ -7,7 +7,10 @@ from __future__ import with_statement
 #   python -c 'import setuptools; execfile("setup.py")' bdist_egg
 #
 import sys
-from distutils.core import setup, Extension, Command
+try:
+    from setuptools import setup, Extension, Command
+except ImportError:
+    from distutils.core import setup, Extension, Command
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
