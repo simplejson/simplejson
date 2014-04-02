@@ -1,11 +1,6 @@
 #!/usr/bin/env python
 from __future__ import with_statement
 
-#
-# To use setuptools commands such as bdist_egg, execute like this:
-#
-#   python -c 'import setuptools; execfile("setup.py")' bdist_egg
-#
 import sys
 try:
     from setuptools import setup, Extension, Command
@@ -16,7 +11,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '3.3.3'
+VERSION = '3.4.0'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
 with open('README.rst', 'r') as f:
