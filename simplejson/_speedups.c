@@ -2151,7 +2151,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     PyObject *rval = NULL;
     int fallthrough = 0;
     if (idx >= length) {
-	raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
+        raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
         return NULL;
     }
     switch (str[idx]) {
@@ -2259,7 +2259,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     PyObject *rval = NULL;
     int fallthrough = 0;
     if (idx >= length) {
-	raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
+        raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
         return NULL;
     }
     switch (PyUnicode_READ(kind, str, idx)) {
