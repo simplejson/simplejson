@@ -1,6 +1,7 @@
 """Implementation of JSONEncoder
 """
 from __future__ import absolute_import
+import sys
 import re
 from operator import itemgetter
 from decimal import Decimal
@@ -121,7 +122,8 @@ class JSONEncoder(object):
             indent=None, separators=None, encoding='utf-8', default=None,
             use_decimal=True, namedtuple_as_object=True,
             tuple_as_array=True, bigint_as_string=False,
-            item_sort_key=None, for_json=False, ignore_nan=False):
+            item_sort_key=None, for_json=False, ignore_nan=False,
+            max_indent_level=-1):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -207,6 +209,7 @@ class JSONEncoder(object):
         self.item_sort_key = item_sort_key
         self.for_json = for_json
         self.ignore_nan = ignore_nan
+        self.max_indent_level = max_indent_level
         if indent is not None and not isinstance(indent, string_types):
             indent = indent * ' '
         self.indent = indent
@@ -334,7 +337,7 @@ class JSONEncoder(object):
                 self.skipkeys, _one_shot, self.use_decimal,
                 self.namedtuple_as_object, self.tuple_as_array,
                 self.bigint_as_string, self.item_sort_key,
-                self.encoding, self.for_json,
+                self.encoding, self.for_json, self.max_indent_level,
                 Decimal=Decimal)
         try:
             return _iterencode(o, 0)
@@ -373,6 +376,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
         _use_decimal, _namedtuple_as_object, _tuple_as_array,
         _bigint_as_string, _item_sort_key, _encoding, _for_json,
+        _max_indent_level,
         ## HACK: hand-optimized bytecode; turn globals into locals
         _PY3=PY3,
         ValueError=ValueError,
@@ -391,6 +395,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         raise TypeError("item_sort_key must be None or callable")
     elif _sort_keys and not _item_sort_key:
         _item_sort_key = itemgetter(0)
+    _item_separator_eol = ','
+    if _indent is not None and _max_indent_level <= 0:
+        _max_indent_level = sys.maxint
 
     def _iterencode_list(lst, _current_indent_level):
         if not lst:
@@ -402,10 +409,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 raise ValueError("Circular reference detected")
             markers[markerid] = lst
         buf = '['
-        if _indent is not None:
+        if _indent is not None and _current_indent_level < _max_indent_level:
             _current_indent_level += 1
             newline_indent = '\n' + (_indent * _current_indent_level)
-            separator = _item_separator + newline_indent
+            separator = _item_separator_eol + newline_indent
             buf += newline_indent
         else:
             newline_indent = None
@@ -454,7 +461,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                         chunks = _iterencode(value, _current_indent_level)
                 for chunk in chunks:
                     yield chunk
-        if newline_indent is not None:
+        if newline_indent is not None and _current_indent_level <= _max_indent_level:
             _current_indent_level -= 1
             yield '\n' + (_indent * _current_indent_level)
         yield ']'
@@ -494,10 +501,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 raise ValueError("Circular reference detected")
             markers[markerid] = dct
         yield '{'
-        if _indent is not None:
+        if _indent is not None and _current_indent_level < _max_indent_level:
             _current_indent_level += 1
             newline_indent = '\n' + (_indent * _current_indent_level)
-            item_separator = _item_separator + newline_indent
+            item_separator = _item_separator_eol + newline_indent
             yield newline_indent
         else:
             newline_indent = None
@@ -567,7 +574,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                         chunks = _iterencode(value, _current_indent_level)
                 for chunk in chunks:
                     yield chunk
-        if newline_indent is not None:
+        if newline_indent is not None and _current_indent_level <= _max_indent_level:
             _current_indent_level -= 1
             yield '\n' + (_indent * _current_indent_level)
         yield '}'
