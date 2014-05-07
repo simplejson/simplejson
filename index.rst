@@ -563,8 +563,6 @@ Encoders and decoders
       Changed *indent* from an integer number of spaces to a string.
 
    If specified, *separators* should be an ``(item_separator, key_separator)``
-   tuple.  The default is ``(', ', ': ')``.  To get the most compact JSON
-   representation, you should specify ``(',', ':')`` to eliminate whitespace.
    tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
    ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
    you should specify ``(',', ':')`` to eliminate whitespace.
