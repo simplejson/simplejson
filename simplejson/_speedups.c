@@ -168,7 +168,7 @@ typedef struct _PyEncoderObject {
     int use_decimal;
     int namedtuple_as_object;
     int tuple_as_array;
-    int bigint_as_string;
+    int int_as_string_bitcount;
     PyObject *item_sort_key;
     PyObject *item_sort_kw;
     int for_json;
@@ -197,7 +197,7 @@ JSON_ParseEncoding(PyObject *encoding);
 static PyObject *
 JSON_UnicodeFromChar(JSON_UNICHR c);
 static PyObject *
-maybe_quote_bigint(PyObject *encoded, PyObject *obj);
+maybe_quote_bigint(PyObject *encoded, PyObject *obj, int max_int_bits);
 static Py_ssize_t
 ascii_char_size(JSON_UNICHR c);
 static Py_ssize_t
@@ -384,24 +384,19 @@ JSON_UnicodeFromChar(JSON_UNICHR c)
 }
 
 static PyObject *
-maybe_quote_bigint(PyObject *encoded, PyObject *obj)
+maybe_quote_bigint(PyObject *encoded, PyObject *obj, int max_int_bits)
 {
-    static PyObject *big_long = NULL;
-    static PyObject *small_long = NULL;
+    PyObject *big_long = PyLong_FromUnsignedLongLong(1LLU << max_int_bits);
     if (big_long == NULL) {
-        big_long = PyLong_FromLongLong(1LL << 53);
-        if (big_long == NULL) {
-            Py_DECREF(encoded);
-            return NULL;
-        }
+        Py_DECREF(encoded);
+        return NULL;
     }
+    PyObject *small_long = PyLong_FromLongLong(-1LL << max_int_bits);
     if (small_long == NULL) {
-        small_long = PyLong_FromLongLong(-1LL << 53);
-        if (small_long == NULL) {
-            Py_DECREF(encoded);
-            return NULL;
-        }
+        Py_DECREF(encoded);
+        return NULL;
     }
+
     if (PyObject_RichCompareBool(obj, big_long, Py_GE) ||
         PyObject_RichCompareBool(obj, small_long, Py_LE)) {
 #if PY_MAJOR_VERSION >= 3
@@ -413,6 +408,9 @@ maybe_quote_bigint(PyObject *encoded, PyObject *obj)
         Py_DECREF(encoded);
         encoded = quoted;
     }
+
+    Py_DECREF(big_long);
+    Py_DECREF(small_long);
     return encoded;
 }
 
@@ -2567,6 +2565,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         s->sort_keys = NULL;
         s->item_sort_key = NULL;
         s->item_sort_kw = NULL;
+        s->int_as_string_bitcount = -1;
         s->Decimal = NULL;
     }
     return (PyObject *)s;
@@ -2576,13 +2575,33 @@ static int
 encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* initialize Encoder object */
-    static char *kwlist[] = {"markers", "default", "encoder", "indent", "key_separator", "item_separator", "sort_keys", "skipkeys", "allow_nan", "key_memo", "use_decimal", "namedtuple_as_object", "tuple_as_array", "bigint_as_string", "item_sort_key", "encoding", "for_json", "ignore_nan", "Decimal", NULL};
+    static char *kwlist[] = {
+        "markers",
+        "default",
+        "encoder",
+        "indent",
+        "key_separator",
+        "item_separator",
+        "sort_keys",
+        "skipkeys",
+        "allow_nan",
+        "key_memo",
+        "use_decimal",
+        "namedtuple_as_object",
+        "tuple_as_array",
+        "int_as_string_bitcount",
+        "item_sort_key",
+        "encoding",
+        "for_json",
+        "ignore_nan",
+        "Decimal",
+        NULL};
 
     PyEncoderObject *s;
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
     PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
     PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array;
-    PyObject *bigint_as_string, *item_sort_key, *encoding, *for_json;
+    PyObject *int_as_string_bitcount, *item_sort_key, *encoding, *for_json;
     PyObject *ignore_nan, *Decimal;
 
     assert(PyEncoder_Check(self));
@@ -2591,8 +2610,9 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
-        &namedtuple_as_object, &tuple_as_array, &bigint_as_string,
-        &item_sort_key, &encoding, &for_json, &ignore_nan, &Decimal))
+        &namedtuple_as_object, &tuple_as_array,
+        &int_as_string_bitcount, &item_sort_key, &encoding, &for_json,
+        &ignore_nan, &Decimal))
         return -1;
 
     s->markers = markers;
@@ -2614,7 +2634,20 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->use_decimal = PyObject_IsTrue(use_decimal);
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
-    s->bigint_as_string = PyObject_IsTrue(bigint_as_string);
+    s->int_as_string_bitcount = -1;
+    if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
+        static const unsigned int long_long_bitsize = SIZEOF_LONG_LONG * 8;
+        int int_as_string_bitcount_val = PyLong_AsLong(int_as_string_bitcount);
+        if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < long_long_bitsize) {
+            s->int_as_string_bitcount = int_as_string_bitcount_val;
+        }
+        else {
+            PyErr_Format(PyExc_TypeError,
+                         "int_as_string_bitcount (%d) must be greater than 0 and less than the number of bits of a `long long` type (%u bits)",
+                         int_as_string_bitcount_val, long_long_bitsize);
+        }
+    }
+
     if (item_sort_key != Py_None) {
         if (!PyCallable_Check(item_sort_key))
             PyErr_SetString(PyExc_TypeError, "item_sort_key must be None or callable");
@@ -2801,8 +2834,8 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         else if (PyInt_Check(obj) || PyLong_Check(obj)) {
             PyObject *encoded = PyObject_Str(obj);
             if (encoded != NULL) {
-                if (s->bigint_as_string) {
-                    encoded = maybe_quote_bigint(encoded, obj);
+                if (s->int_as_string_bitcount > 0) {
+                    encoded = maybe_quote_bigint(encoded, obj, s->int_as_string_bitcount);
                     if (encoded == NULL)
                         break;
                 }
