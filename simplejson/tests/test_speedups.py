@@ -1,3 +1,4 @@
+import sys
 import unittest
 from unittest import TestCase
 
@@ -14,7 +15,7 @@ def skip_if_speedups_missing(func):
             if hasattr(unittest, 'SkipTest'):
                 raise unittest.SkipTest("C Extension not available")
             else:
-                print "C Extension not available"
+                sys.stdout.write("C Extension not available")
                 return
         return func(*args, **kwargs)
 

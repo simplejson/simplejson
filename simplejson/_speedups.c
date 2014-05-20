@@ -168,7 +168,8 @@ typedef struct _PyEncoderObject {
     int use_decimal;
     int namedtuple_as_object;
     int tuple_as_array;
-    int int_as_string_bitcount;
+    PyObject *max_long_size;
+    PyObject *min_long_size;
     PyObject *item_sort_key;
     PyObject *item_sort_kw;
     int for_json;
@@ -187,6 +188,8 @@ static PyMemberDef encoder_members[] = {
     {"skipkeys", T_OBJECT, offsetof(PyEncoderObject, skipkeys_bool), READONLY, "skipkeys"},
     {"key_memo", T_OBJECT, offsetof(PyEncoderObject, key_memo), READONLY, "key_memo"},
     {"item_sort_key", T_OBJECT, offsetof(PyEncoderObject, item_sort_key), READONLY, "item_sort_key"},
+    {"max_long_size", T_OBJECT, offsetof(PyEncoderObject, max_long_size), READONLY, "max_long_size"},
+    {"min_long_size", T_OBJECT, offsetof(PyEncoderObject, min_long_size), READONLY, "min_long_size"},
     {NULL}
 };
 
@@ -197,7 +200,7 @@ JSON_ParseEncoding(PyObject *encoding);
 static PyObject *
 JSON_UnicodeFromChar(JSON_UNICHR c);
 static PyObject *
-maybe_quote_bigint(PyObject *encoded, PyObject *obj, int max_int_bits);
+maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj);
 static Py_ssize_t
 ascii_char_size(JSON_UNICHR c);
 static Py_ssize_t
@@ -384,33 +387,22 @@ JSON_UnicodeFromChar(JSON_UNICHR c)
 }
 
 static PyObject *
-maybe_quote_bigint(PyObject *encoded, PyObject *obj, int max_int_bits)
+maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 {
-    PyObject *big_long = PyLong_FromUnsignedLongLong(1LLU << max_int_bits);
-    if (big_long == NULL) {
-        Py_DECREF(encoded);
-        return NULL;
-    }
-    PyObject *small_long = PyLong_FromLongLong(-1LL << max_int_bits);
-    if (small_long == NULL) {
-        Py_DECREF(encoded);
-        return NULL;
-    }
-
-    if (PyObject_RichCompareBool(obj, big_long, Py_GE) ||
-        PyObject_RichCompareBool(obj, small_long, Py_LE)) {
+    if (s->max_long_size != Py_None && s->min_long_size != Py_None) {
+        if (PyObject_RichCompareBool(obj, s->max_long_size, Py_GE) ||
+            PyObject_RichCompareBool(obj, s->min_long_size, Py_LE)) {
 #if PY_MAJOR_VERSION >= 3
-        PyObject* quoted = PyUnicode_FromFormat("\"%U\"", encoded);
+            PyObject* quoted = PyUnicode_FromFormat("\"%U\"", encoded);
 #else
-        PyObject* quoted = PyString_FromFormat("\"%s\"",
-                                               PyString_AsString(encoded));
+            PyObject* quoted = PyString_FromFormat("\"%s\"",
+                                                   PyString_AsString(encoded));
 #endif
-        Py_DECREF(encoded);
-        encoded = quoted;
+            Py_DECREF(encoded);
+            encoded = quoted;
+        }
     }
 
-    Py_DECREF(big_long);
-    Py_DECREF(small_long);
     return encoded;
 }
 
@@ -2565,8 +2557,9 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         s->sort_keys = NULL;
         s->item_sort_key = NULL;
         s->item_sort_kw = NULL;
-        s->int_as_string_bitcount = -1;
         s->Decimal = NULL;
+        s->max_long_size = NULL;
+        s->min_long_size = NULL;
     }
     return (PyObject *)s;
 }
@@ -2634,12 +2627,22 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->use_decimal = PyObject_IsTrue(use_decimal);
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
-    s->int_as_string_bitcount = -1;
+
+    s->max_long_size = Py_None;
+    Py_INCREF(Py_None);
+    s->min_long_size = Py_None;
+    Py_INCREF(Py_None);
     if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
         static const unsigned int long_long_bitsize = SIZEOF_LONG_LONG * 8;
         int int_as_string_bitcount_val = PyLong_AsLong(int_as_string_bitcount);
         if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < long_long_bitsize) {
-            s->int_as_string_bitcount = int_as_string_bitcount_val;
+            Py_DECREF(Py_None);
+            Py_DECREF(Py_None);
+            s->max_long_size = PyLong_FromUnsignedLongLong(1LLU << int_as_string_bitcount_val);
+            s->min_long_size = PyLong_FromLongLong(-1LL << int_as_string_bitcount_val);
+            if (s->min_long_size == NULL || s->max_long_size == NULL) {
+                return -1;
+            }
         }
         else {
             PyErr_Format(PyExc_TypeError,
@@ -2834,11 +2837,9 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         else if (PyInt_Check(obj) || PyLong_Check(obj)) {
             PyObject *encoded = PyObject_Str(obj);
             if (encoded != NULL) {
-                if (s->int_as_string_bitcount > 0) {
-                    encoded = maybe_quote_bigint(encoded, obj, s->int_as_string_bitcount);
-                    if (encoded == NULL)
-                        break;
-                }
+                encoded = maybe_quote_bigint(s, encoded, obj);
+                if (encoded == NULL)
+                    break;
                 rv = _steal_accumulate(rval, encoded);
             }
         }
@@ -3190,6 +3191,8 @@ encoder_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(s->sort_keys);
     Py_VISIT(s->item_sort_kw);
     Py_VISIT(s->item_sort_key);
+    Py_VISIT(s->max_long_size);
+    Py_VISIT(s->min_long_size);
     Py_VISIT(s->Decimal);
     return 0;
 }
@@ -3213,6 +3216,8 @@ encoder_clear(PyObject *self)
     Py_CLEAR(s->sort_keys);
     Py_CLEAR(s->item_sort_kw);
     Py_CLEAR(s->item_sort_key);
+    Py_CLEAR(s->max_long_size);
+    Py_CLEAR(s->min_long_size);
     Py_CLEAR(s->Decimal);
     return 0;
 }
