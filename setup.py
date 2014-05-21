@@ -11,7 +11,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '3.4.1'
+VERSION = '3.5.0'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
 with open('README.rst', 'r') as f:
@@ -30,6 +30,7 @@ Programming Language :: Python :: 2.6
 Programming Language :: Python :: 2.7
 Programming Language :: Python :: 3
 Programming Language :: Python :: 3.3
+Programming Language :: Python :: 3.4
 Programming Language :: Python :: Implementation :: CPython
 Programming Language :: Python :: Implementation :: PyPy
 Topic :: Software Development :: Libraries :: Python Modules

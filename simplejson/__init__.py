@@ -98,7 +98,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     Expecting property name: line 1 column 3 (char 2)
 """
 from __future__ import absolute_import
-__version__ = '3.4.1'
+__version__ = '3.5.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -211,7 +211,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     sparingly.
 
     If *int_as_string_bitcount* is a positive number (n), then int of size
-    greater than 2**n or lower than -2**n will be encoded as strings.
+    greater than or equal to 2**n or lower than or equal to -2**n will be
+    encoded as strings.
 
     If specified, *item_sort_key* is a callable used to sort the items in
     each dictionary. This is useful if you want to sort items other than
@@ -325,7 +326,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     rounding that happens in Javascript otherwise.
 
     If *int_as_string_bitcount* is a positive number (n), then int of size
-    greater than 2**n or lower than -2**n will be encoded as strings.
+    greater than or equal to 2**n or lower than or equal to -2**n will be
+    encoded as strings.
 
     If specified, *item_sort_key* is a callable used to sort the items in
     each dictionary. This is useful if you want to sort items other than

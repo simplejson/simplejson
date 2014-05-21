@@ -183,7 +183,8 @@ class JSONEncoder(object):
         rounding that happens in Javascript otherwise.
 
         If int_as_string_bitcount is a positive number (n), then int of size
-        greater than 2**n or lower than -2**n will be encoded as strings.
+        greater than or equal to 2**n or lower than or equal to -2**n will be
+        encoded as strings.
 
         If specified, item_sort_key is a callable used to sort the items in
         each dictionary. This is useful if you want to sort items other than
@@ -323,10 +324,7 @@ class JSONEncoder(object):
 
         key_memo = {}
         int_as_string_bitcount = (
-            (self.bigint_as_string and 53)
-            or
-            self.int_as_string_bitcount
-        )
+            53 if self.bigint_as_string else self.int_as_string_bitcount)
         if (_one_shot and c_make_encoder is not None
                 and self.indent is None):
             _iterencode = c_make_encoder(

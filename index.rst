@@ -129,7 +129,7 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 Basic Usage
 -----------
 
-.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, [for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]]])
+.. function:: dump(obj, fp[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, [for_json[, ignore_nan[, int_as_string_bitcount[, **kw]]]]]]]]]]]]]]]]]]])
 
    Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
    file-like object).
@@ -216,10 +216,11 @@ Basic Usage
    .. versionchanged:: 2.2.0
      *tuple_as_array* is new in 2.2.0.
 
-   If *bigint_as_string* is true (default: ``False``), :class:`int`` ``2**53``
+   If *bigint_as_string* is true (default: ``False``), :class:`int` ``2**53``
    and higher or lower than ``-2**53`` will be encoded as strings. This is to
    avoid the rounding that happens in Javascript otherwise. Note that this
    option loses type information, so use with extreme caution.
+   See also *int_as_string_bitcount*.
 
    .. versionchanged:: 2.4.0
      *bigint_as_string* is new in 2.4.0.
@@ -261,6 +262,15 @@ Basic Usage
    .. versionchanged:: 3.2.0
       *ignore_nan* is new in 3.2.0.
 
+   If *int_as_string_bitcount* is a positive number ``n`` (default: ``False``),
+   :class:`int` ``2**n`` and higher or lower than ``-2**n`` will be encoded as strings. This is to
+   avoid the rounding that happens in Javascript otherwise. Note that this
+   option loses type information, so use with extreme caution.
+   See also *bigint_as_string* (which is equivalent to `int_as_string_bitcount=53`).
+
+   .. versionchanged:: 3.5.0
+     *int_as_string_bitcount* is new in 3.5.0.
+
   .. note::
 
         JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
@@ -268,7 +278,7 @@ Basic Usage
         container protocol to delimit them.
 
 
-.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, for_json[, ignore_nan[, **kw]]]]]]]]]]]]]]]]]])
+.. function:: dumps(obj[, skipkeys[, ensure_ascii[, check_circular[, allow_nan[, cls[, indent[, separators[, encoding[, default[, use_decimal[, namedtuple_as_object[, tuple_as_array[, bigint_as_string[, sort_keys[, item_sort_key[, for_json[, ignore_nan[, int_as_string_bitcount[, **kw]]]]]]]]]]]]]]]]]])
 
    Serialize *obj* to a JSON formatted :class:`str`.
 

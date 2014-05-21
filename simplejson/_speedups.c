@@ -2608,17 +2608,25 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         &ignore_nan, &Decimal))
         return -1;
 
+    Py_INCREF(markers);
     s->markers = markers;
+    Py_INCREF(defaultfn);
     s->defaultfn = defaultfn;
+    Py_INCREF(encoder);
     s->encoder = encoder;
     s->encoding = JSON_ParseEncoding(encoding);
     if (s->encoding == NULL)
         return -1;
+    Py_INCREF(indent);
     s->indent = indent;
+    Py_INCREF(key_separator);
     s->key_separator = key_separator;
+    Py_INCREF(item_separator);
     s->item_separator = item_separator;
+    Py_INCREF(skipkeys);
     s->skipkeys_bool = skipkeys;
     s->skipkeys = PyObject_IsTrue(skipkeys);
+    Py_INCREF(key_memo);
     s->key_memo = key_memo;
     s->fast_encode = (PyCFunction_Check(s->encoder) && PyCFunction_GetFunction(s->encoder) == (PyCFunction)py_encode_basestring_ascii);
     s->allow_or_ignore_nan = (
@@ -2627,17 +2635,10 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->use_decimal = PyObject_IsTrue(use_decimal);
     s->namedtuple_as_object = PyObject_IsTrue(namedtuple_as_object);
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
-
-    s->max_long_size = Py_None;
-    Py_INCREF(Py_None);
-    s->min_long_size = Py_None;
-    Py_INCREF(Py_None);
     if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
         static const unsigned int long_long_bitsize = SIZEOF_LONG_LONG * 8;
         int int_as_string_bitcount_val = PyLong_AsLong(int_as_string_bitcount);
         if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < long_long_bitsize) {
-            Py_DECREF(Py_None);
-            Py_DECREF(Py_None);
             s->max_long_size = PyLong_FromUnsignedLongLong(1LLU << int_as_string_bitcount_val);
             s->min_long_size = PyLong_FromLongLong(-1LL << int_as_string_bitcount_val);
             if (s->min_long_size == NULL || s->max_long_size == NULL) {
@@ -2648,9 +2649,19 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
             PyErr_Format(PyExc_TypeError,
                          "int_as_string_bitcount (%d) must be greater than 0 and less than the number of bits of a `long long` type (%u bits)",
                          int_as_string_bitcount_val, long_long_bitsize);
+	    return -1;
         }
     }
-
+    else if (int_as_string_bitcount == Py_None) {
+	Py_INCREF(Py_None);
+	s->max_long_size = Py_None;
+	Py_INCREF(Py_None);
+	s->min_long_size = Py_None;
+    }
+    else {
+	PyErr_SetString(PyExc_TypeError, "int_as_string_bitcount must be None or an integer");
+	return -1;
+    }
     if (item_sort_key != Py_None) {
         if (!PyCallable_Check(item_sort_key)) {
             PyErr_SetString(PyExc_TypeError, "item_sort_key must be None or callable");
@@ -2681,22 +2692,14 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         if (PyDict_SetItemString(s->item_sort_kw, "key", item_sort_key))
             return -1;
     }
+    Py_INCREF(sort_keys);
     s->sort_keys = sort_keys;
+    Py_INCREF(item_sort_key);
     s->item_sort_key = item_sort_key;
+    Py_INCREF(Decimal);
     s->Decimal = Decimal;
     s->for_json = PyObject_IsTrue(for_json);
 
-    Py_INCREF(s->markers);
-    Py_INCREF(s->defaultfn);
-    Py_INCREF(s->encoder);
-    Py_INCREF(s->indent);
-    Py_INCREF(s->key_separator);
-    Py_INCREF(s->item_separator);
-    Py_INCREF(s->key_memo);
-    Py_INCREF(s->skipkeys_bool);
-    Py_INCREF(s->sort_keys);
-    Py_INCREF(s->item_sort_key);
-    Py_INCREF(s->Decimal);
     return 0;
 }
 
