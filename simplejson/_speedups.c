@@ -2616,8 +2616,10 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->tuple_as_array = PyObject_IsTrue(tuple_as_array);
     s->bigint_as_string = PyObject_IsTrue(bigint_as_string);
     if (item_sort_key != Py_None) {
-        if (!PyCallable_Check(item_sort_key))
+        if (!PyCallable_Check(item_sort_key)) {
             PyErr_SetString(PyExc_TypeError, "item_sort_key must be None or callable");
+	    return -1;
+	}
     }
     else if (PyObject_IsTrue(sort_keys)) {
         static PyObject *itemgetter0 = NULL;
