@@ -37,6 +37,7 @@ def all_tests_suite():
     def get_suite():
         return additional_tests(
             unittest.TestLoader().loadTestsFromNames([
+                'simplejson.tests.test_bitsize_int_as_string',
                 'simplejson.tests.test_bigint_as_string',
                 'simplejson.tests.test_check_circular',
                 'simplejson.tests.test_decode',

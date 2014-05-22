@@ -401,7 +401,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
     elif _sort_keys and not _item_sort_key:
         _item_sort_key = itemgetter(0)
 
-    if _int_as_string_bitcount is not None and _int_as_string_bitcount < 0:
+    if (_int_as_string_bitcount is not None and
+        (_int_as_string_bitcount <= 0 or
+         not isinstance(_int_as_string_bitcount, integer_types))):
         raise TypeError("int_as_string_bitcount must be a positive integer")
 
     def _encode_int(value):
