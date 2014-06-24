@@ -384,6 +384,10 @@ class JSONDecoder(object):
         have extraneous data at the end.
 
         """
+        if idx < 0:
+            # Ensure that raw_decode bails on negative indexes, the regex
+            # would otherwise mask this behavior. #98
+            raise JSONDecodeError('Expecting value', s, idx)
         if _PY3 and not isinstance(s, text_type):
             raise TypeError("Input string must be text, not bytes")
         return self.scan_once(s, idx=_w(s, idx).end())

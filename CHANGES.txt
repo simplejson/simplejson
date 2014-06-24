@@ -1,3 +1,8 @@
+Version 3.5.3 released 2014-06-24
+
+* Fix lower bound checking in scan_once / raw_decode API
+  https://github.com/simplejson/simplejson/issues/98
+
 Version 3.5.2 released 2014-05-22
 
 * Fix Windows build with VS2008
