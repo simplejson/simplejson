@@ -159,7 +159,7 @@ class JSONEncoder(object):
             encoder = encode_basestring
         allow_nan = self.allow_nan
         for key, value in dct.iteritems():
-            if isinstance(key, basestring):
+            if isinstance(key, (str, unicode)):
                 pass
             # JavaScript is weakly typed for these, so it makes sense to
             # also allow them.  Many encoders seem to do something like this.
@@ -190,7 +190,7 @@ class JSONEncoder(object):
             del markers[markerid]
 
     def _iterencode(self, o, markers=None):
-        if isinstance(o, basestring):
+        if isinstance(o, (str, unicode)):
             if self.ensure_ascii:
                 encoder = encode_basestring_ascii
             else:
