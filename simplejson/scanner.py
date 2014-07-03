@@ -2,6 +2,8 @@
 Iterator based sre token scanner
 """
 from __future__ import generators
+import __builtin__
+__builtin__.enumerate = lambda seq:  zip(xrange(len(seq)), seq)
 
 import sre_parse, sre_compile, sre_constants
 from sre_constants import BRANCH, SUBPATTERN
