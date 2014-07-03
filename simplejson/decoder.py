@@ -12,7 +12,9 @@ def _floatconstants():
     import sys
     _BYTES = '7FF80000000000007FF0000000000000'.decode('hex')
     if sys.byteorder != 'big':
-        _BYTES = _BYTES[:8][::-1] + _BYTES[8:][::-1]
+        # slicing not available in Python 2.2
+        #_BYTES = _BYTES[:8][::-1] + _BYTES[8:][::-1]
+        _BYTES = '000000000000f87f000000000000f07f'.decode('hex')
     nan, inf = struct.unpack('dd', _BYTES)
     return nan, inf, -inf
 
