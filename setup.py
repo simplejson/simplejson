@@ -1,9 +1,15 @@
 #!/usr/bin/env python
+import sys
+if sys.version_info < (2, 3):
+    from distutils.core import setup
 
-import ez_setup
-ez_setup.use_setuptools()
+    def find_packages(exclude=None):
+        return ['simplejson', 'simplejson.tests']
+else:
+    import ez_setup
+    ez_setup.use_setuptools()
 
-from setuptools import setup, find_packages
+    from setuptools import setup, find_packages
 
 VERSION = '1.1'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
