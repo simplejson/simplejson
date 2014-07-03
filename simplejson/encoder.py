@@ -1,6 +1,7 @@
 """
 Implementation of JSONEncoder
 """
+from __future__ import generators
 import re
 
 # this should match any kind of infinity

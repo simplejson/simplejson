@@ -1,6 +1,8 @@
 """
 Iterator based sre token scanner
 """
+from __future__ import generators
+
 import sre_parse, sre_compile, sre_constants
 from sre_constants import BRANCH, SUBPATTERN
 from sre import VERBOSE, MULTILINE, DOTALL
