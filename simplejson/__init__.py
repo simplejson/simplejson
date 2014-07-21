@@ -437,7 +437,16 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
     of subclassing whenever possible.
 
     """
-    return loads(fp.read(),
+    # Strip the UTF-8 BOM
+    contents = fp.read()
+    ord0 = ord(contents[0])
+    if ord0 in (0xef, 0xfeff):
+        if ord0 == 0xfeff:
+            contents = contents[1:]
+        elif contents[:3] == '\xef\xbb\xbf':
+            contents = contents[3:]
+
+    return loads(contents,
         encoding=encoding, cls=cls, object_hook=object_hook,
         parse_float=parse_float, parse_int=parse_int,
         parse_constant=parse_constant, object_pairs_hook=object_pairs_hook,

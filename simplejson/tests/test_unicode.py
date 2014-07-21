@@ -1,4 +1,5 @@
 import sys
+import os.path
 from unittest import TestCase
 
 import simplejson as json
@@ -143,3 +144,11 @@ class TestUnicode(TestCase):
         self.assertEqual(
             json.dumps(c, ensure_ascii=False),
             '"' + c + '"')
+
+    def test_strip_bom(self):
+        thisdir = os.path.dirname(__file__)
+        json_file = os.path.join(thisdir, "utf-8-bom.json")
+        doc_ascii = {
+            u"content": u"\u3053\u3093\u306b\u3061\u308f"
+        }
+        self.assertEqual(json.load(open(json_file)), doc_ascii)
