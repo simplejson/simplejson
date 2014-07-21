@@ -98,7 +98,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     Expecting property name: line 1 column 3 (char 2)
 """
 from __future__ import absolute_import
-__version__ = '3.5.3'
+__version__ = '3.6.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
@@ -437,16 +437,7 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
     of subclassing whenever possible.
 
     """
-    # Strip the UTF-8 BOM
-    contents = fp.read()
-    ord0 = ord(contents[0])
-    if ord0 in (0xef, 0xfeff):
-        if ord0 == 0xfeff:
-            contents = contents[1:]
-        elif contents[:3] == '\xef\xbb\xbf':
-            contents = contents[3:]
-
-    return loads(contents,
+    return loads(fp.read(),
         encoding=encoding, cls=cls, object_hook=object_hook,
         parse_float=parse_float, parse_int=parse_int,
         parse_constant=parse_constant, object_pairs_hook=object_pairs_hook,
