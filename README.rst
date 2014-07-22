@@ -21,3 +21,9 @@ objects with the ``object_hook`` or ``object_pairs_hook`` kwargs. This
 is particularly useful for implementing protocols such as JSON-RPC
 that have a richer type system than JSON itself.
 
+For those of you that have legacy systems to maintain, there is a
+very old fork of simplejson in the [python2.2] branch that supports
+Python 2.2. This is based off of a very old version of simplejson,
+is not maintained, and should only be used as a last resort.
+
+[python2.2]: https://github.com/simplejson/simplejson/tree/python2.2
