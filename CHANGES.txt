@@ -1,3 +1,8 @@
+Version 3.6.1 released 2014-08-09
+
+* Documentation updates
+  https://github.com/simplejson/simplejson/issues/102
+
 Version 3.6.0 released 2014-07-21
 
 * Automatically strip any UTF-8 BOM from input to more closely
