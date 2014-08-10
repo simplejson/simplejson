@@ -1,3 +1,8 @@
+Version 3.6.2 released 2014-08-09
+
+* Documentation updates
+  http://bugs.python.org/issue21514
+
 Version 3.6.1 released 2014-08-09
 
 * Documentation updates
