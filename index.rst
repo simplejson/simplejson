@@ -814,7 +814,7 @@ Other than the *ensure_ascii* parameter, this module is defined strictly in
 terms of conversion between Python objects and
 :class:`Unicode strings <str>`, and thus does not otherwise directly address
 the issue of character encodings.
- 
+
 The RFC prohibits adding a byte order mark (BOM) to the start of a JSON text,
 and this module's serializer does not add a BOM to its output.
 The RFC permits, but does not require, JSON deserializers to ignore an initial
@@ -906,6 +906,17 @@ when serializing instances of "exotic" numerical types such as
 .. highlight:: bash
 
 .. _json-commandline:
+
+
+Restrictions on Key Encoding/Decoding
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Key encoding/decoding is limited to Python standard types and
+:class:`decimal.Decimal`. While *for_json* and *default* arguments allow for
+the serialization of exotic types in dictionary values, no such mechanism
+exists for keys. At this time, there are no plans to support this
+functionality.
+
 
 Command Line Interface
 ----------------------
