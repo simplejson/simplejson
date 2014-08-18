@@ -553,6 +553,15 @@ Encoders and decoders
    | None              | null          |
    +-------------------+---------------+
 
+   .. note:: The JSON format only permits strings to be used as object
+      keys, thus any Python dicts to be encoded should only have string keys.
+      For backwards compatibility, several other types are automatically
+      coerced to strings: int, long, float, Decimal, bool, and None.
+      It is error-prone to rely on this behavior, so avoid it when possible.
+      Dictionaries with other types used as keys should be pre-processed or
+      wrapped in another type with an appropriate `for_json` method to
+      transform the keys during encoding.
+
    It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as their
    corresponding ``float`` values, which is outside the JSON spec.
 
@@ -570,8 +579,8 @@ Encoders and decoders
         or *for_json* kwarg. This is faster and more portable than subclassing.
 
    If *skipkeys* is false (the default), then it is a :exc:`TypeError` to
-   attempt encoding of keys that are not str, int, long, float or None.  If
-   *skipkeys* is true, such items are simply skipped.
+   attempt encoding of keys that are not str, int, long, float, Decimal, bool,
+   or None. If *skipkeys* is true, such items are simply skipped.
 
    If *ensure_ascii* is true (the default), the output is guaranteed to be
    :class:`str` objects with all incoming unicode characters escaped.  If
@@ -814,7 +823,7 @@ Other than the *ensure_ascii* parameter, this module is defined strictly in
 terms of conversion between Python objects and
 :class:`Unicode strings <str>`, and thus does not otherwise directly address
 the issue of character encodings.
- 
+
 The RFC prohibits adding a byte order mark (BOM) to the start of a JSON text,
 and this module's serializer does not add a BOM to its output.
 The RFC permits, but does not require, JSON deserializers to ignore an initial
