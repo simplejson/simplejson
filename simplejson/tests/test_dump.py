@@ -119,3 +119,12 @@ class TestDump(TestCase):
         # the C API uses an accumulator that collects after 100,000 appends
         lst = [0] * 100000
         self.assertEqual(json.loads(json.dumps(lst)), lst)
+
+    def test_sort_keys(self):
+        # https://github.com/simplejson/simplejson/issues/106
+        for num_keys in range(2, 32):
+            p = dict((str(x), x) for x in range(num_keys))
+            sio = StringIO()
+            json.dump(p, sio, sort_keys=True)
+            self.assertEqual(sio.getvalue(), json.dumps(p, sort_keys=True))
+            self.assertEqual(json.loads(sio.getvalue()), p)
