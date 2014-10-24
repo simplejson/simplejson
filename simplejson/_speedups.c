@@ -3070,6 +3070,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 bail:
     Py_XDECREF(encoded);
     Py_XDECREF(items);
+    Py_XDECREF(item);
     Py_XDECREF(iter);
     Py_XDECREF(kstr);
     Py_XDECREF(ident);
