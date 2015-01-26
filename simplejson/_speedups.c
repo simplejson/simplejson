@@ -2178,6 +2178,13 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
             else
                 fallthrough = 1;
             break;
+        case ',':
+        case ']':
+            /* ,, */
+            Py_INCREF(Py_None);
+            *next_idx_ptr = idx;
+            rval = Py_None;
+            break;
         case 't':
             /* true */
             if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
@@ -2287,6 +2294,13 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             }
             else
                 fallthrough = 1;
+            break;
+        case ',':
+        case ']':
+            /* ,, */
+            Py_INCREF(Py_None);
+            *next_idx_ptr = idx;
+            rval = Py_None;
             break;
         case 't':
             /* true */

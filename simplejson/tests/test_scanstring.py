@@ -101,8 +101,8 @@ class TestScanString(TestCase):
             (u'Comma instead of colon', 25))
 
         self.assertEqual(
-            scanstring('["Colon instead of comma": false]', 2, None, True),
-            (u'Colon instead of comma', 25))
+            scanstring('["sparse-array",,,]', 2, None, True),
+            (u'sparse-array', 15))
 
         self.assertEqual(
             scanstring('["Bad value", truth]', 2, None, True),

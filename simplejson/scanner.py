@@ -91,6 +91,10 @@ def py_make_scanner(context):
         elif nextchar == '{':
             return parse_object((string, idx + 1), encoding, strict,
                 _scan_once, object_hook, object_pairs_hook, memo)
+        elif nextchar == ',':
+            return None, idx
+        elif nextchar == ']':
+            return None, idx
         elif nextchar == '[':
             return parse_array((string, idx + 1), _scan_once)
         elif nextchar == 'n' and string[idx:idx + 4] == 'null':
