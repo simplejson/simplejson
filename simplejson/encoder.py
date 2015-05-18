@@ -311,6 +311,9 @@ class JSONEncoder(object):
             elif o == _neginf:
                 text = '-Infinity'
             else:
+                if type(o) != float:
+                    # See #118, do not trust custom str/repr
+                    o = float(o)
                 return _repr(o)
 
             if ignore_nan:
@@ -412,6 +415,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             or
             _int_as_string_bitcount < 1
         )
+        if type(value) not in integer_types:
+            # See #118, do not trust custom str/repr
+            value = int(value)
         if (
             skip_quoting or
             (-1 << _int_as_string_bitcount)
@@ -501,6 +507,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif key is None:
             key = 'null'
         elif isinstance(key, integer_types):
+            if key not in integer_types:
+                # See #118, do not trust custom str/repr
+                key = int(key)
             key = str(key)
         elif _use_decimal and isinstance(key, Decimal):
             key = str(key)
