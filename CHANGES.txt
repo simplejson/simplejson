@@ -1,3 +1,8 @@
+Version 3.7.1 released 2015-05-18
+
+* Fix compilation with MSVC
+  https://github.com/simplejson/simplejson/pull/119
+
 Version 3.7.0 released 2015-05-18
 
 * simplejson no longer trusts custom str/repr methods for int, long, float
