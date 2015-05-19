@@ -663,11 +663,12 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
     else if (PyInt_Check(key) || PyLong_Check(key)) {
         if (!(PyInt_CheckExact(key) || PyLong_CheckExact(key))) {
             /* See #118, do not trust custom str/repr */
+            PyObject *res;
             PyObject *tmp = PyObject_CallFunctionObjArgs((PyObject *)&PyLong_Type, key, NULL);
             if (tmp == NULL) {
                 return NULL;
             }
-            PyObject *res = PyObject_Str(tmp);
+            res = PyObject_Str(tmp);
             Py_DECREF(tmp);
             return res;
         }
@@ -2818,11 +2819,12 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
     }
     else {
         /* See #118, do not trust custom str/repr */
+        PyObject *res;
         PyObject *tmp = PyObject_CallFunctionObjArgs((PyObject *)&PyFloat_Type, obj, NULL);
         if (tmp == NULL) {
             return NULL;
         }
-        PyObject *res = PyObject_Repr(tmp);
+        res = PyObject_Repr(tmp);
         Py_DECREF(tmp);
         return res;
     }
