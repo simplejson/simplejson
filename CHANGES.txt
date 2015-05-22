@@ -1,3 +1,8 @@
+Version 3.7.2 released 2015-05-22
+
+* Do not cache Decimal class in encoder, only reference the decimal module.
+  This may make reload work in more common scenarios.
+
 Version 3.7.1 released 2015-05-18
 
 * Fix compilation with MSVC
