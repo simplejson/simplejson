@@ -1,3 +1,8 @@
+Version 3.7.3 released 2015-05-31
+
+* Fix typo introduced in 3.7.0 (behavior should be indistinguishable)
+  https://github.com/simplejson/simplejson/commit/e18cc09b688ea1f3305c27616fd3cadd2adc6d31#commitcomment-11443842
+
 Version 3.7.2 released 2015-05-22
 
 * Do not cache Decimal class in encoder, only reference the decimal module.

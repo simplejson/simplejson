@@ -510,7 +510,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif key is None:
             key = 'null'
         elif isinstance(key, integer_types):
-            if key not in integer_types:
+            if type(key) not in integer_types:
                 # See #118, do not trust custom str/repr
                 key = int(key)
             key = str(key)
