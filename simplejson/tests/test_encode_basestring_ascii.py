@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import simplejson.encoder
+from simplejson.compat import b
 
 CASES = [
     (u'/\\"\ucafe\ubabe\uab98\ufcde\ubcda\uef4a\x08\x0c\n\r\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?', '"/\\\\\\"\\ucafe\\ubabe\\uab98\\ufcde\\ubcda\\uef4a\\b\\f\\n\\r\\t`1~!@#$%^&*()_+-=[]{}|;:\',./<>?"'),
@@ -11,9 +12,9 @@ CASES = [
     (u' s p a c e d ', '" s p a c e d "'),
     (u'\U0001d120', '"\\ud834\\udd20"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
-    ('\xce\xb1\xce\xa9', '"\\u03b1\\u03a9"'),
+    (b('\xce\xb1\xce\xa9'), '"\\u03b1\\u03a9"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
-    ('\xce\xb1\xce\xa9', '"\\u03b1\\u03a9"'),
+    (b('\xce\xb1\xce\xa9'), '"\\u03b1\\u03a9"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
     (u'\u03b1\u03a9', '"\\u03b1\\u03a9"'),
     (u"`1~!@#$%^&*()_+-={':[,]}|;.</>?", '"`1~!@#$%^&*()_+-={\':[,]}|;.</>?"'),
@@ -34,10 +35,10 @@ class TestEncodeBaseStringAscii(TestCase):
         fname = encode_basestring_ascii.__name__
         for input_string, expect in CASES:
             result = encode_basestring_ascii(input_string)
-            #self.assertEquals(result, expect,
+            #self.assertEqual(result, expect,
             #    '{0!r} != {1!r} for {2}({3!r})'.format(
             #        result, expect, fname, input_string))
-            self.assertEquals(result, expect,
+            self.assertEqual(result, expect,
                 '%r != %r for %s(%r)' % (result, expect, fname, input_string))
 
     def test_sorted_dict(self):

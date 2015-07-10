@@ -1,29 +1,47 @@
 #!/usr/bin/env python
+from __future__ import with_statement
 
 import sys
-from distutils.core import setup, Extension, Command
+try:
+    from setuptools import setup, Extension, Command
+except ImportError:
+    from distutils.core import setup, Extension, Command
 from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '2.3.0'
+VERSION = '3.7.4'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
-LONG_DESCRIPTION = open('README.rst', 'r').read()
+
+with open('README.rst', 'r') as f:
+   LONG_DESCRIPTION = f.read()
 
 CLASSIFIERS = filter(None, map(str.strip,
 """
+Development Status :: 5 - Production/Stable
 Intended Audience :: Developers
 License :: OSI Approved :: MIT License
+License :: OSI Approved :: Academic Free License (AFL)
 Programming Language :: Python
+Programming Language :: Python :: 2
+Programming Language :: Python :: 2.5
+Programming Language :: Python :: 2.6
+Programming Language :: Python :: 2.7
+Programming Language :: Python :: 3
+Programming Language :: Python :: 3.3
+Programming Language :: Python :: 3.4
+Programming Language :: Python :: Implementation :: CPython
+Programming Language :: Python :: Implementation :: PyPy
 Topic :: Software Development :: Libraries :: Python Modules
 """.splitlines()))
 
 if sys.platform == 'win32' and sys.version_info > (2, 6):
    # 2.6's distutils.msvc9compiler can raise an IOError when failing to
    # find the compiler
+   # It can also raise ValueError http://bugs.python.org/issue7511
    ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError,
-                 IOError)
+                 IOError, ValueError)
 else:
    ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError)
 
@@ -58,7 +76,10 @@ class TestCommand(Command):
     def run(self):
         import sys, subprocess
         raise SystemExit(
-            subprocess.call([sys.executable, 'simplejson/tests/__init__.py']))
+            subprocess.call([sys.executable,
+                             # Turn on deprecation warnings
+                             '-Wd',
+                             'simplejson/tests/__init__.py']))
 
 def run_setup(with_binary):
     cmdclass = dict(test=TestCommand)
@@ -89,16 +110,17 @@ def run_setup(with_binary):
 try:
     run_setup(not IS_PYPY)
 except BuildFailed:
-    BUILD_EXT_WARNING = "WARNING: The C extension could not be compiled, speedups are not enabled."
-    print '*' * 75
-    print BUILD_EXT_WARNING
-    print "Failure information, if any, is above."
-    print "I'm retrying the build without the C extension now."
-    print '*' * 75
+    BUILD_EXT_WARNING = ("WARNING: The C extension could not be compiled, "
+                         "speedups are not enabled.")
+    print('*' * 75)
+    print(BUILD_EXT_WARNING)
+    print("Failure information, if any, is above.")
+    print("I'm retrying the build without the C extension now.")
+    print('*' * 75)
 
     run_setup(False)
 
-    print '*' * 75
-    print BUILD_EXT_WARNING
-    print "Plain-Python installation succeeded."
-    print '*' * 75
+    print('*' * 75)
+    print(BUILD_EXT_WARNING)
+    print("Plain-Python installation succeeded.")
+    print('*' * 75)

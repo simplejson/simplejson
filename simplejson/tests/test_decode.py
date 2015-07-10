@@ -1,8 +1,9 @@
+from __future__ import absolute_import
 import decimal
 from unittest import TestCase
-from StringIO import StringIO
 
 import simplejson as json
+from simplejson.compat import StringIO
 from simplejson import OrderedDict
 
 class TestDecode(TestCase):
@@ -13,19 +14,19 @@ class TestDecode(TestCase):
     def test_decimal(self):
         rval = json.loads('1.1', parse_float=decimal.Decimal)
         self.assertTrue(isinstance(rval, decimal.Decimal))
-        self.assertEquals(rval, decimal.Decimal('1.1'))
+        self.assertEqual(rval, decimal.Decimal('1.1'))
 
     def test_float(self):
         rval = json.loads('1', parse_int=float)
         self.assertTrue(isinstance(rval, float))
-        self.assertEquals(rval, 1.0)
+        self.assertEqual(rval, 1.0)
 
     def test_decoder_optimizations(self):
         # Several optimizations were made that skip over calls to
         # the whitespace regex, so this test is designed to try and
         # exercise the uncommon cases. The array cases are already covered.
         rval = json.loads('{   "key"    :    "value"    ,  "k":"v"    }')
-        self.assertEquals(rval, {"key":"value", "k":"v"})
+        self.assertEqual(rval, {"key":"value", "k":"v"})
 
     def test_empty_objects(self):
         s = '{}'
@@ -81,3 +82,18 @@ class TestDecode(TestCase):
         self.assertEqual(
             ({'a': {}}, 9),
             cls(object_pairs_hook=dict).raw_decode("{\"a\": {}}"))
+        # https://github.com/simplejson/simplejson/pull/38
+        self.assertEqual(
+            ({'a': {}}, 11),
+            cls().raw_decode(" \n{\"a\": {}}"))
+
+    def test_bounds_checking(self):
+        # https://github.com/simplejson/simplejson/issues/98
+        j = json.decoder.JSONDecoder()
+        for i in [4, 5, 6, -1, -2, -3, -4, -5, -6]:
+            self.assertRaises(ValueError, j.scan_once, '1234', i)
+            self.assertRaises(ValueError, j.raw_decode, '1234', i)
+        x, y = sorted(['128931233', '472389423'], key=id)
+        diff = id(x) - id(y)
+        self.assertRaises(ValueError, j.scan_once, y, diff)
+        self.assertRaises(ValueError, j.raw_decode, y, i)

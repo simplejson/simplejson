@@ -1,14 +1,12 @@
 import unittest
 
-import simplejson.decoder
-import simplejson.encoder
-
+import simplejson as json
 
 class TestEncodeForHTML(unittest.TestCase):
 
     def setUp(self):
-        self.decoder = simplejson.decoder.JSONDecoder()
-        self.encoder = simplejson.encoder.JSONEncoderForHTML()
+        self.decoder = json.JSONDecoder()
+        self.encoder = json.JSONEncoderForHTML()
 
     def test_basic_encode(self):
         self.assertEqual(r'"\u0026"', self.encoder.encode('&'))

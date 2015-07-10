@@ -1,6 +1,7 @@
+from __future__ import absolute_import
 import unittest
 import simplejson as json
-from StringIO import StringIO
+from simplejson.compat import StringIO
 
 try:
     from collections import namedtuple
@@ -21,11 +22,36 @@ else:
     Value = namedtuple('Value', ['value'])
     Point = namedtuple('Point', ['x', 'y'])
 
+class DuckValue(object):
+    def __init__(self, *args):
+        self.value = Value(*args)
+
+    def _asdict(self):
+        return self.value._asdict()
+
+class DuckPoint(object):
+    def __init__(self, *args):
+        self.point = Point(*args)
+
+    def _asdict(self):
+        return self.point._asdict()
+
+class DeadDuck(object):
+    _asdict = None
+
+class DeadDict(dict):
+    _asdict = None
+
+CONSTRUCTORS = [
+    lambda v: v,
+    lambda v: [v],
+    lambda v: [{'key': v}],
+]
+
 class TestNamedTuple(unittest.TestCase):
     def test_namedtuple_dumps(self):
-        for v in [Value(1), Point(1, 2)]:
+        for v in [Value(1), Point(1, 2), DuckValue(1), DuckPoint(1, 2)]:
             d = v._asdict()
-            l = list(v)
             self.assertEqual(d, json.loads(json.dumps(v)))
             self.assertEqual(
                 d,
@@ -35,6 +61,10 @@ class TestNamedTuple(unittest.TestCase):
                 d,
                 json.loads(json.dumps(v, namedtuple_as_object=True,
                                       tuple_as_array=False)))
+
+    def test_namedtuple_dumps_false(self):
+        for v in [Value(1), Point(1, 2)]:
+            l = list(v)
             self.assertEqual(
                 l,
                 json.loads(json.dumps(v, namedtuple_as_object=False)))
@@ -42,9 +72,8 @@ class TestNamedTuple(unittest.TestCase):
                 tuple_as_array=False, namedtuple_as_object=False)
 
     def test_namedtuple_dump(self):
-        for v in [Value(1), Point(1, 2)]:
+        for v in [Value(1), Point(1, 2), DuckValue(1), DuckPoint(1, 2)]:
             d = v._asdict()
-            l = list(v)
             sio = StringIO()
             json.dump(v, sio)
             self.assertEqual(d, json.loads(sio.getvalue()))
@@ -62,6 +91,10 @@ class TestNamedTuple(unittest.TestCase):
             self.assertEqual(
                 d,
                 json.loads(sio.getvalue()))
+
+    def test_namedtuple_dump_false(self):
+        for v in [Value(1), Point(1, 2)]:
+            l = list(v)
             sio = StringIO()
             json.dump(v, sio, namedtuple_as_object=False)
             self.assertEqual(
@@ -69,3 +102,21 @@ class TestNamedTuple(unittest.TestCase):
                 json.loads(sio.getvalue()))
             self.assertRaises(TypeError, json.dump, v, StringIO(),
                 tuple_as_array=False, namedtuple_as_object=False)
+
+    def test_asdict_not_callable_dump(self):
+        for f in CONSTRUCTORS:
+            self.assertRaises(TypeError,
+                json.dump, f(DeadDuck()), StringIO(), namedtuple_as_object=True)
+            sio = StringIO()
+            json.dump(f(DeadDict()), sio, namedtuple_as_object=True)
+            self.assertEqual(
+                json.dumps(f({})),
+                sio.getvalue())
+
+    def test_asdict_not_callable_dumps(self):
+        for f in CONSTRUCTORS:
+            self.assertRaises(TypeError,
+                json.dumps, f(DeadDuck()), namedtuple_as_object=True)
+            self.assertEqual(
+                json.dumps(f({})),
+                json.dumps(f(DeadDict()), namedtuple_as_object=True))

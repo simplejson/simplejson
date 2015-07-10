@@ -1,8 +1,8 @@
 from unittest import TestCase
+import textwrap
 
 import simplejson as json
-import textwrap
-from StringIO import StringIO
+from simplejson.compat import StringIO
 
 class TestIndent(TestCase):
     def test_indent(self):
@@ -42,26 +42,26 @@ class TestIndent(TestCase):
         h3 = json.loads(d3)
         h4 = json.loads(d4)
 
-        self.assertEquals(h1, h)
-        self.assertEquals(h2, h)
-        self.assertEquals(h3, h)
-        self.assertEquals(h4, h)
-        self.assertEquals(d3, expect.replace('\t', '  '))
-        self.assertEquals(d4, expect.replace('\t', '  '))
+        self.assertEqual(h1, h)
+        self.assertEqual(h2, h)
+        self.assertEqual(h3, h)
+        self.assertEqual(h4, h)
+        self.assertEqual(d3, expect.replace('\t', '  '))
+        self.assertEqual(d4, expect.replace('\t', '  '))
         # NOTE: Python 2.4 textwrap.dedent converts tabs to spaces,
         #       so the following is expected to fail. Python 2.4 is not a
         #       supported platform in simplejson 2.1.0+.
-        self.assertEquals(d2, expect)
+        self.assertEqual(d2, expect)
 
     def test_indent0(self):
         h = {3: 1}
         def check(indent, expected):
             d1 = json.dumps(h, indent=indent)
-            self.assertEquals(d1, expected)
+            self.assertEqual(d1, expected)
 
             sio = StringIO()
             json.dump(h, sio, indent=indent)
-            self.assertEquals(sio.getvalue(), expected)
+            self.assertEqual(sio.getvalue(), expected)
 
         # indent=0 should emit newlines
         check(0, '{\n"3": 1\n}')
@@ -73,14 +73,14 @@ class TestIndent(TestCase):
         expect = '[\n1,\n2,\n3,\n4\n]'
         expect_spaces = '[\n1, \n2, \n3, \n4\n]'
         # Ensure that separators still works
-        self.assertEquals(
+        self.assertEqual(
             expect_spaces,
             json.dumps(lst, indent=0, separators=(', ', ': ')))
         # Force the new defaults
-        self.assertEquals(
+        self.assertEqual(
             expect,
             json.dumps(lst, indent=0, separators=(',', ': ')))
         # Added in 2.1.4
-        self.assertEquals(
+        self.assertEqual(
             expect,
             json.dumps(lst, indent=0))

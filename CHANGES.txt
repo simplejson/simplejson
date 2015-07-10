@@ -1,7 +1,288 @@
-Version 2.3.0 released 2011-XX-XX
+Version 3.7.4 released 2015-XX-XX
 
 * New iterable_as_array encoder option to perform lazy serialization of
   any iterable objects, without having to convert to tuple or list.
+
+Version 3.7.3 released 2015-05-31
+
+* Fix typo introduced in 3.7.0 (behavior should be indistinguishable)
+  https://github.com/simplejson/simplejson/commit/e18cc09b688ea1f3305c27616fd3cadd2adc6d31#commitcomment-11443842
+
+Version 3.7.2 released 2015-05-22
+
+* Do not cache Decimal class in encoder, only reference the decimal module.
+  This may make reload work in more common scenarios.
+
+Version 3.7.1 released 2015-05-18
+
+* Fix compilation with MSVC
+  https://github.com/simplejson/simplejson/pull/119
+
+Version 3.7.0 released 2015-05-18
+
+* simplejson no longer trusts custom str/repr methods for int, long, float
+  subclasses. These instances are now formatted as if they were exact
+  instances of those types.
+  https://github.com/simplejson/simplejson/issues/118
+
+Version 3.6.5 released 2014-10-24
+
+* Importing bug fix for reference leak when an error occurs during
+  dict encoding
+  https://github.com/simplejson/simplejson/issues/109
+
+Version 3.6.4 released 2014-09-29
+
+* Important bug fix for dump when only sort_keys is set
+  https://github.com/simplejson/simplejson/issues/106
+
+Version 3.6.3 released 2014-08-18
+
+* Documentation updates
+  https://github.com/simplejson/simplejson/issues/103
+
+Version 3.6.2 released 2014-08-09
+
+* Documentation updates
+  http://bugs.python.org/issue21514
+
+Version 3.6.1 released 2014-08-09
+
+* Documentation updates
+  https://github.com/simplejson/simplejson/issues/102
+
+Version 3.6.0 released 2014-07-21
+
+* Automatically strip any UTF-8 BOM from input to more closely
+  follow the latest specs
+  https://github.com/simplejson/simplejson/pull/101
+
+Version 3.5.3 released 2014-06-24
+
+* Fix lower bound checking in scan_once / raw_decode API
+  https://github.com/simplejson/simplejson/issues/98
+
+Version 3.5.2 released 2014-05-22
+
+* Fix Windows build with VS2008
+  https://github.com/simplejson/simplejson/pull/97
+
+Version 3.5.1 released 2014-05-21
+
+* Consistently reject int_as_string_bitcount settings that are not
+  positive integers
+
+Version 3.5.0 released 2014-05-20
+
+* Added int_as_string_bitcount encoder option
+  https://github.com/simplejson/pull/96
+* Fixed potential crash when encoder created with incorrect options
+
+Version 3.4.1 released 2014-04-30
+
+* Fixed tests to run on Python 3.4
+
+Version 3.4.0 released 2014-04-02
+
+* Native setuptools support re-introduced
+  https://github.com/simplejson/simplejson/pull/92
+
+Version 3.3.3 released 2014-02-14
+
+* Improve test suite's Python 3.4 compatibility
+  https://github.com/simplejson/simplejson/issues/87
+
+Version 3.3.2 released 2014-01-06
+
+* Docstring fix for decoded string types
+  https://github.com/simplejson/simplejson/pull/82
+
+Version 3.3.1 released 2013-10-05
+
+* JSONDecodeError exceptions can now be pickled
+  https://github.com/simplejson/simplejson/pull/78
+
+Version 3.3.0 released 2013-05-07
+
+* Unpaired surrogates once again pass through the decoder, to match older
+  behavior and the RFC-4627 spec.
+  https://github.com/simplejson/simplejson/issues/62
+
+Version 3.2.0 released 2013-05-01
+
+* New ignore_nan kwarg in encoder that serializes out
+  of range floats (Infinity, -Infinity, NaN) as null for ECMA-262
+  compliance.
+  https://github.com/simplejson/simplejson/pull/63
+* New for_json kwarg in encoder to make it possible to for
+  subclasses of dict and list to be specialized.
+  https://github.com/simplejson/simplejson/pull/69
+
+Version 3.1.3 released 2013-04-06
+
+* Updated documentation to discourage subclassing whenever possible.
+   default, object_hook, and object_pairs_hook provide almost all of
+   the functionality of subclassing.
+
+Version 3.1.2 released 2013-03-20
+
+* Updated documentation to reflect separators behavior when indent is
+  not None
+  https://github.com/simplejson/simplejson/issues/59
+* Test suite should be compatible with debug builds of Python 2.x and 3.x
+  https://github.com/simplejson/simplejson/pull/65
+
+Version 3.1.1 released 2013-02-21
+
+* setup.py now has another workaround for Windows machines without
+  MSVC installed
+  http://bugs.python.org/issue7511
+
+Version 3.1.0 released 2013-02-21
+
+* Updated JSON conformance test suite
+  http://bugs.python.org/issue16559
+* simplejson.tool tests and bugfix for Python 3.x
+  http://bugs.python.org/issue16549
+* Improve error messages for certain kinds of truncated input
+  http://bugs.python.org/issue16009
+* Moved JSONDecodeError to json.scanner (still available for import
+  from json.decoder)
+* Changed scanner to use JSONDecodeError directly rather than
+  StopIteration to improve error messages
+
+Version 3.0.9 released 2013-02-21
+
+* Fix an off-by-one error in the colno property of JSONDecodeError
+  (when lineno == 1)
+  http://bugs.python.org/issue17225
+
+Version 3.0.8 released 2013-02-19
+
+* Fix a Python 2.x compiler warning for narrow unicode builds
+  https://github.com/simplejson/simplejson/issues/56
+
+Version 3.0.7 released 2013-01-11
+
+* NOTE: this release only changes the license.
+* simplejson is now dual-licensed software, MIT or AFL v2.1. It is
+  also made explicit that this code is also licensed to the PSF under
+  a Contributor Agreement.
+
+Version 3.0.6 released 2013-01-11
+
+* Fix for major Python 2.x ensure_ascii=False encoding regression
+  introduced in simplejson 3.0.0. If you use this setting, please
+  upgrade immediately.
+  https://github.com/simplejson/simplejson/issues/50
+
+Version 3.0.5 released 2013-01-03
+
+* NOTE: this release only changes the tests, it is
+  not essential to upgrade
+* Tests now run with deprecation warnings printed
+* Fixed Python 3 syntax error in simplejson.tool
+  https://github.com/simplejson/simplejson/issues/49
+* Fixed Python 3.3 deprecation warnings in test suite
+  https://github.com/simplejson/simplejson/issues/48
+
+Version 3.0.4 released 2013-01-02
+
+* MSVC compatibility for Python 3.3
+  https://github.com/simplejson/simplejson/pull/47
+
+Version 3.0.3 released 2013-01-01
+
+* Fixes for bugs introduced in 3.0.2
+* Fixes for Python 2.5 compatibility
+* MSVC compatibility for Python 2.x
+  https://github.com/simplejson/simplejson/pull/46
+
+Version 3.0.2 released 2013-01-01
+
+* THIS VERSION HAS BEEN REMOVED
+* Missed a changeset to _speedups.c in the 3.0.1 branch cut
+
+Version 3.0.1 released 2013-01-01
+
+* THIS VERSION HAS BEEN REMOVED
+* Add accumulator optimization to encoder, equivalent to the usage of
+  `_Py_Accu` in the Python 3.3 json library. Only relevant if encoding
+  very large JSON documents.
+
+Version 3.0.0 released 2012-12-30
+
+* Python 3.3 is now supported, thanks to Vinay Sajip
+  https://github.com/simplejson/simplejson/issues/8
+* `sort_keys`/`item_sort_key` now sort on the stringified verison of the
+  key, rather than the original object. This ensures that the sort
+  only compares string types and makes the behavior consistent between
+  Python 2.x and Python 3.x.
+* Like other number types, Decimal instances used as keys are now
+  coerced to strings when use_decimal is True.
+
+Version 2.6.2 released 2012-09-21
+
+* JSONEncoderForHTML was not exported in the simplejson module
+  https://github.com/simplejson/simplejson/issues/41
+
+Version 2.6.1 released 2012-07-27
+
+* raw_decode() now skips whitespace before the object
+  https://github.com/simplejson/simplejson/pull/38
+
+Version 2.6.0 released 2012-06-26
+
+* Error messages changed to match proposal for Python 3.3.1
+  http://bugs.python.org/issue5067
+
+Version 2.5.2 released 2012-05-10
+
+* Fix for regression introduced in 2.5.1
+  https://github.com/simplejson/simplejson/issues/35
+
+Version 2.5.1 released 2012-05-10
+
+* Support for use_decimal=True in environments that use Python
+  sub-interpreters such as uWSGI
+  https://github.com/simplejson/simplejson/issues/34
+
+Version 2.5.0 released 2012-03-29
+
+* New item_sort_key option for encoder to allow fine grained control of sorted
+  output
+
+Version 2.4.0 released 2012-03-06
+
+* New bigint_as_string option for encoder to trade JavaScript number precision
+  issues for type issues.
+  https://github.com/simplejson/simplejson/issues/31
+
+Version 2.3.3 released 2012-02-27
+
+* Allow unknown numerical types for indent parameter
+  https://github.com/simplejson/simplejson/pull/29
+
+Version 2.3.2 released 2011-12-30
+
+* Fix crashing regression in speedups introduced in 2.3.1
+
+Version 2.3.1 released 2011-12-29
+
+* namedtuple_as_object now checks _asdict to ensure that it
+  is callable.
+  https://github.com/simplejson/simplejson/issues/26
+
+Version 2.3.0 released 2011-12-05
+
+* Any objects with _asdict() methods are now considered for
+  namedtuple_as_object.
+  https://github.com/simplejson/simplejson/pull/22
+
+Version 2.2.1 released 2011-09-06
+
+* Fix MANIFEST.in issue when building a sdist from a sdist.
+  https://github.com/simplejson/simplejson/issues/16
 
 Version 2.2.0 released 2011-09-04
 
@@ -237,7 +518,7 @@ Version 1.1 released 2005-12-31
 * dump, dumps, load, loads now accept an optional cls kwarg to use an
   alternate JSONEncoder or JSONDecoder class for convenience.
 * The read/write compatibility shim for json-py now have deprecation warnings
- 
+
 Version 1.0 released 2005-12-25
 
  * Initial release
