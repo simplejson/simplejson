@@ -97,7 +97,7 @@ Using simplejson.tool from the shell to validate and pretty-print::
     Expecting property name: line 1 column 3 (char 2)
 """
 from __future__ import absolute_import
-__version__ = '3.7.4'
+__version__ = '3.8.0'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',

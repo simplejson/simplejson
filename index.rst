@@ -234,8 +234,8 @@ Basic Usage
   any object not in the above table that implements ``__iter__()``
   will be encoded as a JSON array.
 
-  .. versionchanged:: 3.7.4
-    *iterable_as_array* is new in 3.7.4.
+  .. versionchanged:: 3.8.0
+    *iterable_as_array* is new in 3.8.0.
 
    .. versionchanged:: 2.2.0
      *tuple_as_array* is new in 2.2.0.
@@ -385,8 +385,8 @@ Basic Usage
    any object not in the above table that implements ``__iter__()``
    will be encoded as a JSON array.
 
-   .. versionchanged:: 2.3.0
-     *iterable_as_array* is new in 2.3.0.
+   .. versionchanged:: 3.8.0
+     *iterable_as_array* is new in 3.8.0.
 
 
    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
@@ -681,8 +681,8 @@ Encoders and decoders
    any object not in the above table that implements ``__iter__()``
    will be encoded as a JSON array.
 
-   .. versionchanged:: 3.7.4
-     *iterable_as_array* is new in 3.7.4.
+   .. versionchanged:: 3.8.0
+     *iterable_as_array* is new in 3.8.0.
 
    If *bigint_as_string* is true (default: ``False``), :class:`int`` ``2**53``
    and higher or lower than ``-2**53`` will be encoded as strings. This is to

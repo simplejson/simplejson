@@ -2603,6 +2603,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         "for_json",
         "ignore_nan",
         "Decimal",
+        "iterable_as_array",
         NULL};
 
     PyEncoderObject *s;
@@ -2615,7 +2616,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array,
