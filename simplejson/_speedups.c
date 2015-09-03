@@ -2596,7 +2596,6 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         "use_decimal",
         "namedtuple_as_object",
         "tuple_as_array",
-        "iterable_as_array"
         "int_as_string_bitcount",
         "item_sort_key",
         "encoding",
