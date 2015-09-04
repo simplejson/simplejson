@@ -1,4 +1,9 @@
-Version 3.8.0 released 2015-XX-XX
+Version 3.8.1 released 2015-XX-XX
+
+* Fix typo in keyword argument name introduced in 3.8.0
+  https://github.com/simplejson/simplejson/pull/123
+
+Version 3.8.0 released 2015-07-18
 
 * New iterable_as_array encoder option to perform lazy serialization of
   any iterable objects, without having to convert to tuple or list.
