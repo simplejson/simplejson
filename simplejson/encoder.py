@@ -496,10 +496,14 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                         chunks = _iterencode(value, _current_indent_level)
                 for chunk in chunks:
                     yield chunk
-        if newline_indent is not None:
-            _current_indent_level -= 1
-            yield '\n' + (_indent * _current_indent_level)
-        yield ']'
+        if first:
+            # iterable_as_array misses the fast path at the top
+            yield '[]'
+        else:
+            if newline_indent is not None:
+                _current_indent_level -= 1
+                yield '\n' + (_indent * _current_indent_level)
+            yield ']'
         if markers is not None:
             del markers[markerid]
 

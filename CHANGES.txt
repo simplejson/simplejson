@@ -1,5 +1,7 @@
-Version 3.8.1 released 2015-XX-XX
+Version 3.8.1 released 2015-10-27
 
+* Fix issue with iterable_as_array and indent option
+  https://github.com/simplejson/simplejson/issues/128
 * Fix typo in keyword argument name introduced in 3.8.0
   https://github.com/simplejson/simplejson/pull/123
 
