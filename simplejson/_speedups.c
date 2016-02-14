@@ -2654,7 +2654,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
         static const unsigned int long_long_bitsize = SIZEOF_LONG_LONG * 8;
         int int_as_string_bitcount_val = (int)PyLong_AsLong(int_as_string_bitcount);
-        if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < long_long_bitsize) {
+        if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < (int)long_long_bitsize) {
             s->max_long_size = PyLong_FromUnsignedLongLong(1ULL << int_as_string_bitcount_val);
             s->min_long_size = PyLong_FromLongLong(-1LL << int_as_string_bitcount_val);
             if (s->min_long_size == NULL || s->max_long_size == NULL) {

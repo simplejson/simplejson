@@ -1,12 +1,45 @@
 language: python
-python:
-  - "2.6"
-  - "2.7"
-  - "3.3"
-  - "3.4"
-  - "3.5"
-  - "pypy"
+cache:
+  directories:
+  - "$HOME/.cache/pip"
+  - "$HOME/.pyenv"
+matrix:
+  include:
+  - os: linux
+    dist: trusty
+    python: '2.6'
+  - os: linux
+    dist: trusty
+    python: '2.7'
+  - os: linux
+    dist: trusty
+    python: '3.3'
+  - os: linux
+    dist: trusty
+    python: '3.4'
+  - os: linux
+    dist: trusty
+    python: '3.5'
+  - os: linux
+    dist: trusty
+    python: pypy
+  - os: osx
+    language: objective-c
+    env: PYENV_VERSION=2.7.11
+  - os: osx
+    language: objective-c
+    env: PYENV_VERSION=3.5.1
+install:
+- "./.travis/install.sh"
 script:
-  - python setup.py build_ext -i
-  - python -m compileall -f .
-  - python setup.py test
+- "./.travis/run.sh"
+deploy:
+  provider: releases
+  api_key:
+    secure: QiadMGAmtPw+Ut7LWqa3U/tImPIgiPH79mM9o8DGBckcacp9HkDYvCGuOjs5hZbCBBuQ6IAkikotS8iCSwHey1GK9jSDbpgKvVGiACdp8HNhitY8V/S3e1UukDlMeu+Q7vCJtynSGX0BJuiOQB8ZQyQ2HEZ7kMQgTLCEO1Uljhc=
+  file: dist/*.whl
+  file_glob: true
+  on:
+    repo: simplejson/simplejson
+    tags: true
+  skip_cleanup: true
