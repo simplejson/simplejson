@@ -9,7 +9,7 @@ import subprocess
 
 
 def get_json(url):
-    return json.load(io.TextIOWrapper(urlopen(url), encoding='utf-8'))
+    return json.loads(urlopen(url).read().decode('utf-8'))
 
 
 def download_file(src_url, dest_path):
@@ -36,7 +36,7 @@ def download_github_artifacts():
     release = get_json(
         'https://api.github.com/repos/simplejson/simplejson/releases/latest')
     for asset in release['assets']:
-        download_file(asset['url'], 'dist/{name}'.format(**asset))
+        download_file(asset['browser_download_url'], 'dist/{name}'.format(**asset))
 
 
 def main():
