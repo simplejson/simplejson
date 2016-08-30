@@ -175,6 +175,7 @@ typedef struct _PyEncoderObject {
     PyObject *item_sort_key;
     PyObject *item_sort_kw;
     int for_json;
+    int is_json;
 } PyEncoderObject;
 
 static PyMemberDef encoder_members[] = {
@@ -208,11 +209,13 @@ ascii_char_size(JSON_UNICHR c);
 static Py_ssize_t
 ascii_escape_char(JSON_UNICHR c, char *output, Py_ssize_t chars);
 static PyObject *
-ascii_escape_unicode(PyObject *pystr);
+ascii_escape_unicode(PyObject *pystr, PyObject *is_json);
 static PyObject *
-ascii_escape_str(PyObject *pystr);
+ascii_escape_str(PyObject *pystr, PyObject *is_json);
 static PyObject *
-py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
+py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *args, PyObject *kwds);
+static PyObject *
+c_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr, PyObject *is_json);
 #if PY_MAJOR_VERSION < 3
 static PyObject *
 join_list_string(PyObject *lst);
@@ -258,7 +261,7 @@ _encoded_const(PyObject *obj);
 static void
 raise_errmsg(char *msg, PyObject *s, Py_ssize_t end);
 static PyObject *
-encoder_encode_string(PyEncoderObject *s, PyObject *obj);
+encoder_encode_string(PyEncoderObject *s, PyObject *obj, PyObject *is_json);
 static int
 _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr);
 static PyObject *
@@ -437,6 +440,20 @@ _has_for_json_hook(PyObject *obj)
 }
 
 static int
+_is_already_json(PyObject *obj)
+{
+    int rval = 0;
+    PyObject *is_json = PyObject_GetAttrString(obj, "is_json");
+    if (is_json == NULL) {
+        PyErr_Clear();
+        return 0;
+    }
+    rval = PyObject_IsTrue(is_json);
+    Py_DECREF(is_json);
+    return rval;
+}
+
+static int
 _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr)
 {
     /* PyObject to Py_ssize_t converter */
@@ -523,7 +540,7 @@ ascii_char_size(JSON_UNICHR c)
 }
 
 static PyObject *
-ascii_escape_unicode(PyObject *pystr)
+ascii_escape_unicode(PyObject *pystr, PyObject *is_json)
 {
     /* Take a PyUnicode pystr and return a new ASCII-only escaped PyString */
     Py_ssize_t i;
@@ -534,6 +551,7 @@ ascii_escape_unicode(PyObject *pystr)
     void *data;
     PyObject *rval;
     char *output;
+    int already_json = PyObject_IsTrue(is_json) && _is_already_json(pystr);
 
     if (PyUnicode_READY(pystr))
         return NULL;
@@ -541,9 +559,13 @@ ascii_escape_unicode(PyObject *pystr)
     kind = PyUnicode_KIND(pystr);
     data = PyUnicode_DATA(pystr);
     input_chars = PyUnicode_GetLength(pystr);
-    output_size = 2;
-    for (i = 0; i < input_chars; i++) {
-        output_size += ascii_char_size(PyUnicode_READ(kind, data, i));
+    if (already_json) {
+        output_size = input_chars;
+    } else {
+        output_size = 2;
+        for (i = 0; i < input_chars; i++) {
+            output_size += ascii_char_size(PyUnicode_READ(kind, data, i));
+        }
     }
 #if PY_MAJOR_VERSION >= 3
     rval = PyUnicode_New(output_size, 127);
@@ -560,11 +582,17 @@ ascii_escape_unicode(PyObject *pystr)
     output = PyString_AS_STRING(rval);
 #endif
     chars = 0;
-    output[chars++] = '"';
-    for (i = 0; i < input_chars; i++) {
-        chars = ascii_escape_char(PyUnicode_READ(kind, data, i), output, chars);
+    if (already_json) {
+        for (i = 0; i < input_chars; i++) {
+            output[chars++] = (char)PyUnicode_READ(kind, data, i);
+        }
+    } else {
+        output[chars++] = '"';
+        for (i = 0; i < input_chars; i++) {
+            chars = ascii_escape_char(PyUnicode_READ(kind, data, i), output, chars);
+        }
+        output[chars++] = '"';
     }
-    output[chars++] = '"';
     assert(chars == output_size);
     return rval;
 }
@@ -572,13 +600,13 @@ ascii_escape_unicode(PyObject *pystr)
 #if PY_MAJOR_VERSION >= 3
 
 static PyObject *
-ascii_escape_str(PyObject *pystr)
+ascii_escape_str(PyObject *pystr, PyObject *is_json)
 {
     PyObject *rval;
     PyObject *input = PyUnicode_DecodeUTF8(PyString_AS_STRING(pystr), PyString_GET_SIZE(pystr), NULL);
     if (input == NULL)
         return NULL;
-    rval = ascii_escape_unicode(input);
+    rval = ascii_escape_unicode(input, is_json);
     Py_DECREF(input);
     return rval;
 }
@@ -586,7 +614,7 @@ ascii_escape_str(PyObject *pystr)
 #else /* PY_MAJOR_VERSION >= 3 */
 
 static PyObject *
-ascii_escape_str(PyObject *pystr)
+ascii_escape_str(PyObject *pystr, PyObject *is_json)
 {
     /* Take a PyString pystr and return a new ASCII-only escaped PyString */
     Py_ssize_t i;
@@ -596,10 +624,15 @@ ascii_escape_str(PyObject *pystr)
     PyObject *rval;
     char *output;
     char *input_str;
+    int already_json = PyObject_IsTrue(is_json) && _is_already_json(pystr);
 
     input_chars = PyString_GET_SIZE(pystr);
     input_str = PyString_AS_STRING(pystr);
-    output_size = 2;
+    if (already_json) {
+        output_size = input_chars;
+    } else {
+        output_size = 2;
+    }
 
     /* Fast path for a string that's already ASCII */
     for (i = 0; i < input_chars; i++) {
@@ -611,11 +644,11 @@ ascii_escape_str(PyObject *pystr)
             if (uni == NULL) {
                 return NULL;
             }
-            rval = ascii_escape_unicode(uni);
+            rval = ascii_escape_unicode(uni, is_json);
             Py_DECREF(uni);
             return rval;
         }
-        output_size += ascii_char_size(c);
+        if (!already_json) output_size += ascii_char_size(c);
     }
 
     rval = PyString_FromStringAndSize(NULL, output_size);
@@ -624,11 +657,17 @@ ascii_escape_str(PyObject *pystr)
     }
     chars = 0;
     output = PyString_AS_STRING(rval);
-    output[chars++] = '"';
-    for (i = 0; i < input_chars; i++) {
-        chars = ascii_escape_char((JSON_UNICHR)input_str[i], output, chars);
+    if (already_json) {
+        for (i = 0; i < input_chars; i++) {
+            output[chars++] = (char)input_str[i];
+        }
+    } else {
+        output[chars++] = '"';
+        for (i = 0; i < input_chars; i++) {
+            chars = ascii_escape_char((JSON_UNICHR)input_str[i], output, chars);
+        }
+        output[chars++] = '"';
     }
-    output[chars++] = '"';
     assert(chars == output_size);
     return rval;
 }
@@ -1348,15 +1387,29 @@ PyDoc_STRVAR(pydoc_encode_basestring_ascii,
 );
 
 static PyObject *
-py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
+py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *args, PyObject* kwds)
 {
     /* Return an ASCII-only JSON representation of a Python string */
-    /* METH_O */
+    /* METH_VARGS | METH_KEYWORDS */
+    PyObject *pystr, *is_json;
+    static char *kwlist[] = {"s", "is_json", NULL};
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O", kwlist, &pystr, &is_json))
+        return NULL;
+
+    if (is_json == NULL) {
+        is_json = Py_False;
+    }
+    return c_encode_basestring_ascii(self, pystr, is_json);
+}
+
+static PyObject *
+c_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr, PyObject* is_json)
+{
     if (PyString_Check(pystr)) {
-        return ascii_escape_str(pystr);
+        return ascii_escape_str(pystr, is_json);
     }
     else if (PyUnicode_Check(pystr)) {
-        return ascii_escape_unicode(pystr);
+        return ascii_escape_unicode(pystr, is_json);
     }
     else {
         PyErr_Format(PyExc_TypeError,
@@ -2600,6 +2653,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         "item_sort_key",
         "encoding",
         "for_json",
+        "is_json",
         "ignore_nan",
         "Decimal",
         "iterable_as_array",
@@ -2609,17 +2663,17 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject *markers, *defaultfn, *encoder, *indent, *key_separator;
     PyObject *item_separator, *sort_keys, *skipkeys, *allow_nan, *key_memo;
     PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array, *iterable_as_array;
-    PyObject *int_as_string_bitcount, *item_sort_key, *encoding, *for_json;
+    PyObject *int_as_string_bitcount, *item_sort_key, *encoding, *for_json, *is_json;
     PyObject *ignore_nan, *Decimal;
 
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array,
-        &int_as_string_bitcount, &item_sort_key, &encoding, &for_json,
+        &int_as_string_bitcount, &item_sort_key, &encoding, &for_json, &is_json,
         &ignore_nan, &Decimal, &iterable_as_array))
         return -1;
 
@@ -2715,6 +2769,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     Py_INCREF(Decimal);
     s->Decimal = Decimal;
     s->for_json = PyObject_IsTrue(for_json);
+    s->is_json = PyObject_IsTrue(is_json);
 
     return 0;
 }
@@ -2833,13 +2888,13 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
 }
 
 static PyObject *
-encoder_encode_string(PyEncoderObject *s, PyObject *obj)
+encoder_encode_string(PyEncoderObject *s, PyObject *obj, PyObject *is_json)
 {
     /* Return the JSON representation of a string */
     if (s->fast_encode)
-        return py_encode_basestring_ascii(NULL, obj);
+        return c_encode_basestring_ascii(NULL, obj, is_json);
     else
-        return PyObject_CallFunctionObjArgs(s->encoder, obj, NULL);
+        return PyObject_Call(s->encoder, Py_BuildValue("[O]", obj), Py_BuildValue("{s: O}", "is_json", is_json));
 }
 
 static int
@@ -2864,7 +2919,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         }
         else if (PyString_Check(obj) || PyUnicode_Check(obj))
         {
-            PyObject *encoded = encoder_encode_string(s, obj);
+            PyObject *encoded = encoder_encode_string(s, obj, s->is_json ? Py_True : Py_False);
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
         }
@@ -3083,7 +3138,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
                 goto bail;
         }
         if (encoded == NULL) {
-            encoded = encoder_encode_string(s, kstr);
+            encoded = encoder_encode_string(s, kstr, s->is_json ? Py_True : Py_False);
             Py_CLEAR(kstr);
             if (encoded == NULL)
                 goto bail;
@@ -3329,7 +3384,7 @@ PyTypeObject PyEncoderType = {
 static PyMethodDef speedups_methods[] = {
     {"encode_basestring_ascii",
         (PyCFunction)py_encode_basestring_ascii,
-        METH_O,
+        METH_VARARGS | METH_KEYWORDS,
         pydoc_encode_basestring_ascii},
     {"scanstring",
         (PyCFunction)py_scanstring,

@@ -39,7 +39,7 @@ for i in [0x2028, 0x2029]:
 
 FLOAT_REPR = repr
 
-def encode_basestring(s, _PY3=PY3, _q=u('"')):
+def encode_basestring(s, _PY3=PY3, _q=u('"'), is_json=False):
     """Return a JSON representation of a Python string
 
     """
@@ -49,12 +49,15 @@ def encode_basestring(s, _PY3=PY3, _q=u('"')):
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
-    def replace(match):
-        return ESCAPE_DCT[match.group(0)]
-    return _q + ESCAPE.sub(replace, s) + _q
+    if is_json and getattr(s, 'is_json', False):
+        return s
+    else:
+        def replace(match):
+            return ESCAPE_DCT[match.group(0)]
+        return _q + ESCAPE.sub(replace, s) + _q
 
 
-def py_encode_basestring_ascii(s, _PY3=PY3):
+def py_encode_basestring_ascii(s, _PY3=PY3, is_json=False):
     """Return an ASCII-only JSON representation of a Python string
 
     """
@@ -64,23 +67,27 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
-    def replace(match):
-        s = match.group(0)
-        try:
-            return ESCAPE_DCT[s]
-        except KeyError:
-            n = ord(s)
-            if n < 0x10000:
-                #return '\\u{0:04x}'.format(n)
-                return '\\u%04x' % (n,)
-            else:
-                # surrogate pair
-                n -= 0x10000
-                s1 = 0xd800 | ((n >> 10) & 0x3ff)
-                s2 = 0xdc00 | (n & 0x3ff)
-                #return '\\u{0:04x}\\u{1:04x}'.format(s1, s2)
-                return '\\u%04x\\u%04x' % (s1, s2)
-    return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
+
+    if is_json and getattr(s, 'is_json', False):
+        return s
+    else:
+        def replace(match):
+            s = match.group(0)
+            try:
+                return ESCAPE_DCT[s]
+            except KeyError:
+                n = ord(s)
+                if n < 0x10000:
+                    #return '\\u{0:04x}'.format(n)
+                    return '\\u%04x' % (n,)
+                else:
+                    # surrogate pair
+                    n -= 0x10000
+                    s1 = 0xd800 | ((n >> 10) & 0x3ff)
+                    s2 = 0xdc00 | (n & 0x3ff)
+                    #return '\\u{0:04x}\\u{1:04x}'.format(s1, s2)
+                    return '\\u%04x\\u%04x' % (s1, s2)
+        return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
 
 
 encode_basestring_ascii = (
@@ -123,7 +130,7 @@ class JSONEncoder(object):
                  indent=None, separators=None, encoding='utf-8', default=None,
                  use_decimal=True, namedtuple_as_object=True,
                  tuple_as_array=True, bigint_as_string=False,
-                 item_sort_key=None, for_json=False, ignore_nan=False,
+                 item_sort_key=None, for_json=False, is_json=False, ignore_nan=False,
                  int_as_string_bitcount=None, iterable_as_array=False):
         """Constructor for JSONEncoder, with sensible defaults.
 
@@ -218,6 +225,7 @@ class JSONEncoder(object):
         self.bigint_as_string = bigint_as_string
         self.item_sort_key = item_sort_key
         self.for_json = for_json
+        self.is_json = is_json
         self.ignore_nan = ignore_nan
         self.int_as_string_bitcount = int_as_string_bitcount
         if indent is not None and not isinstance(indent, string_types):
@@ -266,9 +274,9 @@ class JSONEncoder(object):
                 o = o.decode(_encoding)
         if isinstance(o, string_types):
             if self.ensure_ascii:
-                return encode_basestring_ascii(o)
+                return encode_basestring_ascii(o, is_json=self.is_json)
             else:
-                return encode_basestring(o)
+                return encode_basestring(o, is_json=self.is_json)
         # This doesn't pass the iterator directly to ''.join() because the
         # exceptions aren't as detailed.  The list call should be roughly
         # equivalent to the PySequence_Fast that ''.join() would do.
@@ -299,10 +307,10 @@ class JSONEncoder(object):
         else:
             _encoder = encode_basestring
         if self.encoding != 'utf-8':
-            def _encoder(o, _orig_encoder=_encoder, _encoding=self.encoding):
+            def _encoder(o, _orig_encoder=_encoder, _encoding=self.encoding, is_json=False):
                 if isinstance(o, binary_type):
                     o = o.decode(_encoding)
-                return _orig_encoder(o)
+                return _orig_encoder(o, is_json=is_json)
 
         def floatstr(o, allow_nan=self.allow_nan, ignore_nan=self.ignore_nan,
                 _repr=FLOAT_REPR, _inf=PosInf, _neginf=-PosInf):
@@ -342,7 +350,7 @@ class JSONEncoder(object):
                 self.skipkeys, self.allow_nan, key_memo, self.use_decimal,
                 self.namedtuple_as_object, self.tuple_as_array,
                 int_as_string_bitcount,
-                self.item_sort_key, self.encoding, self.for_json,
+                self.item_sort_key, self.encoding, self.for_json, self.is_json,
                 self.ignore_nan, decimal.Decimal, self.iterable_as_array)
         else:
             _iterencode = _make_iterencode(
@@ -351,7 +359,7 @@ class JSONEncoder(object):
                 self.skipkeys, _one_shot, self.use_decimal,
                 self.namedtuple_as_object, self.tuple_as_array,
                 int_as_string_bitcount,
-                self.item_sort_key, self.encoding, self.for_json,
+                self.item_sort_key, self.encoding, self.for_json, self.is_json,
                 self.iterable_as_array, Decimal=decimal.Decimal)
         try:
             return _iterencode(o, 0)
@@ -390,7 +398,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
         _use_decimal, _namedtuple_as_object, _tuple_as_array,
         _int_as_string_bitcount, _item_sort_key,
-        _encoding,_for_json,
+        _encoding,_for_json,_is_json,
         _iterable_as_array,
         ## HACK: hand-optimized bytecode; turn globals into locals
         _PY3=PY3,
@@ -463,7 +471,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 buf = separator
             if (isinstance(value, string_types) or
                 (_PY3 and isinstance(value, binary_type))):
-                yield buf + _encoder(value)
+                yield buf + _encoder(value, is_json=_is_json)
             elif value is None:
                 yield buf + 'null'
             elif value is True:
@@ -577,11 +585,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 first = False
             else:
                 yield item_separator
-            yield _encoder(key)
+            yield _encoder(key, is_json=_is_json)
             yield _key_separator
             if (isinstance(value, string_types) or
                 (_PY3 and isinstance(value, binary_type))):
-                yield _encoder(value)
+                yield _encoder(value, is_json=_is_json)
             elif value is None:
                 yield 'null'
             elif value is True:
@@ -623,7 +631,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
     def _iterencode(o, _current_indent_level):
         if (isinstance(o, string_types) or
             (_PY3 and isinstance(o, binary_type))):
-            yield _encoder(o)
+            yield _encoder(o, is_json=_is_json)
         elif o is None:
             yield 'null'
         elif o is True:

@@ -101,7 +101,7 @@ __version__ = '3.8.2'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
-    'OrderedDict', 'simple_first',
+    'OrderedDict', 'simple_first', 'json_str'
 ]
 
 __author__ = 'Bob Ippolito <bob@redivi.com>'
@@ -119,6 +119,9 @@ def _import_OrderedDict():
         from . import ordered_dict
         return ordered_dict.OrderedDict
 OrderedDict = _import_OrderedDict()
+
+class json_str(str):
+    is_json = True
 
 def _import_c_make_encoder():
     try:
@@ -143,6 +146,7 @@ _default_encoder = JSONEncoder(
     bigint_as_string=False,
     item_sort_key=None,
     for_json=False,
+    is_json=False,
     ignore_nan=False,
     int_as_string_bitcount=None,
 )
@@ -152,7 +156,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
          encoding='utf-8', default=None, use_decimal=True,
          namedtuple_as_object=True, tuple_as_array=True,
          bigint_as_string=False, sort_keys=False, item_sort_key=None,
-         for_json=False, ignore_nan=False, int_as_string_bitcount=None,
+         for_json=False, is_json=False, ignore_nan=False, int_as_string_bitcount=None,
          iterable_as_array=False, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
@@ -231,6 +235,11 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
     method will use the return value of that method for encoding as JSON
     instead of the object.
 
+    If *is_json* is true (default: ``False``), objects with a ``is_json``
+    attribute will not be processed or escaped. The value will be treated
+    as if it was already processed by a json encoder. However, it will be
+    converted to ``encoding``.
+
     If *ignore_nan* is true (default: ``False``), then out of range
     :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
     ``null`` in compliance with the ECMA-262 specification. If true, this will
@@ -249,7 +258,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array and not iterable_as_array
         and not bigint_as_string and not sort_keys
-        and not item_sort_key and not for_json
+        and not item_sort_key and not for_json and not is_json
         and not ignore_nan and int_as_string_bitcount is None
         and not kw
     ):
@@ -268,6 +277,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             sort_keys=sort_keys,
             item_sort_key=item_sort_key,
             for_json=for_json,
+            is_json=is_json,
             ignore_nan=ignore_nan,
             int_as_string_bitcount=int_as_string_bitcount,
             **kw).iterencode(obj)
@@ -282,7 +292,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
           encoding='utf-8', default=None, use_decimal=True,
           namedtuple_as_object=True, tuple_as_array=True,
           bigint_as_string=False, sort_keys=False, item_sort_key=None,
-          for_json=False, ignore_nan=False, int_as_string_bitcount=None,
+          for_json=False, is_json=False, ignore_nan=False, int_as_string_bitcount=None,
           iterable_as_array=False, **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
@@ -355,6 +365,11 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     method will use the return value of that method for encoding as JSON
     instead of the object.
 
+    If *is_json* is true (default: ``False``), objects with a ``is_json``
+    attribute will not be processed or escaped. The value will be treated
+    as if it was already processed by a json encoder. However, it will be
+    converted to ``encoding``.
+
     If *ignore_nan* is true (default: ``False``), then out of range
     :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
     ``null`` in compliance with the ECMA-262 specification. If true, this will
@@ -373,7 +388,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array and not iterable_as_array
         and not bigint_as_string and not sort_keys
-        and not item_sort_key and not for_json
+        and not item_sort_key and not for_json and not is_json
         and not ignore_nan and int_as_string_bitcount is None
         and not kw
     ):
@@ -392,6 +407,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         sort_keys=sort_keys,
         item_sort_key=item_sort_key,
         for_json=for_json,
+        is_json=is_json,
         ignore_nan=ignore_nan,
         int_as_string_bitcount=int_as_string_bitcount,
         **kw).encode(obj)
