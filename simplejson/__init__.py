@@ -101,7 +101,7 @@ __version__ = '3.8.2'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
-    'OrderedDict', 'simple_first',
+    'OrderedDict', 'simple_first', 'json_str'
 ]
 
 __author__ = 'Bob Ippolito <bob@redivi.com>'
@@ -119,6 +119,9 @@ def _import_OrderedDict():
         from . import ordered_dict
         return ordered_dict.OrderedDict
 OrderedDict = _import_OrderedDict()
+
+class json_str(str):
+    is_json = True
 
 def _import_c_make_encoder():
     try:

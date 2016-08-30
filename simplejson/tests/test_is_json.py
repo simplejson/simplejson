@@ -1,10 +1,6 @@
 import unittest
 import simplejson as json
 
-
-class json_str(str):
-    is_json = True
-
 dct1 = {
     'key1': 'value1'
 }
@@ -16,7 +12,7 @@ dct2 = {
 
 dct3 = {
     'key2': 'value2',
-    'd1': json_str(json.dumps(dct1))
+    'd1': json.json_str(json.dumps(dct1))
 }
 
 
