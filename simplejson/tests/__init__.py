@@ -63,6 +63,7 @@ def all_tests_suite():
                 'simplejson.tests.test_namedtuple',
                 'simplejson.tests.test_tool',
                 'simplejson.tests.test_for_json',
+                'simplejson.tests.test_is_json',
                 'simplejson.tests.test_subclass',
             ]))
     suite = get_suite()
