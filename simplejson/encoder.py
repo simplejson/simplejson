@@ -39,6 +39,22 @@ for i in [0x2028, 0x2029]:
 
 FLOAT_REPR = repr
 
+class _JsonStr(str):
+    pass
+
+if not PY3:
+    class _JsonUni(unicode):
+        pass
+    JSON_TYPES = (_JsonStr, _JsonUni)
+else:
+    JSON_TYPES = (_JsonStr,)
+
+def json_str(s):
+    if not PY3 and isinstance(s, unicode):
+        return _JsonUni(s)
+    else:
+        return _JsonStr(s)
+
 def encode_basestring(s, _PY3=PY3, _q=u('"')):
     """Return a JSON representation of a Python string
 
@@ -49,9 +65,12 @@ def encode_basestring(s, _PY3=PY3, _q=u('"')):
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
-    def replace(match):
-        return ESCAPE_DCT[match.group(0)]
-    return _q + ESCAPE.sub(replace, s) + _q
+    if isinstance(s, JSON_TYPES):
+        return s
+    else:
+        def replace(match):
+            return ESCAPE_DCT[match.group(0)]
+        return _q + ESCAPE.sub(replace, s) + _q
 
 
 def py_encode_basestring_ascii(s, _PY3=PY3):
@@ -64,23 +83,27 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
-    def replace(match):
-        s = match.group(0)
-        try:
-            return ESCAPE_DCT[s]
-        except KeyError:
-            n = ord(s)
-            if n < 0x10000:
-                #return '\\u{0:04x}'.format(n)
-                return '\\u%04x' % (n,)
-            else:
-                # surrogate pair
-                n -= 0x10000
-                s1 = 0xd800 | ((n >> 10) & 0x3ff)
-                s2 = 0xdc00 | (n & 0x3ff)
-                #return '\\u{0:04x}\\u{1:04x}'.format(s1, s2)
-                return '\\u%04x\\u%04x' % (s1, s2)
-    return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
+
+    if isinstance(s, JSON_TYPES):
+        return s
+    else:
+        def replace(match):
+            s = match.group(0)
+            try:
+                return ESCAPE_DCT[s]
+            except KeyError:
+                n = ord(s)
+                if n < 0x10000:
+                    #return '\\u{0:04x}'.format(n)
+                    return '\\u%04x' % (n,)
+                else:
+                    # surrogate pair
+                    n -= 0x10000
+                    s1 = 0xd800 | ((n >> 10) & 0x3ff)
+                    s2 = 0xdc00 | (n & 0x3ff)
+                    #return '\\u{0:04x}\\u{1:04x}'.format(s1, s2)
+                    return '\\u%04x\\u%04x' % (s1, s2)
+        return '"' + str(ESCAPE_ASCII.sub(replace, s)) + '"'
 
 
 encode_basestring_ascii = (

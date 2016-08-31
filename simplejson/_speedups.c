@@ -213,6 +213,8 @@ static PyObject *
 ascii_escape_str(PyObject *pystr);
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
+static int
+is_json_type(PyObject *pystr);
 #if PY_MAJOR_VERSION < 3
 static PyObject *
 join_list_string(PyObject *lst);
@@ -276,6 +278,37 @@ moduleinit(void);
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
 
 #define MIN_EXPANSION 6
+
+static PyObject* JsonStrType;
+#if PY_MAJOR_VERSION < 3
+static PyObject* JsonUniType;
+#endif /* PY_MAJOR_VERSION < 3 */
+static int is_json_type(PyObject *pystr)
+{
+    if (JsonStrType == NULL) {
+        PyObject *encoder_module = PyImport_ImportModule("simplejson.encoder");
+        JsonStrType = PyObject_GetAttrString(encoder_module, "_JsonStr");
+        Py_DECREF(encoder_module);
+        if (JsonStrType == NULL)
+            return 0;
+    }
+    if (PyObject_isInstance(pystr, JsonStrType))
+        return 1;
+
+#if PY_MAJOR_VERSION < 3
+    if (JsonUniType == NULL) {
+        PyObject *encoder_module = PyImport_ImportModule("simplejson.encoder");
+        JsonUniType = PyObject_GetAttrString(encoder_module, "_JsonUni");
+        Py_DECREF(encoder_module);
+        if (JsonUniType == NULL)
+            return 0;
+    }
+    if (PyObject_isInstance(pystr, JsonUniType))
+        return 1;
+#endif /* PY_MAJOR_VERSION < 3 */
+
+    return 0;
+}
 
 static int
 JSON_Accu_Init(JSON_Accu *acc)
@@ -534,6 +567,7 @@ ascii_escape_unicode(PyObject *pystr)
     void *data;
     PyObject *rval;
     char *output;
+    int already_json = is_json_type(pystr);
 
     if (PyUnicode_READY(pystr))
         return NULL;
@@ -541,9 +575,14 @@ ascii_escape_unicode(PyObject *pystr)
     kind = PyUnicode_KIND(pystr);
     data = PyUnicode_DATA(pystr);
     input_chars = PyUnicode_GetLength(pystr);
-    output_size = 2;
-    for (i = 0; i < input_chars; i++) {
-        output_size += ascii_char_size(PyUnicode_READ(kind, data, i));
+
+    if (already_json) {
+        output_size = input_chars;
+    } else {
+        output_size = 2;
+        for (i = 0; i < input_chars; i++) {
+            output_size += ascii_char_size(PyUnicode_READ(kind, data, i));
+        }
     }
 #if PY_MAJOR_VERSION >= 3
     rval = PyUnicode_New(output_size, 127);
@@ -560,11 +599,17 @@ ascii_escape_unicode(PyObject *pystr)
     output = PyString_AS_STRING(rval);
 #endif
     chars = 0;
-    output[chars++] = '"';
-    for (i = 0; i < input_chars; i++) {
-        chars = ascii_escape_char(PyUnicode_READ(kind, data, i), output, chars);
+    if (already_json) {
+        for (i = 0; i < input_chars; i++) {
+            output[chars++] = (char)PyUnicode_READ(kind, data, i);
+        }
+    } else {
+        output[chars++] = '"';
+        for (i = 0; i < input_chars; i++) {
+            chars = ascii_escape_char(PyUnicode_READ(kind, data, i), output, chars);
+        }
+        output[chars++] = '"';
     }
-    output[chars++] = '"';
     assert(chars == output_size);
     return rval;
 }
@@ -596,10 +641,11 @@ ascii_escape_str(PyObject *pystr)
     PyObject *rval;
     char *output;
     char *input_str;
+    int already_json = is_json_type(pystr);
 
     input_chars = PyString_GET_SIZE(pystr);
     input_str = PyString_AS_STRING(pystr);
-    output_size = 2;
+    output_size = already_json ? input_chars : 2;
 
     /* Fast path for a string that's already ASCII */
     for (i = 0; i < input_chars; i++) {
@@ -615,7 +661,7 @@ ascii_escape_str(PyObject *pystr)
             Py_DECREF(uni);
             return rval;
         }
-        output_size += ascii_char_size(c);
+        if (!already_json) output_size += ascii_char_size(c);
     }
 
     rval = PyString_FromStringAndSize(NULL, output_size);
@@ -624,11 +670,17 @@ ascii_escape_str(PyObject *pystr)
     }
     chars = 0;
     output = PyString_AS_STRING(rval);
-    output[chars++] = '"';
-    for (i = 0; i < input_chars; i++) {
-        chars = ascii_escape_char((JSON_UNICHR)input_str[i], output, chars);
+    if (already_json) {
+        for (i = 0; i < input_chars; i++) {
+            output[chars++] = (char)input_str[i];
+        }
+    } else {
+        output[chars++] = '"';
+        for (i = 0; i < input_chars; i++) {
+            chars = ascii_escape_char((JSON_UNICHR)input_str[i], output, chars);
+        }
+        output[chars++] = '"';
     }
-    output[chars++] = '"';
     assert(chars == output_size);
     return rval;
 }
