@@ -292,7 +292,7 @@ static int is_json_type(PyObject *pystr)
         if (JsonStrType == NULL)
             return 0;
     }
-    if (PyObject_isInstance(pystr, JsonStrType))
+    if (PyObject_IsInstance(pystr, JsonStrType))
         return 1;
 
 #if PY_MAJOR_VERSION < 3
@@ -303,7 +303,7 @@ static int is_json_type(PyObject *pystr)
         if (JsonUniType == NULL)
             return 0;
     }
-    if (PyObject_isInstance(pystr, JsonUniType))
+    if (PyObject_IsInstance(pystr, JsonUniType))
         return 1;
 #endif /* PY_MAJOR_VERSION < 3 */
 
