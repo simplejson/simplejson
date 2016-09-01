@@ -110,7 +110,7 @@ from decimal import Decimal
 
 from .scanner import JSONDecodeError
 from .decoder import JSONDecoder
-from .encoder import JSONEncoder, JSONEncoderForHTML
+from .encoder import JSONEncoder, JSONEncoderForHTML, RawJSON
 def _import_OrderedDict():
     import collections
     try:
