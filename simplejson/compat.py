@@ -1,6 +1,5 @@
 """Python 3 compatibility shims
 """
-import codecs
 import sys
 if sys.version_info[0] < 3:
     PY3 = False
@@ -16,9 +15,8 @@ if sys.version_info[0] < 3:
     integer_types = (int, long)
     unichr = unichr
     reload_module = reload
-    __decode_hex = codecs.getdecoder('hex_codec')
-    def fromhex(s):
-        return __decode_hex(s)[0]
+    import binascii
+    fromhex = binascii.unhexlify
 
 else:
     PY3 = True
@@ -26,6 +24,7 @@ else:
         from importlib import reload as reload_module
     else:
         from imp import reload as reload_module
+    import codecs
     def b(s):
         return codecs.latin_1_encode(s)[0]
     def u(s):
