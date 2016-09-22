@@ -15,8 +15,12 @@ if sys.version_info[0] < 3:
     integer_types = (int, long)
     unichr = unichr
     reload_module = reload
-    import binascii
-    fromhex = binascii.unhexlify
+    try:
+        from binascii import unhexlify as fromhex
+    except ImportError:
+        # Python 2.5
+        def fromhex(s):
+            return s.decode('hex')
 
 else:
     PY3 = True
