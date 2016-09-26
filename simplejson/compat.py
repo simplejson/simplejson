@@ -15,9 +15,6 @@ if sys.version_info[0] < 3:
     integer_types = (int, long)
     unichr = unichr
     reload_module = reload
-    def fromhex(s):
-        return s.decode('hex')
-
 else:
     PY3 = True
     if sys.version_info[:2] >= (3, 4):
@@ -39,8 +36,5 @@ else:
 
     def unichr(s):
         return u(chr(s))
-
-    def fromhex(s):
-        return bytes.fromhex(s)
 
 long_type = integer_types[-1]
