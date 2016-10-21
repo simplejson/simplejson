@@ -3,9 +3,13 @@ try:
 except ImportError:
     from urllib import urlopen
 
+import glob
 import io
 import json
+import os
+import re
 import subprocess
+import sys
 
 
 def get_json(url):
@@ -38,10 +42,39 @@ def download_github_artifacts():
     for asset in release['assets']:
         download_file(asset['browser_download_url'], 'dist/{name}'.format(**asset))
 
+def get_version():
+    return subprocess.check_output([sys.executable, 'setup.py', '--version']).strip()
+
+def artifact_matcher(version):
+    return re.compile('^simplejson-{}.*\\.(gz|exe|whl)$'.format(re.escape(version)))
+
+def sign_artifacts(version):
+    artifacts = set(os.listdir('dist'))
+    pattern = artifact_matcher(version)
+    for fn in artifacts:
+        if pattern.search(fn) and '{}.asc'.format(fn) not in artifacts:
+            sign_artifact(os.path.join('dist', fn))
+
+def sign_artifact(path):
+    print(' '.join(['gpg', '--detach-sign', '-a', path]))
+    subprocess.check_call(['gpg', '--detach-sign', '-a', path])
+
+def upload_artifacts(version):
+    artifacts = set(os.listdir('dist'))
+    pattern = artifact_matcher(version)
+    args = ['twine', 'upload']
+    for fn in artifacts:
+        if pattern.search(fn):
+            filename = os.path.join('dist', fn)
+            args.extend([filename, filename + '.asc'])
+    subprocess.check_call(args)
 
 def main():
     download_appveyor_artifacts()
     download_github_artifacts()
+    version = get_version()
+    sign_artifacts(version)
+    upload_artifacts(version)
 
 
 if __name__ == '__main__':
