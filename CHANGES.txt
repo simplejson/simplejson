@@ -1,5 +1,7 @@
 Version 3.8.3 released XXXX-XX-XX
 
+* Workaround for bad behavior in string subclasses
+  https://github.com/simplejson/simplejson/issues/144
 * Fix warnings flagged by -3
   https://github.com/simplejson/simplejson/pull/146
 * Update readthedocs documentation links

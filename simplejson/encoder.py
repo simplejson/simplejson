@@ -5,7 +5,7 @@ import re
 from operator import itemgetter
 # Do not import Decimal directly to avoid reload issues
 import decimal
-from .compat import u, unichr, binary_type, string_types, integer_types, PY3
+from .compat import u, unichr, binary_type, text_type, string_types, integer_types, PY3
 def _import_speedups():
     try:
         from . import _speedups
@@ -46,9 +46,13 @@ def encode_basestring(s, _PY3=PY3, _q=u('"')):
     if _PY3:
         if isinstance(s, binary_type):
             s = s.decode('utf-8')
+        if type(s) is not text_type:
+            s = text_type(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
+        if type(s) not in string_types:
+            s = text_type(s)
     def replace(match):
         return ESCAPE_DCT[match.group(0)]
     return _q + ESCAPE.sub(replace, s) + _q
@@ -61,9 +65,13 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
     if _PY3:
         if isinstance(s, binary_type):
             s = s.decode('utf-8')
+        if type(s) is not text_type:
+            s = text_type(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
+        if type(s) not in string_types:
+            s = text_type(s)
     def replace(match):
         s = match.group(0)
         try:
