@@ -33,4 +33,3 @@ Python 2.2. This is based off of a very old version of simplejson,
 is not maintained, and should only be used as a last resort.
 
 .. _python2.2: https://github.com/simplejson/simplejson/tree/python2.2
-https://github.com/simplejson/simplejson/tree/python2.2
