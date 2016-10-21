@@ -1,3 +1,12 @@
+Version 3.8.3 released XXXX-XX-XX
+
+* Fix warnings flagged by -3
+  https://github.com/simplejson/simplejson/pull/146
+* Update readthedocs documentation links
+  https://github.com/simplejson/simplejson/pull/137
+* Add build status badge to README
+  https://github.com/simplejson/simplejson/pull/134
+
 Version 3.8.2 released 2016-02-14
 
 * Fix implicit cast compiler warning in _speedups.c
