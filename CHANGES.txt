@@ -1,4 +1,4 @@
-Version 3.8.3 released XXXX-XX-XX
+Version 3.9.0 released XXXX-XX-XX
 
 * Workaround for bad behavior in string subclasses
   https://github.com/simplejson/simplejson/issues/144
