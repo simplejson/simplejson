@@ -14,6 +14,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     fi
     PYENV_ROOT="$HOME/.pyenv-simplejson"
     PATH="$PYENV_ROOT/bin:$PATH"
+    hash -r
     eval "$(pyenv init -)"
     hash -r
     pyenv install --list
