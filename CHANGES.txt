@@ -1,3 +1,8 @@
+Version 3.10.0 released XXXX-XX-XX
+
+* Add RawJSON class to allow a faster path for already encoded JSON.
+  https://github.com/simplejson/simplejson/pull/143
+
 Version 3.9.0 released 2016-10-21
 
 * Workaround for bad behavior in string subclasses

@@ -40,8 +40,12 @@ for i in [0x2028, 0x2029]:
 FLOAT_REPR = repr
 
 class RawJSON(object):
+    """Wrap an encoded JSON document for direct embedding in the output
+
+    """
     def __init__(self, encoded_json):
         self.encoded_json = encoded_json
+
 
 def encode_basestring(s, _PY3=PY3, _q=u('"')):
     """Return a JSON representation of a Python string
@@ -641,7 +645,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             (_PY3 and isinstance(o, binary_type))):
             yield _encoder(o)
         elif isinstance(o, RawJSON):
-            buf + o.encoded_json
+            yield o.encoded_json
         elif o is None:
             yield 'null'
         elif o is True:
