@@ -1,4 +1,4 @@
-Version 3.10.0 released XXXX-XX-XX
+Version 3.10.0 released 2016-10-28
 
 * Add RawJSON class to allow a faster path for already encoded JSON.
   https://github.com/simplejson/simplejson/pull/143
