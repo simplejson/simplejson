@@ -406,7 +406,7 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
         use_decimal=False, namedtuple_as_object=True, tuple_as_array=True,
         **kw):
     """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
-    a JSON document) to a Python object.
+    a JSON document) to a Python dictionary.
 
     *encoding* determines the encoding used to interpret any
     :class:`str` objects decoded by this instance (``'utf-8'`` by
@@ -463,7 +463,7 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
         parse_int=None, parse_constant=None, object_pairs_hook=None,
         use_decimal=False, **kw):
     """Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
-    document) to a Python object.
+    document) to a Python dictionary.
 
     *encoding* determines the encoding used to interpret any
     :class:`str` objects decoded by this instance (``'utf-8'`` by
