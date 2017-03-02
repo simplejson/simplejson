@@ -477,6 +477,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 first = False
             else:
                 buf = separator
+            tryother = False
             if (isinstance(value, string_types) or
                 (_PY3 and isinstance(value, binary_type))):
                 yield buf + _encoder(value)
@@ -491,10 +492,16 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif isinstance(value, integer_types):
                 yield buf + _encode_int(value)
             elif isinstance(value, float):
-                yield buf + _floatstr(value)
+                try:
+                    yield buf + _floatstr(value)
+                except ValueError:
+                    tryother = True
             elif _use_decimal and isinstance(value, Decimal):
                 yield buf + str(value)
             else:
+                tryother = True
+
+            if tryother:
                 yield buf
                 for_json = _for_json and getattr(value, 'for_json', None)
                 if for_json and callable(for_json):
@@ -514,6 +521,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                         chunks = _iterencode(value, _current_indent_level)
                 for chunk in chunks:
                     yield chunk
+
         if first:
             # iterable_as_array misses the fast path at the top
             yield '[]'
@@ -597,6 +605,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 yield item_separator
             yield _encoder(key)
             yield _key_separator
+
+            tryother = False
             if (isinstance(value, string_types) or
                 (_PY3 and isinstance(value, binary_type))):
                 yield _encoder(value)
@@ -611,10 +621,16 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif isinstance(value, integer_types):
                 yield _encode_int(value)
             elif isinstance(value, float):
-                yield _floatstr(value)
+                try:
+                    yield _floatstr(value)
+                except ValueError:
+                    tryother = True
             elif _use_decimal and isinstance(value, Decimal):
                 yield str(value)
             else:
+                tryother = True
+
+            if tryother:
                 for_json = _for_json and getattr(value, 'for_json', None)
                 if for_json and callable(for_json):
                     chunks = _iterencode(for_json(), _current_indent_level)
@@ -641,6 +657,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             del markers[markerid]
 
     def _iterencode(o, _current_indent_level):
+        tryother = False
         if (isinstance(o, string_types) or
             (_PY3 and isinstance(o, binary_type))):
             yield _encoder(o)
@@ -655,8 +672,13 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif isinstance(o, integer_types):
             yield _encode_int(o)
         elif isinstance(o, float):
-            yield _floatstr(o)
+            try:
+                yield _floatstr(o)
+            except ValueError:
+                tryother = True
         else:
+            tryother = True
+        if tryother:
             for_json = _for_json and getattr(o, 'for_json', None)
             if for_json and callable(for_json):
                 for chunk in _iterencode(for_json(), _current_indent_level):
