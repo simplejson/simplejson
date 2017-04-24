@@ -3,8 +3,6 @@ try:
 except ImportError:
     from urllib import urlopen
 
-import glob
-import io
 import json
 import os
 import re
