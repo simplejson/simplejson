@@ -20,6 +20,10 @@ class TestFloat(TestCase):
         for f in (PosInf, NegInf, NaN):
             self.assertRaises(ValueError, json.dumps, f, allow_nan=False)
 
+    def test_big_floats_as_string(self):
+        for num in [NaN, PosInf, NegInf]:
+            self.assertEqual(repr(float(json.loads(json.dumps(num, big_floats_as_string=True)))), repr(num))
+
     def test_floats(self):
         for num in [1617161771.7650001, math.pi, math.pi**100,
                     math.pi**-100, 3.1]:
