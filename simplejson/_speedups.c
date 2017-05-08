@@ -68,19 +68,6 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
 #endif
 #endif /* PY_VERSION_HEX < 0x02060000 */
 
-#if PY_VERSION_HEX < 0x02050000
-#if !defined(PY_SSIZE_T_MIN)
-typedef int Py_ssize_t;
-#define PY_SSIZE_T_MAX INT_MAX
-#define PY_SSIZE_T_MIN INT_MIN
-#define PyInt_FromSsize_t PyInt_FromLong
-#define PyInt_AsSsize_t PyInt_AsLong
-#endif
-#if !defined(Py_IS_FINITE)
-#define Py_IS_FINITE(X) (!Py_IS_INFINITY(X) && !Py_IS_NAN(X))
-#endif
-#endif /* PY_VERSION_HEX < 0x02050000 */
-
 #ifdef __GNUC__
 #define UNUSED __attribute__((__unused__))
 #else
