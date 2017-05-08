@@ -407,7 +407,7 @@ Basic Usage
         only one JSON document, it is recommended to use :func:`loads`.
 
 
-.. function:: loads(fp, encoding='utf-8', cls=None, object_hook=None, \
+.. function:: loads(s, encoding='utf-8', cls=None, object_hook=None, \
                     parse_float=None, parse_int=None, \
                     parse_constant=None, object_pairs_hook=None, \
                     use_decimal=None, **kw)
