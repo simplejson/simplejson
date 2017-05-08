@@ -3336,10 +3336,8 @@ static PyObject *
 moduleinit(void)
 {
     PyObject *m;
-    PyScannerType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&PyScannerType) < 0)
         return NULL;
-    PyEncoderType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&PyEncoderType) < 0)
         return NULL;
 
