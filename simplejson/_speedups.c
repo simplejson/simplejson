@@ -231,16 +231,12 @@ static PyObject *
 _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
 static PyObject *
 scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
-static int
-scanner_init(PyObject *self, PyObject *args, PyObject *kwds);
 static void
 scanner_dealloc(PyObject *self);
 static int
 scanner_clear(PyObject *self);
 static PyObject *
 encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
-static int
-encoder_init(PyObject *self, PyObject *args, PyObject *kwds);
 static void
 encoder_dealloc(PyObject *self);
 static int
@@ -2430,23 +2426,6 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    PyScannerObject *s;
-    s = (PyScannerObject *)type->tp_alloc(type, 0);
-    if (s != NULL) {
-        s->encoding = NULL;
-        s->strict = NULL;
-        s->object_hook = NULL;
-        s->pairs_hook = NULL;
-        s->parse_float = NULL;
-        s->parse_int = NULL;
-        s->parse_constant = NULL;
-    }
-    return (PyObject *)s;
-}
-
-static PyObject *
 JSON_ParseEncoding(PyObject *encoding)
 {
     if (encoding == NULL)
@@ -2465,8 +2444,8 @@ JSON_ParseEncoding(PyObject *encoding)
     return NULL;
 }
 
-static int
-scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
+static PyObject *
+scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     /* Initialize Scanner object */
     PyObject *ctx;
@@ -2474,11 +2453,12 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     PyScannerObject *s;
     PyObject *encoding;
 
-    assert(PyScanner_Check(self));
-    s = (PyScannerObject *)self;
-
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:make_scanner", kwlist, &ctx))
-        return -1;
+        return NULL;
+
+    s = (PyScannerObject *)type->tp_alloc(type, 0);
+    if (s == NULL)
+        return NULL;
 
     if (s->memo == NULL) {
         s->memo = PyDict_New();
@@ -2513,17 +2493,11 @@ scanner_init(PyObject *self, PyObject *args, PyObject *kwds)
     if (s->parse_constant == NULL)
         goto bail;
 
-    return 0;
+    return (PyObject *)s;
 
 bail:
-    Py_CLEAR(s->encoding);
-    Py_CLEAR(s->strict);
-    Py_CLEAR(s->object_hook);
-    Py_CLEAR(s->pairs_hook);
-    Py_CLEAR(s->parse_float);
-    Py_CLEAR(s->parse_int);
-    Py_CLEAR(s->parse_constant);
-    return -1;
+    Py_DECREF(s);
+    return NULL;
 }
 
 PyDoc_STRVAR(scanner_doc, "JSON scanner object");
@@ -2565,7 +2539,7 @@ PyTypeObject PyScannerType = {
     0,                    /* tp_descr_get */
     0,                    /* tp_descr_set */
     0,                    /* tp_dictoffset */
-    scanner_init,                    /* tp_init */
+    0,                    /* tp_init */
     0,/* PyType_GenericAlloc, */        /* tp_alloc */
     scanner_new,          /* tp_new */
     0,/* PyObject_GC_Del, */              /* tp_free */
@@ -2573,30 +2547,6 @@ PyTypeObject PyScannerType = {
 
 static PyObject *
 encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    PyEncoderObject *s;
-    s = (PyEncoderObject *)type->tp_alloc(type, 0);
-    if (s != NULL) {
-        s->markers = NULL;
-        s->defaultfn = NULL;
-        s->encoder = NULL;
-        s->encoding = NULL;
-        s->indent = NULL;
-        s->key_separator = NULL;
-        s->item_separator = NULL;
-        s->key_memo = NULL;
-        s->sort_keys = NULL;
-        s->item_sort_key = NULL;
-        s->item_sort_kw = NULL;
-        s->Decimal = NULL;
-        s->max_long_size = NULL;
-        s->min_long_size = NULL;
-    }
-    return (PyObject *)s;
-}
-
-static int
-encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
     static char *kwlist[] = {
         "markers",
@@ -2628,16 +2578,17 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject *int_as_string_bitcount, *item_sort_key, *encoding, *for_json;
     PyObject *ignore_nan, *Decimal;
 
-    assert(PyEncoder_Check(self));
-    s = (PyEncoderObject *)self;
-
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array,
         &int_as_string_bitcount, &item_sort_key, &encoding, &for_json,
         &ignore_nan, &Decimal, &iterable_as_array))
-        return -1;
+        return NULL;
+
+    s = (PyEncoderObject *)type->tp_alloc(type, 0);
+    if (s == NULL)
+        return NULL;
 
     Py_INCREF(markers);
     s->markers = markers;
@@ -2647,7 +2598,7 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->encoder = encoder;
     s->encoding = JSON_ParseEncoding(encoding);
     if (s->encoding == NULL)
-        return -1;
+        goto bail;
     Py_INCREF(indent);
     s->indent = indent;
     Py_INCREF(key_separator);
@@ -2674,14 +2625,14 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
             s->max_long_size = PyLong_FromUnsignedLongLong(1ULL << int_as_string_bitcount_val);
             s->min_long_size = PyLong_FromLongLong(-1LL << int_as_string_bitcount_val);
             if (s->min_long_size == NULL || s->max_long_size == NULL) {
-                return -1;
+                goto bail;
             }
         }
         else {
             PyErr_Format(PyExc_TypeError,
                          "int_as_string_bitcount (%d) must be greater than 0 and less than the number of bits of a `long long` type (%u bits)",
                          int_as_string_bitcount_val, long_long_bitsize);
-            return -1;
+            goto bail;
         }
     }
     else if (int_as_string_bitcount == Py_None) {
@@ -2692,12 +2643,12 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     }
     else {
         PyErr_SetString(PyExc_TypeError, "int_as_string_bitcount must be None or an integer");
-        return -1;
+        goto bail;
     }
     if (item_sort_key != Py_None) {
         if (!PyCallable_Check(item_sort_key)) {
             PyErr_SetString(PyExc_TypeError, "item_sort_key must be None or callable");
-            return -1;
+            goto bail;
         }
     }
     else if (PyObject_IsTrue(sort_keys)) {
@@ -2705,13 +2656,13 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
         if (!itemgetter0) {
             PyObject *operator = PyImport_ImportModule("operator");
             if (!operator)
-                return -1;
+                goto bail;
             itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
             Py_DECREF(operator);
         }
         item_sort_key = itemgetter0;
         if (!item_sort_key)
-            return -1;
+            goto bail;
     }
     if (item_sort_key == Py_None) {
         Py_INCREF(Py_None);
@@ -2720,9 +2671,9 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     else {
         s->item_sort_kw = PyDict_New();
         if (s->item_sort_kw == NULL)
-            return -1;
+            goto bail;
         if (PyDict_SetItemString(s->item_sort_kw, "key", item_sort_key))
-            return -1;
+            goto bail;
     }
     Py_INCREF(sort_keys);
     s->sort_keys = sort_keys;
@@ -2732,7 +2683,11 @@ encoder_init(PyObject *self, PyObject *args, PyObject *kwds)
     s->Decimal = Decimal;
     s->for_json = PyObject_IsTrue(for_json);
 
-    return 0;
+    return (PyObject *)s;
+
+bail:
+    Py_DECREF(s);
+    return NULL;
 }
 
 static PyObject *
@@ -3342,7 +3297,7 @@ PyTypeObject PyEncoderType = {
     0,                    /* tp_descr_get */
     0,                    /* tp_descr_set */
     0,                    /* tp_dictoffset */
-    encoder_init,         /* tp_init */
+    0,                    /* tp_init */
     0,                    /* tp_alloc */
     encoder_new,          /* tp_new */
     0,                    /* tp_free */
@@ -3381,10 +3336,8 @@ static PyObject *
 moduleinit(void)
 {
     PyObject *m;
-    PyScannerType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&PyScannerType) < 0)
         return NULL;
-    PyEncoderType.tp_new = PyType_GenericNew;
     if (PyType_Ready(&PyEncoderType) < 0)
         return NULL;
 
