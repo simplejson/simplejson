@@ -24,11 +24,7 @@ FLAGS = re.VERBOSE | re.MULTILINE | re.DOTALL
 def _floatconstants():
     if sys.version_info < (2, 6):
         _BYTES = '7FF80000000000007FF0000000000000'.decode('hex')
-        # The struct module in Python 2.4 would get frexp() out of range here
-        # when an endian is specified in the format string. Fixed in Python 2.5+
-        if sys.byteorder != 'big':
-            _BYTES = _BYTES[:8][::-1] + _BYTES[8:][::-1]
-        nan, inf = struct.unpack('dd', _BYTES)
+        nan, inf = struct.unpack('>dd', _BYTES)
     else:
         nan = float('nan')
         inf = float('inf')
