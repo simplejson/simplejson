@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import os
 import subprocess
-import shutil
 
 SPHINX_BUILD = 'sphinx-build'
 
