@@ -2166,7 +2166,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     switch (str[idx]) {
         case '"':
             /* string */
-            strict = PyObject_IsTrue(s->strict)
+            strict = PyObject_IsTrue(s->strict);
             if (strict < 0)
                 return NULL;
             rval = scanstring_str(pystr, idx + 1,
