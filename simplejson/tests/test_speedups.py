@@ -1,12 +1,10 @@
-from __future__ import with_statement
-
 import sys
 import unittest
 from unittest import TestCase
 
 import simplejson
 from simplejson import encoder, decoder, scanner
-from simplejson.compat import PY3
+from simplejson.compat import PY3, long_type
 
 
 def has_speedups():
@@ -39,15 +37,13 @@ class TestDecode(TestCase):
 
     @skip_if_speedups_missing
     def test_bad_bool_args(self):
-        with self.assertRaises(ZeroDivisionError):
-            decoder.JSONDecoder(strict=BadBool()).decode('""')
-        with self.assertRaises(ZeroDivisionError):
-            decoder.JSONDecoder(strict=BadBool()).decode('{}')
+        def test(value):
+            decoder.JSONDecoder(strict=BadBool()).decode(value)
+        self.assertRaises(ZeroDivisionError, test, '""')
+        self.assertRaises(ZeroDivisionError, test, '{}')
         if not PY3:
-            with self.assertRaises(ZeroDivisionError):
-                decoder.JSONDecoder(strict=BadBool()).decode(u'""')
-            with self.assertRaises(ZeroDivisionError):
-                decoder.JSONDecoder(strict=BadBool()).decode(u'{}')
+            self.assertRaises(ZeroDivisionError, test, u'""')
+            self.assertRaises(ZeroDivisionError, test, u'{}')
 
 class TestEncode(TestCase):
     @skip_if_speedups_missing
@@ -63,32 +59,24 @@ class TestEncode(TestCase):
 
     @skip_if_speedups_missing
     def test_bad_bool_args(self):
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(skipkeys=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(ensure_ascii=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(check_circular=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(allow_nan=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(sort_keys=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(use_decimal=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(namedtuple_as_object=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(tuple_as_array=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(bigint_as_string=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(for_json=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(ignore_nan=BadBool()).encode({})
-        with self.assertRaises(ZeroDivisionError):
-            encoder.JSONEncoder(iterable_as_array=BadBool()).encode({})
+        def test(name):
+            encoder.JSONEncoder(**{name: BadBool()}).encode({})
+        self.assertRaises(ZeroDivisionError, test, 'skipkeys')
+        self.assertRaises(ZeroDivisionError, test, 'ensure_ascii')
+        self.assertRaises(ZeroDivisionError, test, 'check_circular')
+        self.assertRaises(ZeroDivisionError, test, 'allow_nan')
+        self.assertRaises(ZeroDivisionError, test, 'sort_keys')
+        self.assertRaises(ZeroDivisionError, test, 'use_decimal')
+        self.assertRaises(ZeroDivisionError, test, 'namedtuple_as_object')
+        self.assertRaises(ZeroDivisionError, test, 'tuple_as_array')
+        self.assertRaises(ZeroDivisionError, test, 'bigint_as_string')
+        self.assertRaises(ZeroDivisionError, test, 'for_json')
+        self.assertRaises(ZeroDivisionError, test, 'ignore_nan')
+        self.assertRaises(ZeroDivisionError, test, 'iterable_as_array')
 
     @skip_if_speedups_missing
     def test_int_as_string_bitcount_overflow(self):
-        with self.assertRaises((TypeError, OverflowError)):
-            encoder.JSONEncoder(int_as_string_bitcount=2**32+31).encode(0)
+        long_count = long_type(2)**32+31
+        def test():
+            encoder.JSONEncoder(int_as_string_bitcount=long_count).encode(0)
+        self.assertRaises((TypeError, OverflowError), test)
