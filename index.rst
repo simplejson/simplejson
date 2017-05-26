@@ -938,6 +938,17 @@ when serializing instances of "exotic" numerical types such as
 
 .. _json-commandline:
 
+
+Restrictions on Key Encoding/Decoding
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Key encoding/decoding is limited to Python standard types and
+:class:`decimal.Decimal`. While *for_json* and *default* arguments allow for
+the serialization of exotic types in dictionary values, no such mechanism
+exists for keys. At this time, there are no plans to support this
+functionality.
+
+
 Command Line Interface
 ----------------------
 
