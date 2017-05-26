@@ -102,6 +102,9 @@ JSONDOCS = [
 
 SKIPS = {
     1: "why not have a string payload?",
+    4: "sparse-array [,,] ",
+    5: "sparse-array [,,] ",
+    6: "sparse-array [,,] ",
     18: "spec doesn't specify any nesting limitations",
 }
 
@@ -119,21 +122,6 @@ class TestFail(TestCase):
             else:
                 self.fail("Expected failure for fail%d.json: %r" % (idx, doc))
 
-    def test_array_decoder_issue46(self):
-        # http://code.google.com/p/simplejson/issues/detail?id=46
-        for doc in [u'[,]', '[,]']:
-            try:
-                json.loads(doc)
-            except json.JSONDecodeError:
-                e = sys.exc_info()[1]
-                self.assertEqual(e.pos, 1)
-                self.assertEqual(e.lineno, 1)
-                self.assertEqual(e.colno, 2)
-            except Exception:
-                e = sys.exc_info()[1]
-                self.fail("Unexpected exception raised %r %s" % (e, e))
-            else:
-                self.fail("Unexpected success parsing '[,]'")
 
     def test_truncated_input(self):
         test_cases = [
@@ -155,7 +143,6 @@ class TestFail(TestCase):
              11),
             ('"', 'Unterminated string starting at', 0),
             ('"spam', 'Unterminated string starting at', 0),
-            ('[,', "Expecting value", 1),
         ]
         for data, msg, idx in test_cases:
             try:
