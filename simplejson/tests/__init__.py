@@ -50,6 +50,7 @@ def all_tests_suite():
                 'simplejson.tests.test_float',
                 'simplejson.tests.test_indent',
                 'simplejson.tests.test_iterable',
+                'simplejson.tests.test_multibyte',
                 'simplejson.tests.test_pass1',
                 'simplejson.tests.test_pass2',
                 'simplejson.tests.test_pass3',
