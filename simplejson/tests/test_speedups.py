@@ -1,10 +1,12 @@
+from __future__ import with_statement
+
 import sys
 import unittest
 from unittest import TestCase
 
 import simplejson
 from simplejson import encoder, decoder, scanner
-from simplejson.compat import PY3, long_type
+from simplejson.compat import PY3, long_type, b
 
 
 def has_speedups():
@@ -80,3 +82,9 @@ class TestEncode(TestCase):
         def test():
             encoder.JSONEncoder(int_as_string_bitcount=long_count).encode(0)
         self.assertRaises((TypeError, OverflowError), test)
+
+    if PY3:
+        @skip_if_speedups_missing
+        def test_bad_encoding(self):
+            with self.assertRaises(UnicodeEncodeError):
+                encoder.JSONEncoder(encoding='\udcff').encode({b('key'): 123})

@@ -642,10 +642,13 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
     }
     else if (PyString_Check(key)) {
 #if PY_MAJOR_VERSION >= 3
+        const char *encoding = JSON_ASCII_AS_STRING(s->encoding);
+        if (encoding == NULL)
+            return NULL;
         return PyUnicode_Decode(
             PyString_AS_STRING(key),
             PyString_GET_SIZE(key),
-            JSON_ASCII_AS_STRING(s->encoding),
+            encoding,
             NULL);
 #else /* PY_MAJOR_VERSION >= 3 */
         Py_INCREF(key);
@@ -2598,6 +2601,8 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     s->encoder = encoder;
     s->encoding = JSON_ParseEncoding(encoding);
     if (s->encoding == NULL)
+        goto bail;
+    if (JSON_ASCII_AS_STRING(s->encoding) == NULL)
         goto bail;
     Py_INCREF(indent);
     s->indent = indent;
