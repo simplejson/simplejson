@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 from __future__ import with_statement
 
+# comment
+
 import sys
 try:
     from setuptools import setup, Extension, Command
