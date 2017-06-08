@@ -116,7 +116,8 @@ JSON_Accu_Destroy(JSON_Accu *acc);
 typedef struct _PyScannerObject {
     PyObject_HEAD
     PyObject *encoding;
-    PyObject *strict;
+    PyObject *strict_bool;
+    int strict;
     PyObject *object_hook;
     PyObject *pairs_hook;
     PyObject *parse_float;
@@ -127,7 +128,7 @@ typedef struct _PyScannerObject {
 
 static PyMemberDef scanner_members[] = {
     {"encoding", T_OBJECT, offsetof(PyScannerObject, encoding), READONLY, "encoding"},
-    {"strict", T_OBJECT, offsetof(PyScannerObject, strict), READONLY, "strict"},
+    {"strict", T_OBJECT, offsetof(PyScannerObject, strict_bool), READONLY, "strict"},
     {"object_hook", T_OBJECT, offsetof(PyScannerObject, object_hook), READONLY, "object_hook"},
     {"object_pairs_hook", T_OBJECT, offsetof(PyScannerObject, pairs_hook), READONLY, "object_pairs_hook"},
     {"parse_float", T_OBJECT, offsetof(PyScannerObject, parse_float), READONLY, "parse_float"},
@@ -1383,7 +1384,7 @@ scanner_traverse(PyObject *self, visitproc visit, void *arg)
     assert(PyScanner_Check(self));
     s = (PyScannerObject *)self;
     Py_VISIT(s->encoding);
-    Py_VISIT(s->strict);
+    Py_VISIT(s->strict_bool);
     Py_VISIT(s->object_hook);
     Py_VISIT(s->pairs_hook);
     Py_VISIT(s->parse_float);
@@ -1400,7 +1401,7 @@ scanner_clear(PyObject *self)
     assert(PyScanner_Check(self));
     s = (PyScannerObject *)self;
     Py_CLEAR(s->encoding);
-    Py_CLEAR(s->strict);
+    Py_CLEAR(s->strict_bool);
     Py_CLEAR(s->object_hook);
     Py_CLEAR(s->pairs_hook);
     Py_CLEAR(s->parse_float);
@@ -1433,9 +1434,6 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     int has_pairs_hook = (s->pairs_hook != Py_None);
     int did_parse = 0;
     Py_ssize_t next_idx;
-    int strict = PyObject_IsTrue(s->strict);
-    if (strict < 0)
-        return NULL;
     if (has_pairs_hook) {
         pairs = PyList_New(0);
         if (pairs == NULL)
@@ -1462,7 +1460,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
                 raise_errmsg(ERR_OBJECT_PROPERTY, pystr, idx);
                 goto bail;
             }
-            key = scanstring_str(pystr, idx + 1, encoding, strict, &next_idx);
+            key = scanstring_str(pystr, idx + 1, encoding, s->strict, &next_idx);
             if (key == NULL)
                 goto bail;
             memokey = PyDict_GetItem(s->memo, key);
@@ -1596,10 +1594,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
     int has_pairs_hook = (s->pairs_hook != Py_None);
     int did_parse = 0;
     Py_ssize_t next_idx;
-    int strict = PyObject_IsTrue(s->strict);
 
-    if (strict < 0)
-        return NULL;
     if (has_pairs_hook) {
         pairs = PyList_New(0);
         if (pairs == NULL)
@@ -1626,7 +1621,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
                 raise_errmsg(ERR_OBJECT_PROPERTY, pystr, idx);
                 goto bail;
             }
-            key = scanstring_unicode(pystr, idx + 1, strict, &next_idx);
+            key = scanstring_unicode(pystr, idx + 1, s->strict, &next_idx);
             if (key == NULL)
                 goto bail;
             memokey = PyDict_GetItem(s->memo, key);
@@ -2161,7 +2156,6 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     Py_ssize_t length = PyString_GET_SIZE(pystr);
     PyObject *rval = NULL;
     int fallthrough = 0;
-    int strict;
     if (idx < 0 || idx >= length) {
         raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
         return NULL;
@@ -2169,12 +2163,9 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     switch (str[idx]) {
         case '"':
             /* string */
-            strict = PyObject_IsTrue(s->strict);
-            if (strict < 0)
-                return NULL;
             rval = scanstring_str(pystr, idx + 1,
                 JSON_ASCII_AS_STRING(s->encoding),
-                strict,
+                s->strict,
                 next_idx_ptr);
             break;
         case '{':
@@ -2273,7 +2264,6 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     Py_ssize_t length = PyUnicode_GetLength(pystr);
     PyObject *rval = NULL;
     int fallthrough = 0;
-    int strict;
     if (idx < 0 || idx >= length) {
         raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
         return NULL;
@@ -2281,11 +2271,8 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     switch (PyUnicode_READ(kind, str, idx)) {
         case '"':
             /* string */
-            strict = PyObject_IsTrue(s->strict);
-            if (strict < 0)
-                return NULL;
             rval = scanstring_unicode(pystr, idx + 1,
-                strict,
+                s->strict,
                 next_idx_ptr);
             break;
         case '{':
@@ -2476,8 +2463,11 @@ scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         goto bail;
 
     /* All of these will fail "gracefully" so we don't need to verify them */
-    s->strict = PyObject_GetAttrString(ctx, "strict");
-    if (s->strict == NULL)
+    s->strict_bool = PyObject_GetAttrString(ctx, "strict");
+    if (s->strict_bool == NULL)
+        goto bail;
+    s->strict = PyObject_IsTrue(s->strict_bool);
+    if (s->strict < 0)
         goto bail;
     s->object_hook = PyObject_GetAttrString(ctx, "object_hook");
     if (s->object_hook == NULL)
