@@ -140,7 +140,7 @@ class JSONEncoder(object):
                  use_decimal=True, namedtuple_as_object=True,
                  tuple_as_array=True, bigint_as_string=False,
                  item_sort_key=None, for_json=False, ignore_nan=False,
-                 int_as_string_bitcount=None, iterable_as_array=False):
+                 int_as_string_bitcount=None, iterable_as_array=False, emptystr=False):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -220,6 +220,9 @@ class JSONEncoder(object):
         as ``null`` in compliance with the ECMA-262 specification. If true,
         this will override *allow_nan*.
 
+        If *emptystr* is true (default: ``False``), then all 'null' will be
+        replaced by an empty string '""'.
+
         """
 
         self.skipkeys = skipkeys
@@ -246,6 +249,7 @@ class JSONEncoder(object):
         if default is not None:
             self.default = default
         self.encoding = encoding
+        self.emptystr = emptystr
 
     def default(self, o):
         """Implement this method in a subclass such that it returns
@@ -339,7 +343,10 @@ class JSONEncoder(object):
                 return _repr(o)
 
             if ignore_nan:
-                text = 'null'
+                if self.emptystr:
+                    text = '""'
+                else:
+                    text = 'null'
             elif not allow_nan:
                 raise ValueError(
                     "Out of range float values are not JSON compliant: " +
@@ -368,7 +375,7 @@ class JSONEncoder(object):
                 self.namedtuple_as_object, self.tuple_as_array,
                 int_as_string_bitcount,
                 self.item_sort_key, self.encoding, self.for_json,
-                self.iterable_as_array, Decimal=decimal.Decimal)
+                self.iterable_as_array, emptystr=self.emptystr, Decimal=decimal.Decimal)
         try:
             return _iterencode(o, 0)
         finally:
@@ -407,7 +414,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _use_decimal, _namedtuple_as_object, _tuple_as_array,
         _int_as_string_bitcount, _item_sort_key,
         _encoding,_for_json,
-        _iterable_as_array,
+        _iterable_as_array, emptystr=False,
         ## HACK: hand-optimized bytecode; turn globals into locals
         _PY3=PY3,
         ValueError=ValueError,
@@ -483,7 +490,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif isinstance(value, RawJSON):
                 yield buf + value.encoded_json
             elif value is None:
-                yield buf + 'null'
+                if emptystr:
+                    yield buf + 'null'
+                else:
+                    yield buf + '""'
             elif value is True:
                 yield buf + 'true'
             elif value is False:
@@ -537,7 +547,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif key is False:
             key = 'false'
         elif key is None:
-            key = 'null'
+            if emptystr:
+                key = '""'
+            else:
+                key = 'null'
         elif isinstance(key, integer_types):
             if type(key) not in integer_types:
                 # See #118, do not trust custom str/repr
@@ -603,7 +616,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             elif isinstance(value, RawJSON):
                 yield value.encoded_json
             elif value is None:
-                yield 'null'
+                if emptystr:
+                    yield '""'
+                else:
+                    yield 'null'
             elif value is True:
                 yield 'true'
             elif value is False:
@@ -647,7 +663,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif isinstance(o, RawJSON):
             yield o.encoded_json
         elif o is None:
-            yield 'null'
+            if emptystr:
+                yield '""'
+            else:
+                yield 'null'
         elif o is True:
             yield 'true'
         elif o is False:
