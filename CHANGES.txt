@@ -1,3 +1,25 @@
+Version 3.11.0 released 2017-06-18
+
+* docstring fix in JSONEncoder
+  https://github.com/simplejson/simplejson/pull/172
+* Call PyObject_IsTrue() only once for the strict argument of scanner
+  https://github.com/simplejson/simplejson/pull/170
+* Fix a crash with unencodable encoding in the encoder
+  https://github.com/simplejson/simplejson/pull/171
+* Remove unused imports
+  https://github.com/simplejson/simplejson/pull/162
+* Remove remnants of Python 2.4 support
+  https://github.com/simplejson/simplejson/pull/168
+* Fix argument checking errors in _speedups.c
+  https://github.com/simplejson/simplejson/pull/169
+* Remove the `__init__` methods in extension classes
+  https://github.com/simplejson/simplejson/pull/166
+* Fix typo in the doc for loads
+  https://github.com/simplejson/simplejson/issues/161
+* Add Python 3.6 to testing matrix and PyPI metadata
+  https://github.com/simplejson/simplejson/pull/153
+  https://github.com/simplejson/simplejson/pull/152
+
 Version 3.10.0 released 2016-10-28
 
 * Add RawJSON class to allow a faster path for already encoded JSON.
