@@ -2678,17 +2678,17 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
             if (!item_sort_key)
                 goto bail;
         }
-        if (item_sort_key == Py_None) {
-            Py_INCREF(Py_None);
-            s->item_sort_kw = Py_None;
-        }
-        else {
-            s->item_sort_kw = PyDict_New();
-            if (s->item_sort_kw == NULL)
-                goto bail;
-            if (PyDict_SetItemString(s->item_sort_kw, "key", item_sort_key))
-                goto bail;
-        }
+    }
+    if (item_sort_key == Py_None) {
+        Py_INCREF(Py_None);
+        s->item_sort_kw = Py_None;
+    }
+    else {
+        s->item_sort_kw = PyDict_New();
+        if (s->item_sort_kw == NULL)
+            goto bail;
+        if (PyDict_SetItemString(s->item_sort_kw, "key", item_sort_key))
+            goto bail;
     }
     Py_INCREF(sort_keys);
     s->sort_keys = sort_keys;

@@ -1,3 +1,9 @@
+Version 3.11.1 released 2017-06-19
+
+* Fix issue with item_sort_key when speedups are available, and add
+  auto-discovery to test suites to prevent similar regressions
+  https://github.com/simplejson/simplejson/issues/173
+
 Version 3.11.0 released 2017-06-18
 
 * docstring fix in JSONEncoder
