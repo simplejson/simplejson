@@ -18,3 +18,10 @@ class TestItemSortKey(TestCase):
         self.assertEqual(
             '{"a": 1, "Array": [1, 5, 6, 9], "c": 5, "crate": "dog", "Jack": "jill", "pick": "axe", "tuple": [83, 12, 3], "zeak": "oh"}',
             json.dumps(a, item_sort_key=lambda kv: kv[0].lower()))
+
+    def test_item_sort_key_value(self):
+        # https://github.com/simplejson/simplejson/issues/173
+        a = {'a': 1, 'b': 0}
+        self.assertEqual(
+            '{"b": 0, "a": 1}',
+            json.dumps(a, item_sort_key=lambda kv: kv[1]))
