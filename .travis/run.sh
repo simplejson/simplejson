@@ -10,9 +10,8 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     eval "$(pyenv init -)"
 fi
 
-python setup.py build_ext -i
 python -m compileall -f .
-python setup.py test
+python setup.py pytest
 
 if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
   python setup.py bdist_wheel

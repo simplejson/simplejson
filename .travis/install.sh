@@ -19,5 +19,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     hash -r
     pyenv install --list
     pyenv install -s $PYENV_VERSION
-    pip install wheel
+    pip install wheel pytest-runner
+else
+  pip install pytest-runner
 fi
