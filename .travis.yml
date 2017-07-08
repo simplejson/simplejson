@@ -7,27 +7,35 @@ matrix:
   include:
   - os: linux
     dist: trusty
+    sudo: false
     python: '2.6'
   - os: linux
     dist: trusty
+    sudo: false
     python: '2.7'
   - os: linux
     dist: trusty
+    sudo: false
     python: '3.3'
   - os: linux
     dist: trusty
+    sudo: false
     python: '3.4'
   - os: linux
     dist: trusty
+    sudo: false
     python: '3.5'
   - os: linux
     dist: trusty
+    sudo: false
     python: '3.6'
   - os: linux
     dist: trusty
+    sudo: false
     python: pypy
   - os: linux
     dist: trusty
+    sudo: false
     python: pypy3
   - os: osx
     language: objective-c
