@@ -26,12 +26,15 @@ matrix:
   - os: linux
     dist: trusty
     python: pypy
+  - os: linux
+    dist: trusty
+    python: pypy3
   - os: osx
     language: objective-c
-    env: PYENV_VERSION=2.7.12
+    env: PYENV_VERSION=2.7.13
   - os: osx
     language: objective-c
-    env: PYENV_VERSION=3.5.2
+    env: PYENV_VERSION=3.6.1
 install:
 - "./.travis/install.sh"
 script:
