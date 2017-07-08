@@ -38,7 +38,7 @@ Programming Language :: Python :: Implementation :: PyPy
 Topic :: Software Development :: Libraries :: Python Modules
 """.splitlines()))
 
-if sys.platform == 'win32' and sys.version_info > (2, 6):
+if sys.platform == 'win32' and sys.version_info < (2, 7):
    # 2.6's distutils.msvc9compiler can raise an IOError when failing to
    # find the compiler
    # It can also raise ValueError http://bugs.python.org/issue7511
