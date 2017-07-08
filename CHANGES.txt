@@ -274,7 +274,7 @@ Version 3.0.0 released 2012-12-30
 
 * Python 3.3 is now supported, thanks to Vinay Sajip
   https://github.com/simplejson/simplejson/issues/8
-* `sort_keys`/`item_sort_key` now sort on the stringified verison of the
+* `sort_keys`/`item_sort_key` now sort on the stringified version of the
   key, rather than the original object. This ensures that the sort
   only compares string types and makes the behavior consistent between
   Python 2.x and Python 3.x.
