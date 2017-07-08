@@ -39,10 +39,10 @@ matrix:
     python: pypy3
   - os: osx
     language: objective-c
-    env: PYENV_VERSION=2.7.13
+    env: PYENV_VERSION=2.7.12
   - os: osx
     language: objective-c
-    env: PYENV_VERSION=3.6.1
+    env: PYENV_VERSION=3.5.2
 install:
 - "./.travis/install.sh"
 script:
