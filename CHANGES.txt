@@ -1,3 +1,10 @@
+Version 3.12.0 released 2017-11-05
+
+* Fix threaded import race condition
+  https://github.com/simplejson/simplejson/issues/184
+* Move RawJSON implementation to simplejson.raw_json module
+* Move JSONDecodeError implementation to simplejson.errors module
+
 Version 3.11.1 released 2017-06-19
 
 * Fix issue with item_sort_key when speedups are available, and add

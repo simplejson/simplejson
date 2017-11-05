@@ -263,17 +263,10 @@ moduleinit(void);
 
 #define MIN_EXPANSION 6
 
-static PyObject* RawJSONType;
+static PyObject* RawJSONType = NULL;
 static int
 is_raw_json(PyObject *obj)
 {
-    if (RawJSONType == NULL) {
-        PyObject *encoder_module = PyImport_ImportModule("simplejson.encoder");
-        RawJSONType = PyObject_GetAttrString(encoder_module, "RawJSON");
-        Py_DECREF(encoder_module);
-        if (RawJSONType == NULL)
-            return 0;
-    }
     return PyObject_IsInstance(obj, RawJSONType) ? 1 : 0;
 }
 
@@ -785,22 +778,12 @@ bail:
     return NULL;
 }
 
+/* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
+static PyObject *JSONDecodeError = NULL;
 static void
 raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
 {
-    /* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
-    static PyObject *JSONDecodeError = NULL;
-    PyObject *exc;
-    if (JSONDecodeError == NULL) {
-        PyObject *scanner = PyImport_ImportModule("simplejson.scanner");
-        if (scanner == NULL)
-            return;
-        JSONDecodeError = PyObject_GetAttrString(scanner, "JSONDecodeError");
-        Py_DECREF(scanner);
-        if (JSONDecodeError == NULL)
-            return;
-    }
-    exc = PyObject_CallFunction(JSONDecodeError, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
+    PyObject *exc = PyObject_CallFunction(JSONDecodeError, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
     if (exc) {
         PyErr_SetObject(JSONDecodeError, exc);
         Py_DECREF(exc);
@@ -3349,6 +3332,17 @@ static struct PyModuleDef moduledef = {
 };
 #endif
 
+PyObject *
+import_dependency(char *module_name, char *attr_name)
+{
+    PyObject *module = PyImport_ImportModule(module_name);
+    if (module == NULL)
+        return NULL;
+    PyObject *rval = PyObject_GetAttrString(module, attr_name);
+    Py_DECREF(module);
+    return rval;
+}
+
 static PyObject *
 moduleinit(void)
 {
@@ -3367,6 +3361,12 @@ moduleinit(void)
     PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
     Py_INCREF((PyObject*)&PyEncoderType);
     PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType);
+    RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
+    if (RawJSONType == NULL)
+        return NULL;
+    JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
+    if (JSONDecodeError == NULL)
+        return NULL;
     return m;
 }
 

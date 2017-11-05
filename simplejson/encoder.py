@@ -14,7 +14,8 @@ def _import_speedups():
         return None, None
 c_encode_basestring_ascii, c_make_encoder = _import_speedups()
 
-from simplejson.decoder import PosInf
+from .decoder import PosInf
+from .raw_json import RawJSON
 
 #ESCAPE = re.compile(ur'[\x00-\x1f\\"\b\f\n\r\t\u2028\u2029]')
 # This is required because u() will mangle the string and ur'' isn't valid
@@ -38,14 +39,6 @@ for i in [0x2028, 0x2029]:
     ESCAPE_DCT.setdefault(unichr(i), '\\u%04x' % (i,))
 
 FLOAT_REPR = repr
-
-class RawJSON(object):
-    """Wrap an encoded JSON document for direct embedding in the output
-
-    """
-    def __init__(self, encoded_json):
-        self.encoded_json = encoded_json
-
 
 def encode_basestring(s, _PY3=PY3, _q=u('"')):
     """Return a JSON representation of a Python string
