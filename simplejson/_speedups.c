@@ -692,7 +692,8 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     PyObject *lst = NULL;
     PyObject *item = NULL;
     PyObject *kstr = NULL;
-    static PyObject *sortfun = NULL;
+    PyObject *sortfun = NULL;
+    PyObject *sortres;
     static PyObject *sortargs = NULL;
 
     if (sortargs == NULL) {
@@ -763,8 +764,10 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     sortfun = PyObject_GetAttrString(lst, "sort");
     if (sortfun == NULL)
         goto bail;
-    if (!PyObject_Call(sortfun, sortargs, s->item_sort_kw))
+    sortres = PyObject_Call(sortfun, sortargs, s->item_sort_kw);
+    if (!sortres)
         goto bail;
+    Py_DECREF(sortres);
     Py_CLEAR(sortfun);
     iter = PyObject_GetIter(lst);
     Py_CLEAR(lst);
