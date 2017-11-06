@@ -2807,10 +2807,25 @@ static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj)
 {
     /* Return the JSON representation of a string */
-    if (s->fast_encode)
+    PyObject *encoded;
+
+    if (s->fast_encode) {
         return py_encode_basestring_ascii(NULL, obj);
-    else
-        return PyObject_CallFunctionObjArgs(s->encoder, obj, NULL);
+    }
+    encoded = PyObject_CallFunctionObjArgs(s->encoder, obj, NULL);
+    if (encoded != NULL &&
+#if PY_MAJOR_VERSION < 3
+        !JSON_ASCII_Check(unicode) &&
+#endif /* PY_MAJOR_VERSION < 3 */
+        !PyUnicode_Check(encoded))
+    {
+        PyErr_Format(PyExc_TypeError,
+                     "encoder() must return a string, not %.80s",
+                     Py_TYPE(encoded)->tp_name);
+        Py_DECREF(encoded);
+        return NULL;
+    }
+    return encoded;
 }
 
 static int
