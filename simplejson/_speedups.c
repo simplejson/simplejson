@@ -680,7 +680,9 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
         Py_INCREF(Py_None);
         return Py_None;
     }
-    PyErr_SetString(PyExc_TypeError, "keys must be a string");
+    PyErr_Format(PyExc_TypeError,
+                 "keys must be str, int, float, bool or None, "
+                 "not %.100s", key->ob_type->tp_name);
     return NULL;
 }
 
