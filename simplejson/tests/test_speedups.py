@@ -60,6 +60,30 @@ class TestEncode(TestCase):
         )
 
     @skip_if_speedups_missing
+    def test_bad_str_encoder(self):
+        # Issue #31505: There shouldn't be an assertion failure in case
+        # c_make_encoder() receives a bad encoder() argument.
+        import decimal
+        def bad_encoder1(*args):
+            return None
+        enc = encoder.c_make_encoder(
+                None, lambda obj: str(obj),
+                bad_encoder1, None, ': ', ', ',
+                False, False, False, {}, False, False, False,
+                None, None, 'utf-8', False, False, decimal.Decimal, False)
+        self.assertRaises(TypeError, enc, 'spam', 4)
+        self.assertRaises(TypeError, enc, {'spam': 42}, 4)
+
+        def bad_encoder2(*args):
+            1/0
+        enc = encoder.c_make_encoder(
+                None, lambda obj: str(obj),
+                bad_encoder2, None, ': ', ', ',
+                False, False, False, {}, False, False, False,
+                None, None, 'utf-8', False, False, decimal.Decimal, False)
+        self.assertRaises(ZeroDivisionError, enc, 'spam', 4)
+
+    @skip_if_speedups_missing
     def test_bad_bool_args(self):
         def test(name):
             encoder.JSONEncoder(**{name: BadBool()}).encode({})
