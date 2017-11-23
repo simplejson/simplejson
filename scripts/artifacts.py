@@ -3,7 +3,6 @@ from urllib.request import urlopen
 
 import json
 import os
-import re
 import subprocess
 import sys
 import getpass
@@ -41,30 +40,40 @@ def download_github_artifacts():
 
 
 def get_version():
-    return subprocess.check_output([sys.executable, 'setup.py', '--version']).strip()
+    return subprocess.check_output(
+        [sys.executable, 'setup.py', '--version'],
+        encoding='utf8'
+    ).strip()
 
 
 def artifact_matcher(version):
-    return re.compile(
-        '^simplejson-{}.*(?<!none-any)\\.(exe|whl)$'.format(re.escape(version))
-    )
+    prefix = 'simplejson-{}'.format(version)
+    def matches(fn):
+        return (
+            fn.startswith(prefix) and
+            os.path.splitext(fn)[1] in ('.exe', '.whl') and
+            not fn.endswith('-none-any.whl')
+        )
+    return matches
 
 
 def sign_artifacts(version):
     artifacts = set(os.listdir('dist'))
-    pattern = artifact_matcher(version)
-    passphrase = getpass.getpass()
+    matches = artifact_matcher(version)
+    passphrase = getpass.getpass('\nGPG Passphrase:')
     for fn in artifacts:
-        if pattern.search(fn) and '{}.asc'.format(fn) not in artifacts:
+        if matches(fn) and '{}.asc'.format(fn) not in artifacts:
             sign_artifact(os.path.join('dist', fn), passphrase)
 
 
 def sign_artifact(path, passphrase):
     cmd = [
-        'gpg', '--detach-sign',
-        '-a', path,
+        'gpg',
+        '--detach-sign',
         '--batch',
-        '--passphrase-fd', '0'
+        '--passphrase-fd', '0',
+        '--armor',
+        path
     ]
     print(' '.join(cmd))
     subprocess.run(cmd, check=True, input=passphrase, encoding='utf8')
@@ -72,16 +81,20 @@ def sign_artifact(path, passphrase):
 
 def upload_artifacts(version):
     artifacts = set(os.listdir('dist'))
-    pattern = artifact_matcher(version)
+    matches = artifact_matcher(version)
     args = ['twine', 'upload']
     for fn in artifacts:
-        if pattern.search(fn):
+        if matches(fn):
             filename = os.path.join('dist', fn)
             args.extend([filename, filename + '.asc'])
     subprocess.check_call(args)
 
 
 def main():
+    try:
+        os.makedirs('dist')
+    except OSError:
+        pass
     download_appveyor_artifacts()
     download_github_artifacts()
     version = get_version()
