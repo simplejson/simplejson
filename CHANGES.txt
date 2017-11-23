@@ -1,16 +1,18 @@
 Version 3.12.2 released 2017-11-23
 
 * Workarounds for NamedTemporaryFile issues with Windows for tool tests
+* Make TypeError messages contain type name instead of a repr.
+  https://github.com/simplejson/simplejson/pull/191
 
 Version 3.12.1 released 2017-11-23
 
 * Misc updates to build infrastructure
 * Fix an assertion failure when make_encoder receives a bad encoder argument
-  https://github.com/simplejson/simplejson/issues/188
+  https://github.com/simplejson/simplejson/pull/188
 * Fix potential crash during GC
-  https://github.com/simplejson/simplejson/issues/187
+  https://github.com/simplejson/simplejson/pull/187
 * Fix a reference leak when sorting keys
-  https://github.com/simplejson/simplejson/issues/186
+  https://github.com/simplejson/simplejson/pull/186
 
 Version 3.12.0 released 2017-11-05
 
