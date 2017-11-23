@@ -58,10 +58,13 @@ install:
 build: off
 
 test_script:
+  - "%WITH_COMPILER% %PYTHON%/python setup.py build_ext -i"
+  - "%WITH_COMPILER% %PYTHON%/python setup.py test"
   - "%WITH_COMPILER% %PYTHON%/python setup.py bdist_wheel bdist_wininst"
 
 artifacts:
-  - path: dist\*
+  - path: dist\*.exe
+  - path: dist\*.whl
 
 #on_success:
 #  - TODO: upload the content of dist/*.whl to a public wheelhouse
