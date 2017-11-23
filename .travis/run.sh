@@ -15,5 +15,9 @@ python -m compileall -f .
 python setup.py test
 
 if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
-  python setup.py bdist_wheel
+    python setup.py bdist_wheel
+fi
+
+if [[ $BUILD_SDIST == 'true' ]]; then
+    python setup.py sdist
 fi

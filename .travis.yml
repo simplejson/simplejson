@@ -29,6 +29,7 @@ matrix:
     dist: trusty
     sudo: false
     python: '3.6'
+    env: BUILD_SDIST=true
   - os: linux
     sudo: false
     python: pypy
@@ -49,7 +50,9 @@ deploy:
   provider: releases
   api_key:
     secure: QiadMGAmtPw+Ut7LWqa3U/tImPIgiPH79mM9o8DGBckcacp9HkDYvCGuOjs5hZbCBBuQ6IAkikotS8iCSwHey1GK9jSDbpgKvVGiACdp8HNhitY8V/S3e1UukDlMeu+Q7vCJtynSGX0BJuiOQB8ZQyQ2HEZ7kMQgTLCEO1Uljhc=
-  file: dist/*.whl
+  file:
+    - dist/*.whl
+    - dist/*.tar.gz
   file_glob: true
   on:
     repo: simplejson/simplejson
