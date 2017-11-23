@@ -2,6 +2,7 @@
 *.egg
 *.pyc
 *.so
+*.pyd
 .DS_Store
 /MANIFEST
 /.coverage
