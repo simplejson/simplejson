@@ -48,12 +48,12 @@ def encode_basestring(s, _PY3=PY3, _q=u('"')):
         if isinstance(s, binary_type):
             s = s.decode('utf-8')
         if type(s) is not text_type:
-            s = text_type(s)
+            s = text_type.__str__(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
         if type(s) not in string_types:
-            s = text_type(s)
+            s = text_type.__str__(s)
     def replace(match):
         return ESCAPE_DCT[match.group(0)]
     return _q + ESCAPE.sub(replace, s) + _q
@@ -67,12 +67,12 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
         if isinstance(s, binary_type):
             s = s.decode('utf-8')
         if type(s) is not text_type:
-            s = text_type(s)
+            s = text_type.__str__(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
         if type(s) not in string_types:
-            s = text_type(s)
+            s = text_type.__str__(s)
     def replace(match):
         s = match.group(0)
         try:

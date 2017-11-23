@@ -1,6 +1,10 @@
 from unittest import TestCase
-from simplejson.compat import StringIO, long_type, b, binary_type, PY3
+from simplejson.compat import StringIO, long_type, b, binary_type, text_type, PY3
 import simplejson as json
+
+class MisbehavingTextSubtype(text_type):
+    def __str__(self):
+        return "FAIL!"
 
 def as_text_type(s):
     if PY3 and isinstance(s, binary_type):
@@ -128,3 +132,11 @@ class TestDump(TestCase):
             json.dump(p, sio, sort_keys=True)
             self.assertEqual(sio.getvalue(), json.dumps(p, sort_keys=True))
             self.assertEqual(json.loads(sio.getvalue()), p)
+
+    def test_misbehaving_text_subtype(self):
+        # https://github.com/simplejson/simplejson/issues/185
+        text = "this is some text"
+        self.assertEqual(
+            json.dumps(MisbehavingTextSubtype(text)),
+            json.dumps(text)
+        )
