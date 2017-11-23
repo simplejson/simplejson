@@ -63,35 +63,43 @@ class TestTool(unittest.TestCase):
         out, err = proc.communicate(data)
         self.assertEqual(strip_python_stderr(err), ''.encode())
         self.assertEqual(proc.returncode, 0)
-        return out
+        return out.decode('utf8').splitlines()
 
     def test_stdin_stdout(self):
         self.assertEqual(
             self.runTool(data=self.data.encode()),
-            self.expect.encode())
+            self.expect.splitlines())
 
     def test_infile_stdout(self):
-        with tempfile.NamedTemporaryFile() as infile:
+        infile = tempfile.NamedTemporaryFile(delete=False)
+        try:
             infile.write(self.data.encode())
-            infile.flush()
+            infile.close()
             self.assertEqual(
                 self.runTool(args=[infile.name]),
-                self.expect.encode())
+                self.expect.splitlines())
+        finally:
+            os.unlink(infile.name)
 
     def test_infile_outfile(self):
-        with tempfile.NamedTemporaryFile() as infile:
+        infile = tempfile.NamedTemporaryFile(delete=False)
+        try:
             infile.write(self.data.encode())
-            infile.flush()
+            infile.close()
             # outfile will get overwritten by tool, so the delete
             # may not work on some platforms. Do it manually.
-            outfile = tempfile.NamedTemporaryFile()
+            outfile = tempfile.NamedTemporaryFile(delete=False)
             try:
+                outfile.close()
                 self.assertEqual(
                     self.runTool(args=[infile.name, outfile.name]),
-                    ''.encode())
+                    [])
                 with open(outfile.name, 'rb') as f:
-                    self.assertEqual(f.read(), self.expect.encode())
+                    self.assertEqual(
+                        f.read().decode('utf8').splitlines(),
+                        self.expect.splitlines()
+                    )
             finally:
-                outfile.close()
-                if os.path.exists(outfile.name):
-                    os.unlink(outfile.name)
+                os.unlink(outfile.name)
+        finally:
+            os.unlink(infile.name)
