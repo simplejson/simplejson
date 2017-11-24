@@ -3357,10 +3357,11 @@ static struct PyModuleDef moduledef = {
 PyObject *
 import_dependency(char *module_name, char *attr_name)
 {
+    PyObject *rval;
     PyObject *module = PyImport_ImportModule(module_name);
     if (module == NULL)
         return NULL;
-    PyObject *rval = PyObject_GetAttrString(module, attr_name);
+    rval = PyObject_GetAttrString(module, attr_name);
     Py_DECREF(module);
     return rval;
 }
