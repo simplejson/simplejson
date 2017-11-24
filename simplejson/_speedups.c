@@ -2821,7 +2821,7 @@ encoder_encode_string(PyEncoderObject *s, PyObject *obj)
     encoded = PyObject_CallFunctionObjArgs(s->encoder, obj, NULL);
     if (encoded != NULL &&
 #if PY_MAJOR_VERSION < 3
-        !JSON_ASCII_Check(unicode) &&
+        !JSON_ASCII_Check(encoded) &&
 #endif /* PY_MAJOR_VERSION < 3 */
         !PyUnicode_Check(encoded))
     {
