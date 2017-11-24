@@ -53,7 +53,7 @@ def artifact_matcher(version):
             fn.startswith(prefix) and
             os.path.splitext(fn)[1] in ('.exe', '.whl') and
             not fn.endswith('-none-any.whl')
-        )
+        ) or fn == '{}.tar.gz'.format(prefix)
     return matches
 
 
