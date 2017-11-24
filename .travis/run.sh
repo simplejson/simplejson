@@ -9,8 +9,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     hash -r
     eval "$(pyenv init -)"
 fi
-
-python setup.py build_ext -i
+REQUIRE_SPEEDUPS=1 python setup.py build_ext -i
 python -m compileall -f .
 python setup.py test
 

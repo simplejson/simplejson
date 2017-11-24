@@ -31,6 +31,7 @@
 :: case, I don't know why.
 @ECHO OFF
 
+SET REQUIRE_SPEEDUPS=Y
 SET COMMAND_TO_RUN=%*
 SET WIN_SDK_ROOT=C:\Program Files\Microsoft SDKs\Windows
 SET WIN_WDK=c:\Program Files (x86)\Windows Kits\10\Include\wdf
