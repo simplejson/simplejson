@@ -2,6 +2,10 @@
 """
 from __future__ import absolute_import
 import re
+try:
+    from functools import singledispatch
+except ImportError:
+    from singledispatch import singledispatch
 from operator import itemgetter
 # Do not import Decimal directly to avoid reload issues
 import decimal
@@ -39,6 +43,64 @@ for i in [0x2028, 0x2029]:
     ESCAPE_DCT.setdefault(unichr(i), '\\u%04x' % (i,))
 
 FLOAT_REPR = repr
+
+
+# Simple implementation taken from
+# https://github.com/python/cpython/pull/4987#discussion_r158587413
+#
+# This misses a few corner cases, so I'm _not_ proposing using this, I'm
+# including it in this PR for illustrative purposes only.
+#
+def simplesingledispatchmethod(func):
+    wrapped = singledispatch(func)
+
+    def wrapper(*args, **kwargs):
+        wrapped.dispatch(args[1].__class__)(*args, **kw)
+
+    wrapper.register = wrapped.register
+    update_wrapper(wrapper, func)
+    return wrapper
+
+
+# Alternative implementation from
+# https://gist.github.com/ianhoffman/e25899e8fca3c1ef8772f331b14031d0
+#
+# Note: comments are mine
+#
+
+class singledispatchmethod(object):
+    def __init__(self, method):
+        # Register the function as a singledispatch function
+        self.method = singledispatch(method)
+
+    def register(self, klass, method=None):
+        # Proxy all calls to .register to the registered function
+        return self.method.register(klass, func=method)
+
+    # Implement a non-data descriptor protocol
+    def __get__(self, instance=None, owner=None):
+        if instance or owner:
+            def _method(*args, **kwargs):
+                # From the documentation for singledispatch:
+                #
+                #     def dispatch(cls):
+                #         """generic_func.dispatch(cls) -> <function implementation>
+                #
+                method = self.method.dispatch(args[0].__class__)
+                # method is now the fully resolved function to call
+                return method.__get__(instance, owner)(*args, **kwargs)
+
+            # Bookkeeping
+            _method.__isabstractmethod__ = self.__isabstractmethod__
+            _method.register = self.register
+            return _method
+        else:
+            return self
+
+    @property
+    def __isabstractmethod__(self):
+        return getattr(self.method, '__isabstractmethod__', False)
+
 
 def encode_basestring(s, _PY3=PY3, _q=u('"')):
     """Return a JSON representation of a Python string
@@ -128,6 +190,24 @@ class JSONEncoder(object):
     ``.default()`` method with another method that returns a serializable
     object for ``o`` if possible, otherwise it should call the superclass
     implementation (to raise ``TypeError``).
+
+    An alternative way to extend this to recognize other objects is to use
+    singledispatch, by registering a function that accepts a specific type of
+    object and serializes it appropriately::
+
+        import simplejson as json
+        import uuid
+        from datetime import datetime
+
+        @json.JSONEncoder.default.register(datetime)
+        def jsonify_datetime(encoder, dt):
+            "Serialize a datetime to ISO-8601"
+            return dt.isoformat()
+
+        @json.JSONEncoder.default.register(uuid.UUID)
+        def jsonify_uuid(encoder, uuid_):
+            "Serialize a UUID to a string"
+            return str(uuid_)
 
     """
     item_separator = ', '
@@ -246,6 +326,7 @@ class JSONEncoder(object):
             self.default = default
         self.encoding = encoding
 
+    @singledispatchmethod
     def default(self, o):
         """Implement this method in a subclass such that it returns
         a serializable object for ``o``, or calls the base implementation
@@ -263,6 +344,20 @@ class JSONEncoder(object):
                     return list(iterable)
                 return JSONEncoder.default(self, o)
 
+        Alternatively, you can register additional functions to call with
+        specific types of arguments::
+
+            import simplejson as json
+            import uuid
+            from datetime import datetime
+
+            @json.JSONEncoder.default.register(datetime)
+            def jsonify_datetime(encoder, dt):
+                return dt.isoformat()
+
+            @json.JSONEncoder.default.register(uuid.UUID)
+            def jsonify_uuid(encoder, uuid_):
+                return str(uuid_)
         """
         raise TypeError('Object of type %s is not JSON serializable' %
                         o.__class__.__name__)
