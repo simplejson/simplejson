@@ -21,3 +21,5 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     pyenv install -s $PYENV_VERSION
     pip install wheel
 fi
+
+pip install singledispatch
