@@ -14,3 +14,8 @@ class TestStrSubclass(TestCase):
             self.assertEqual(
                 s,
                 simplejson.loads(simplejson.dumps(WonkyTextSubclass(s))))
+
+            self.assertEqual(
+                s,
+                simplejson.loads(simplejson.dumps(WonkyTextSubclass(s),
+                                                  ensure_ascii=False)))
