@@ -1,3 +1,8 @@
+Version 3.13.3 released 2018-XX-XX
+
+* Fix an incorrect type test in Python 2, avoiding an unnecessary unicode copy.
+  https://github.com/simplejson/simplejson/pull/210
+
 Version 3.13.2 released 2017-11-24
 
 * Fix additional Python 2.x compilation issue on Windows
