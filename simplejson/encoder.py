@@ -52,7 +52,7 @@ def encode_basestring(s, _PY3=PY3, _q=u('"')):
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
-        if type(s) not in string_types:
+        if type(s) not in (str, unicode):
             if isinstance(s, str):
                 s = str.__str__(s)
             else:
@@ -74,7 +74,7 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
-        if type(s) not in string_types:
+        if type(s) not in (str, unicode):
             if isinstance(s, str):
                 s = str.__str__(s)
             else:
