@@ -7,11 +7,19 @@ class TestEncodeForHTML(unittest.TestCase):
     def setUp(self):
         self.decoder = json.JSONDecoder()
         self.encoder = json.JSONEncoderForHTML()
+        self.non_ascii_encoder = json.JSONEncoderForHTML(ensure_ascii=False)
 
     def test_basic_encode(self):
         self.assertEqual(r'"\u0026"', self.encoder.encode('&'))
         self.assertEqual(r'"\u003c"', self.encoder.encode('<'))
         self.assertEqual(r'"\u003e"', self.encoder.encode('>'))
+        self.assertEqual(r'"\u2028"', self.encoder.encode(u'\u2028'))
+
+    def test_non_ascii_basic_encode(self):
+        self.assertEqual(r'"\u0026"', self.non_ascii_encoder.encode('&'))
+        self.assertEqual(r'"\u003c"', self.non_ascii_encoder.encode('<'))
+        self.assertEqual(r'"\u003e"', self.non_ascii_encoder.encode('>'))
+        self.assertEqual(r'"\u2028"', self.non_ascii_encoder.encode(u'\u2028'))
 
     def test_basic_roundtrip(self):
         for char in '&<>':
