@@ -17,7 +17,7 @@ c_encode_basestring_ascii, c_make_encoder = _import_speedups()
 from .decoder import PosInf
 from .raw_json import RawJSON
 
-ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
+ESCAPE = re.compile(r'[\x00-\x1f\\"]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 ESCAPE_DCT = {
@@ -32,8 +32,6 @@ ESCAPE_DCT = {
 for i in range(0x20):
     #ESCAPE_DCT.setdefault(chr(i), '\\u{0:04x}'.format(i))
     ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
-for i in [0x2028, 0x2029]:
-    ESCAPE_DCT.setdefault(unichr(i), '\\u%04x' % (i,))
 
 FLOAT_REPR = repr
 
