@@ -382,7 +382,7 @@ class JSONEncoderForHTML(JSONEncoder):
 
     This class also escapes the line separator and paragraph separator
     characters U+2028 and U+2029, irrespective of the ensure_ascii setting,
-    as these characters are not valid in Javascript strings (see
+    as these characters are not valid in JavaScript strings (see
     http://timelessrepo.com/json-isnt-a-javascript-subset).
     """
 

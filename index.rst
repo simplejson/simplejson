@@ -767,9 +767,9 @@ Encoders and decoders
 
    Subclass of :class:`JSONEncoder` that escapes &, <, and > for embedding in HTML.
 
-   It also escapes the line separator and paragraph separator
-   characters U+2028 and U+2029, irrespective of the ensure_ascii setting,
-   as these characters are not valid in Javascript strings (see
+   It also escapes the characters U+2028 (LINE SEPARATOR) and
+   U+2029 (PARAGRAPH SEPARATOR), irrespective of the *ensure_ascii* setting,
+   as these characters are not valid in JavaScript strings (see
    http://timelessrepo.com/json-isnt-a-javascript-subset).
 
    .. versionchanged:: 2.1.0
