@@ -379,6 +379,11 @@ class JSONEncoderForHTML(JSONEncoder):
     characters &, < and > should be escaped. They cannot be escaped
     with the usual entities (e.g. &amp;) because they are not expanded
     within <script> tags.
+
+    This class also escapes the line separator and paragraph separator
+    characters U+2028 and U+2029, irrespective of the ensure_ascii setting,
+    as these characters are not valid in Javascript strings (see
+    http://timelessrepo.com/json-isnt-a-javascript-subset).
     """
 
     def encode(self, o):
