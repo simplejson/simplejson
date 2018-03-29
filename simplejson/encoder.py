@@ -17,10 +17,7 @@ c_encode_basestring_ascii, c_make_encoder = _import_speedups()
 from .decoder import PosInf
 from .raw_json import RawJSON
 
-#ESCAPE = re.compile(ur'[\x00-\x1f\\"\b\f\n\r\t]')
-# This is required because u() will mangle the string and ur'' isn't valid
-# python3 syntax
-ESCAPE = re.compile(u'[\\x00-\\x1f\\\\"\\b\\f\\n\\r\\t]')
+ESCAPE = re.compile(r'[\x00-\x1f\\"\b\f\n\r\t]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 ESCAPE_DCT = {
