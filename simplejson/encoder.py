@@ -17,10 +17,7 @@ c_encode_basestring_ascii, c_make_encoder = _import_speedups()
 from .decoder import PosInf
 from .raw_json import RawJSON
 
-#ESCAPE = re.compile(ur'[\x00-\x1f\\"\b\f\n\r\t\u2028\u2029]')
-# This is required because u() will mangle the string and ur'' isn't valid
-# python3 syntax
-ESCAPE = re.compile(u'[\\x00-\\x1f\\\\"\\b\\f\\n\\r\\t\u2028\u2029]')
+ESCAPE = re.compile(r'[\x00-\x1f\\"]')
 ESCAPE_ASCII = re.compile(r'([\\"]|[^\ -~])')
 HAS_UTF8 = re.compile(r'[\x80-\xff]')
 ESCAPE_DCT = {
@@ -35,8 +32,6 @@ ESCAPE_DCT = {
 for i in range(0x20):
     #ESCAPE_DCT.setdefault(chr(i), '\\u{0:04x}'.format(i))
     ESCAPE_DCT.setdefault(chr(i), '\\u%04x' % (i,))
-for i in [0x2028, 0x2029]:
-    ESCAPE_DCT.setdefault(unichr(i), '\\u%04x' % (i,))
 
 FLOAT_REPR = repr
 
@@ -382,6 +377,11 @@ class JSONEncoderForHTML(JSONEncoder):
     characters &, < and > should be escaped. They cannot be escaped
     with the usual entities (e.g. &amp;) because they are not expanded
     within <script> tags.
+
+    This class also escapes the line separator and paragraph separator
+    characters U+2028 and U+2029, irrespective of the ensure_ascii setting,
+    as these characters are not valid in JavaScript strings (see
+    http://timelessrepo.com/json-isnt-a-javascript-subset).
     """
 
     def encode(self, o):
@@ -399,6 +399,11 @@ class JSONEncoderForHTML(JSONEncoder):
             chunk = chunk.replace('&', '\\u0026')
             chunk = chunk.replace('<', '\\u003c')
             chunk = chunk.replace('>', '\\u003e')
+
+            if not self.ensure_ascii:
+                chunk = chunk.replace(u'\u2028', '\\u2028')
+                chunk = chunk.replace(u'\u2029', '\\u2029')
+
             yield chunk
 
 
