@@ -2860,12 +2860,6 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
         }
-        else if (is_raw_json(obj))
-        {
-            PyObject *encoded = PyObject_GetAttrString(obj, "encoded_json");
-            if (encoded != NULL)
-                rv = _steal_accumulate(rval, encoded);
-        }
         else if (PyInt_Check(obj) || PyLong_Check(obj)) {
             PyObject *encoded;
             if (PyInt_CheckExact(obj) || PyLong_CheckExact(obj)) {
@@ -2930,6 +2924,12 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         }
         else if (s->use_decimal && PyObject_TypeCheck(obj, (PyTypeObject *)s->Decimal)) {
             PyObject *encoded = PyObject_Str(obj);
+            if (encoded != NULL)
+                rv = _steal_accumulate(rval, encoded);
+        }
+        else if (is_raw_json(obj))
+        {
+            PyObject *encoded = PyObject_GetAttrString(obj, "encoded_json");
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
         }
