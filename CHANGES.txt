@@ -1,5 +1,9 @@
-Version 3.13.3 released 2018-XX-XX
+Version 3.14.0 released 2018-04-21
 
+* Defer is_raw_json test (performance improvement)
+  https://github.com/simplejson/simplejson/pull/212
+* Avoid escaping U+2028 and U+2029 without ensure_ascii
+  https://github.com/simplejson/simplejson/pull/211
 * Fix an incorrect type test in Python 2, avoiding an unnecessary unicode copy.
   https://github.com/simplejson/simplejson/pull/210
 
