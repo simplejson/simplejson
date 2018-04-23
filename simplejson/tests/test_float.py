@@ -3,6 +3,7 @@ from unittest import TestCase
 from simplejson.compat import long_type, text_type
 import simplejson as json
 from simplejson.decoder import NaN, PosInf, NegInf
+from simplejson.compat import integer_types
 
 class TestFloat(TestCase):
     def test_degenerates_allow(self):
@@ -18,7 +19,32 @@ class TestFloat(TestCase):
 
     def test_degenerates_deny(self):
         for f in (PosInf, NegInf, NaN):
-            self.assertRaises(ValueError, json.dumps, f, allow_nan=False)
+            self.assertRaises(TypeError, json.dumps, f, allow_nan=False)
+
+    def test_degenerates_with_default(self):
+        for f in (PosInf, NegInf, NaN):
+            self.assertEqual(
+                json.dumps(f, allow_nan=False, default=repr),
+                '"%s"' % repr(f))
+
+    def test_degenerates_with_sensible_default(self):
+        # shim for ``math.isfinite`` (available only since Python 3.2+)
+        def isfinite(o):
+            if not isinstance(o, integer_types + (float,)):
+                return False
+            if o != o or o == PosInf or o == NegInf:
+                return False
+            return True
+
+        def default(o):
+            if isinstance(o, float) and not isfinite(o):
+                return {"$float": repr(o)}
+            raise TypeError(repr(obj) + " is not JSON serializable")
+
+        floats = (42.1, PosInf, NegInf, NaN)
+        self.assertEqual(
+            json.dumps(floats, allow_nan=False, default=default),
+            '[42.1, {"$float": "inf"}, {"$float": "-inf"}, {"$float": "nan"}]')
 
     def test_floats(self):
         for num in [1617161771.7650001, math.pi, math.pi**100,
