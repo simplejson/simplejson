@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 import simplejson
-from simplejson.compat import text_type, u
+from simplejson.compat import text_type
 
 # Tests for issue demonstrated in https://github.com/simplejson/simplejson/issues/144
 class WonkyTextSubclass(text_type):
@@ -10,7 +10,7 @@ class WonkyTextSubclass(text_type):
 
 class TestStrSubclass(TestCase):
     def test_dump_load(self):
-        for s in ['', '"hello"', 'text', u('\u005c')]:
+        for s in ['', '"hello"', 'text', u'\u005c']:
             self.assertEqual(
                 s,
                 simplejson.loads(simplejson.dumps(WonkyTextSubclass(s))))
