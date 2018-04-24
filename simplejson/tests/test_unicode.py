@@ -3,7 +3,7 @@ import codecs
 from unittest import TestCase
 
 import simplejson as json
-from simplejson.compat import unichr, text_type, b, u, BytesIO
+from simplejson.compat import unichr, text_type, b, BytesIO
 
 class TestUnicode(TestCase):
     def test_encoding1(self):
@@ -93,7 +93,7 @@ class TestUnicode(TestCase):
     def test_ensure_ascii_false_bytestring_encoding(self):
         # http://code.google.com/p/simplejson/issues/detail?id=48
         doc1 = {u'quux': b('Arr\xc3\xaat sur images')}
-        doc2 = {u'quux': u('Arr\xeat sur images')}
+        doc2 = {u'quux': u'Arr\xeat sur images'}
         doc_ascii = '{"quux": "Arr\\u00eat sur images"}'
         doc_unicode = u'{"quux": "Arr\xeat sur images"}'
         self.assertEqual(json.dumps(doc1), doc_ascii)

@@ -1,5 +1,5 @@
 from unittest import TestCase
-from simplejson.compat import StringIO, long_type, b, binary_type, text_type, PY3
+from simplejson.compat import StringIO, long_type, b, text_type, PY3
 import simplejson as json
 
 class MisbehavingTextSubtype(text_type):
@@ -7,7 +7,7 @@ class MisbehavingTextSubtype(text_type):
         return "FAIL!"
 
 def as_text_type(s):
-    if PY3 and isinstance(s, binary_type):
+    if PY3 and isinstance(s, bytes):
         return s.decode('ascii')
     return s
 

@@ -5,8 +5,6 @@ if sys.version_info[0] < 3:
     PY3 = False
     def b(s):
         return s
-    def u(s):
-        return unicode(s, 'unicode_escape')
     import cStringIO as StringIO
     StringIO = BytesIO = StringIO.StringIO
     text_type = unicode
@@ -21,11 +19,8 @@ else:
         from importlib import reload as reload_module
     else:
         from imp import reload as reload_module
-    import codecs
     def b(s):
-        return codecs.latin_1_encode(s)[0]
-    def u(s):
-        return s
+        return bytes(s, 'latin1')
     import io
     StringIO = io.StringIO
     BytesIO = io.BytesIO
@@ -33,8 +28,6 @@ else:
     binary_type = bytes
     string_types = (str,)
     integer_types = (int,)
-
-    def unichr(s):
-        return u(chr(s))
+    unichr = chr
 
 long_type = integer_types[-1]

@@ -2,7 +2,7 @@ import sys, pickle
 from unittest import TestCase
 
 import simplejson as json
-from simplejson.compat import u, b
+from simplejson.compat import text_type, b
 
 class TestErrors(TestCase):
     def test_string_keys_error(self):
@@ -41,7 +41,7 @@ class TestErrors(TestCase):
 
     def test_scan_error(self):
         err = None
-        for t in (u, b):
+        for t in (text_type, b):
             try:
                 json.loads(t('{"asdf": "'))
             except json.JSONDecodeError:

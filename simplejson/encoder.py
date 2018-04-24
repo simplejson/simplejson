@@ -5,7 +5,7 @@ import re
 from operator import itemgetter
 # Do not import Decimal directly to avoid reload issues
 import decimal
-from .compat import u, unichr, binary_type, text_type, string_types, integer_types, PY3
+from .compat import unichr, binary_type, string_types, integer_types, PY3
 def _import_speedups():
     try:
         from . import _speedups
@@ -35,15 +35,15 @@ for i in range(0x20):
 
 FLOAT_REPR = repr
 
-def encode_basestring(s, _PY3=PY3, _q=u('"')):
+def encode_basestring(s, _PY3=PY3, _q=u'"'):
     """Return a JSON representation of a Python string
 
     """
     if _PY3:
-        if isinstance(s, binary_type):
+        if isinstance(s, bytes):
             s = s.decode('utf-8')
-        if type(s) is not text_type:
-            s = text_type.__str__(s)
+        if type(s) is not str:
+            s = str.__str__(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
@@ -62,10 +62,10 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
 
     """
     if _PY3:
-        if isinstance(s, binary_type):
+        if isinstance(s, bytes):
             s = s.decode('utf-8')
-        if type(s) is not text_type:
-            s = text_type.__str__(s)
+        if type(s) is not str:
+            s = str.__str__(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = s.decode('utf-8')
@@ -483,7 +483,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             else:
                 buf = separator
             if (isinstance(value, string_types) or
-                (_PY3 and isinstance(value, binary_type))):
+                (_PY3 and isinstance(value, bytes))):
                 yield buf + _encoder(value)
             elif isinstance(value, RawJSON):
                 yield buf + value.encoded_json
@@ -604,7 +604,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             yield _encoder(key)
             yield _key_separator
             if (isinstance(value, string_types) or
-                (_PY3 and isinstance(value, binary_type))):
+                (_PY3 and isinstance(value, bytes))):
                 yield _encoder(value)
             elif isinstance(value, RawJSON):
                 yield value.encoded_json
@@ -648,7 +648,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
 
     def _iterencode(o, _current_indent_level):
         if (isinstance(o, string_types) or
-            (_PY3 and isinstance(o, binary_type))):
+            (_PY3 and isinstance(o, bytes))):
             yield _encoder(o)
         elif isinstance(o, RawJSON):
             yield o.encoded_json
