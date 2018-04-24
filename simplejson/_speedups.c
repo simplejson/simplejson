@@ -634,8 +634,8 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
         Py_INCREF(key);
         return key;
     }
-    else if (PyString_Check(key)) {
 #if PY_MAJOR_VERSION >= 3
+    else if (PyString_Check(key) && s->encoding != NULL) {
         const char *encoding = JSON_ASCII_AS_STRING(s->encoding);
         if (encoding == NULL)
             return NULL;
@@ -644,11 +644,13 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
             PyString_GET_SIZE(key),
             encoding,
             NULL);
+    }
 #else /* PY_MAJOR_VERSION >= 3 */
+    else if (PyString_Check(key)) {
         Py_INCREF(key);
         return key;
-#endif /* PY_MAJOR_VERSION < 3 */
     }
+#endif /* PY_MAJOR_VERSION < 3 */
     else if (PyFloat_Check(key)) {
         return encoder_encode_float(s, key);
     }
@@ -676,7 +678,7 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
     else if (s->use_decimal && PyObject_TypeCheck(key, (PyTypeObject *)s->Decimal)) {
         return PyObject_Str(key);
     }
-    else if (s->skipkeys) {
+    if (s->skipkeys) {
         Py_INCREF(Py_None);
         return Py_None;
     }
@@ -2578,11 +2580,19 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     s->defaultfn = defaultfn;
     Py_INCREF(encoder);
     s->encoder = encoder;
-    s->encoding = JSON_ParseEncoding(encoding);
-    if (s->encoding == NULL)
-        goto bail;
-    if (JSON_ASCII_AS_STRING(s->encoding) == NULL)
-        goto bail;
+#if PY_MAJOR_VERSION >= 3
+    if (encoding == Py_None) {
+        s->encoding = NULL;
+    }
+    else
+#endif /* PY_MAJOR_VERSION >= 3 */
+    {
+        s->encoding = JSON_ParseEncoding(encoding);
+        if (s->encoding == NULL)
+            goto bail;
+        if (JSON_ASCII_AS_STRING(s->encoding) == NULL)
+            goto bail;
+    }
     Py_INCREF(indent);
     s->indent = indent;
     Py_INCREF(key_separator);
@@ -2854,7 +2864,8 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (cstr != NULL)
                 rv = _steal_accumulate(rval, cstr);
         }
-        else if (PyString_Check(obj) || PyUnicode_Check(obj))
+        else if ((PyString_Check(obj) && s->encoding != NULL) ||
+                 PyUnicode_Check(obj))
         {
             PyObject *encoded = encoder_encode_string(s, obj);
             if (encoded != NULL)
