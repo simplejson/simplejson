@@ -21,6 +21,15 @@ except ImportError:
                 "".encode(),
                 stderr).strip()
 
+def open_temp_file():
+    if sys.version_info >= (2, 6):
+        file = tempfile.NamedTemporaryFile(delete=False)
+        filename = file.name
+    else:
+        fd, filename = tempfile.mkstemp()
+        file = os.fdopen(fd, 'w+b')
+    return file, filename
+
 class TestTool(unittest.TestCase):
     data = """
 
@@ -71,35 +80,35 @@ class TestTool(unittest.TestCase):
             self.expect.splitlines())
 
     def test_infile_stdout(self):
-        infile = tempfile.NamedTemporaryFile(delete=False)
+        infile, infile_name = open_temp_file()
         try:
             infile.write(self.data.encode())
             infile.close()
             self.assertEqual(
-                self.runTool(args=[infile.name]),
+                self.runTool(args=[infile_name]),
                 self.expect.splitlines())
         finally:
-            os.unlink(infile.name)
+            os.unlink(infile_name)
 
     def test_infile_outfile(self):
-        infile = tempfile.NamedTemporaryFile(delete=False)
+        infile, infile_name = open_temp_file()
         try:
             infile.write(self.data.encode())
             infile.close()
             # outfile will get overwritten by tool, so the delete
             # may not work on some platforms. Do it manually.
-            outfile = tempfile.NamedTemporaryFile(delete=False)
+            outfile, outfile_name = open_temp_file()
             try:
                 outfile.close()
                 self.assertEqual(
-                    self.runTool(args=[infile.name, outfile.name]),
+                    self.runTool(args=[infile_name, outfile_name]),
                     [])
-                with open(outfile.name, 'rb') as f:
+                with open(outfile_name, 'rb') as f:
                     self.assertEqual(
                         f.read().decode('utf8').splitlines(),
                         self.expect.splitlines()
                     )
             finally:
-                os.unlink(outfile.name)
+                os.unlink(outfile_name)
         finally:
-            os.unlink(infile.name)
+            os.unlink(infile_name)
