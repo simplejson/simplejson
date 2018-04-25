@@ -366,7 +366,7 @@ class JSONDecoder(object):
 
         """
         if _PY3 and isinstance(s, bytes):
-            s = s.decode(self.encoding)
+            s = str(s, self.encoding)
         obj, end = self.raw_decode(s)
         end = _w(s, end).end()
         if end != len(s):

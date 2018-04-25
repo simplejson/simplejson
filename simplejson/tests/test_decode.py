@@ -3,8 +3,16 @@ import decimal
 from unittest import TestCase
 
 import simplejson as json
-from simplejson.compat import StringIO
+from simplejson.compat import StringIO, b, binary_type
 from simplejson import OrderedDict
+
+class MisbehavingBytesSubtype(binary_type):
+    def decode(self, encoding=None):
+        return "bad decode"
+    def __str__(self):
+        return "bad __str__"
+    def __bytes__(self):
+        return b("bad __bytes__")
 
 class TestDecode(TestCase):
     if not hasattr(TestCase, 'assertIs'):
@@ -86,6 +94,18 @@ class TestDecode(TestCase):
         self.assertEqual(
             ({'a': {}}, 11),
             cls().raw_decode(" \n{\"a\": {}}"))
+
+    def test_bytes_decode(self):
+        cls = json.decoder.JSONDecoder
+        data = b('"\xe2\x82\xac"')
+        self.assertEqual(cls().decode(data), u'\u20ac')
+        self.assertEqual(cls(encoding='latin1').decode(data), u'\xe2\x82\xac')
+        self.assertEqual(cls(encoding=None).decode(data), u'\u20ac')
+
+        data = MisbehavingBytesSubtype(b('"\xe2\x82\xac"'))
+        self.assertEqual(cls().decode(data), u'\u20ac')
+        self.assertEqual(cls(encoding='latin1').decode(data), u'\xe2\x82\xac')
+        self.assertEqual(cls(encoding=None).decode(data), u'\u20ac')
 
     def test_bounds_checking(self):
         # https://github.com/simplejson/simplejson/issues/98

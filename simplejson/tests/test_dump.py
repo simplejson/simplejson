@@ -1,10 +1,18 @@
 from unittest import TestCase
-from simplejson.compat import StringIO, long_type, b, text_type, PY3
+from simplejson.compat import StringIO, long_type, b, binary_type, text_type, PY3
 import simplejson as json
 
 class MisbehavingTextSubtype(text_type):
     def __str__(self):
         return "FAIL!"
+
+class MisbehavingBytesSubtype(binary_type):
+    def decode(self, encoding=None):
+        return "bad decode"
+    def __str__(self):
+        return "bad __str__"
+    def __bytes__(self):
+        return b("bad __bytes__")
 
 def as_text_type(s):
     if PY3 and isinstance(s, bytes):
@@ -142,6 +150,29 @@ class TestDump(TestCase):
         self.assertEqual(
             json.dumps(MisbehavingTextSubtype(text)),
             json.dumps(text)
+        )
+        self.assertEqual(
+            json.dumps([MisbehavingTextSubtype(text)]),
+            json.dumps([text])
+        )
+        self.assertEqual(
+            json.dumps({MisbehavingTextSubtype(text): 42}),
+            json.dumps({text: 42})
+        )
+
+    def test_misbehaving_bytes_subtype(self):
+        data = b("this is some data \xe2\x82\xac")
+        self.assertEqual(
+            json.dumps(MisbehavingBytesSubtype(data)),
+            json.dumps(data)
+        )
+        self.assertEqual(
+            json.dumps([MisbehavingBytesSubtype(data)]),
+            json.dumps([data])
+        )
+        self.assertEqual(
+            json.dumps({MisbehavingBytesSubtype(data): 42}),
+            json.dumps({data: 42})
         )
 
     def test_bytes_toplevel(self):
