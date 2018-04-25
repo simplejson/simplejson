@@ -5,7 +5,7 @@ import re
 from operator import itemgetter
 # Do not import Decimal directly to avoid reload issues
 import decimal
-from .compat import unichr, binary_type, string_types, integer_types, PY3
+from .compat import unichr, binary_type, text_type, string_types, integer_types, PY3
 def _import_speedups():
     try:
         from . import _speedups
@@ -41,13 +41,18 @@ def encode_basestring(s, _PY3=PY3, _q=u'"'):
     """
     if _PY3:
         if isinstance(s, bytes):
-            s = s.decode('utf-8')
-        if type(s) is not str:
+            s = str(s, 'utf-8')
+        elif type(s) is not str:
+            # convert an str subclass instance to exact str
+            # raise a TypeError otherwise
             s = str.__str__(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
-            s = s.decode('utf-8')
-        if type(s) not in (str, unicode):
+            s = unicode(s, 'utf-8')
+        elif type(s) not in (str, unicode):
+            # convert an str subclass instance to exact str
+            # convert a unicode subclass instance to exact unicode
+            # raise a TypeError otherwise
             if isinstance(s, str):
                 s = str.__str__(s)
             else:
@@ -63,13 +68,18 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
     """
     if _PY3:
         if isinstance(s, bytes):
-            s = s.decode('utf-8')
-        if type(s) is not str:
+            s = str(s, 'utf-8')
+        elif type(s) is not str:
+            # convert an str subclass instance to exact str
+            # raise a TypeError otherwise
             s = str.__str__(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
-            s = s.decode('utf-8')
-        if type(s) not in (str, unicode):
+            s = unicode(s, 'utf-8')
+        elif type(s) not in (str, unicode):
+            # convert an str subclass instance to exact str
+            # convert a unicode subclass instance to exact unicode
+            # raise a TypeError otherwise
             if isinstance(s, str):
                 s = str.__str__(s)
             else:
@@ -274,7 +284,7 @@ class JSONEncoder(object):
         if isinstance(o, binary_type):
             _encoding = self.encoding
             if (_encoding is not None and not (_encoding == 'utf-8')):
-                o = o.decode(_encoding)
+                o = text_type(o, _encoding)
         if isinstance(o, string_types):
             if self.ensure_ascii:
                 return encode_basestring_ascii(o)
@@ -312,7 +322,7 @@ class JSONEncoder(object):
         if self.encoding != 'utf-8' and self.encoding is not None:
             def _encoder(o, _orig_encoder=_encoder, _encoding=self.encoding):
                 if isinstance(o, binary_type):
-                    o = o.decode(_encoding)
+                    o = text_type(o, _encoding)
                 return _orig_encoder(o)
 
         def floatstr(o, allow_nan=self.allow_nan, ignore_nan=self.ignore_nan,
@@ -535,7 +545,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         if isinstance(key, string_types): # pragma: no cover
             pass
         elif _PY3 and isinstance(key, bytes) and _encoding is not None:
-            key = key.decode(_encoding)
+            key = str(key, _encoding)
         elif isinstance(key, float):
             key = _floatstr(key)
         elif key is True:
