@@ -1,6 +1,5 @@
 from __future__ import absolute_import
 import unittest
-import doctest
 import sys
 import os
 
@@ -28,6 +27,13 @@ def additional_tests(suite=None):
     import simplejson.decoder
     if suite is None:
         suite = unittest.TestSuite()
+    try:
+        import doctest
+    except ImportError:
+        if sys.version_info < (2, 7):
+            # doctests in 2.6 depends on cStringIO
+            return suite
+        raise
     for mod in (simplejson, simplejson.encoder, simplejson.decoder):
         suite.addTest(doctest.DocTestSuite(mod))
     suite.addTest(doctest.DocFileSuite('../../index.rst'))

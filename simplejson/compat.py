@@ -5,8 +5,11 @@ if sys.version_info[0] < 3:
     PY3 = False
     def b(s):
         return s
-    import cStringIO as StringIO
-    StringIO = BytesIO = StringIO.StringIO
+    try:
+        from cStringIO import StringIO
+    except ImportError:
+        from StringIO import StringIO
+    BytesIO = StringIO
     text_type = unicode
     binary_type = str
     string_types = (basestring,)
@@ -21,9 +24,7 @@ else:
         from imp import reload as reload_module
     def b(s):
         return bytes(s, 'latin1')
-    import io
-    StringIO = io.StringIO
-    BytesIO = io.BytesIO
+    from io import StringIO, BytesIO
     text_type = str
     binary_type = bytes
     string_types = (str,)
