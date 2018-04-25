@@ -43,15 +43,15 @@ def encode_basestring(s, _PY3=PY3, _q=u'"'):
         if isinstance(s, bytes):
             s = str(s, 'utf-8')
         elif type(s) is not str:
-            # convetr an str subclass instance to exact str
+            # convert an str subclass instance to exact str
             # raise a TypeError otherwise
             s = str.__str__(s)
     else:
         if isinstance(s, str) and HAS_UTF8.search(s) is not None:
             s = unicode(s, 'utf-8')
         elif type(s) not in (str, unicode):
-            # convetr an str subclass instance to exact str
-            # convetr a unicode subclass instance to exact unicode
+            # convert an str subclass instance to exact str
+            # convert a unicode subclass instance to exact unicode
             # raise a TypeError otherwise
             if isinstance(s, str):
                 s = str.__str__(s)
