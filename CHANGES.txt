@@ -1,3 +1,18 @@
+Version 3.15.0 released 2018-05-12
+
+* Clean up the C code
+  https://github.com/simplejson/simplejson/pull/220
+* Bypass the decode() method in bytes subclasses
+  https://github.com/simplejson/simplejson/pull/219
+* Support builds without cStringIO
+  https://github.com/simplejson/simplejson/pull/217
+* Allow to disable serializing bytes by default in Python 3
+  https://github.com/simplejson/simplejson/pull/216
+* Simplify the compatibility code
+  https://github.com/simplejson/simplejson/pull/215
+* Fix tests in Python 2.5
+  https://github.com/simplejson/simplejson/pull/214
+
 Version 3.14.0 released 2018-04-21
 
 * Defer is_raw_json test (performance improvement)
