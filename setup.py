@@ -18,6 +18,8 @@ DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 with open('README.rst', 'r') as f:
    LONG_DESCRIPTION = f.read()
 
+PYTHON_REQUIRES = '>=2.5, !=3.0.*, !=3.1.*, !=3.2.*'
+
 CLASSIFIERS = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
@@ -41,7 +43,7 @@ CLASSIFIERS = [
 if sys.platform == 'win32' and sys.version_info < (2, 7):
    # 2.6's distutils.msvc9compiler can raise an IOError when failing to
    # find the compiler
-   # It can also raise ValueError http://bugs.python.org/issue7511
+   # It can also raise ValueError https://bugs.python.org/issue7511
    ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError,
                  IOError, ValueError)
 else:
@@ -101,9 +103,10 @@ def run_setup(with_binary):
         description=DESCRIPTION,
         long_description=LONG_DESCRIPTION,
         classifiers=CLASSIFIERS,
+        python_requires=PYTHON_REQUIRES,
         author="Bob Ippolito",
         author_email="bob@redivi.com",
-        url="http://github.com/simplejson/simplejson",
+        url="https://github.com/simplejson/simplejson",
         license="MIT License",
         packages=['simplejson', 'simplejson.tests'],
         platforms=['any'],
