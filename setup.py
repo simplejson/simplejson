@@ -18,6 +18,8 @@ DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 with open('README.rst', 'r') as f:
    LONG_DESCRIPTION = f.read()
 
+PYTHON_REQUIRES = '>=2.5, !=3.0.*, !=3.1.*, !=3.2.*'
+
 CLASSIFIERS = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
@@ -101,6 +103,7 @@ def run_setup(with_binary):
         description=DESCRIPTION,
         long_description=LONG_DESCRIPTION,
         classifiers=CLASSIFIERS,
+        python_requires=PYTHON_REQUIRES,
         author="Bob Ippolito",
         author_email="bob@redivi.com",
         url="https://github.com/simplejson/simplejson",
