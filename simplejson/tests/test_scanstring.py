@@ -22,6 +22,8 @@ class TestScanString(TestCase):
             return
         self._test_scanstring(simplejson.decoder.c_scanstring)
 
+        self.assertTrue(isinstance(simplejson.decoder.c_scanstring('""', 0)[0], str))
+
     def _test_scanstring(self, scanstring):
         if sys.maxunicode == 65535:
             self.assertEqual(
