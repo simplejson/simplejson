@@ -3331,7 +3331,7 @@ init_constants(void)
 #else /* PY_MAJOR_VERSION >= 3 */
     JSON_EmptyStr = PyString_FromString("");
     if (JSON_EmptyStr == NULL)
-	return 0;
+        return 0;
     JSON_EmptyUnicode = PyUnicode_FromUnicode(NULL, 0);
 #endif /* PY_MAJOR_VERSION >= 3 */
     if (JSON_EmptyUnicode == NULL)
