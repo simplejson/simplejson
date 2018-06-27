@@ -76,6 +76,9 @@ static PyObject *JSON_Infinity = NULL;
 static PyObject *JSON_NegInfinity = NULL;
 static PyObject *JSON_NaN = NULL;
 static PyObject *JSON_EmptyUnicode = NULL;
+#if PY_MAJOR_VERSION < 3
+static PyObject *JSON_EmptyStr = NULL;
+#endif
 
 static PyTypeObject PyScannerType;
 static PyTypeObject PyEncoderType;
@@ -785,12 +788,7 @@ join_list_string(PyObject *lst)
     /* return ''.join(lst) */
     static PyObject *joinfn = NULL;
     if (joinfn == NULL) {
-        PyObject *ustr = PyString_FromStringAndSize(NULL, 0);
-        if (ustr == NULL)
-            return NULL;
-
-        joinfn = PyObject_GetAttrString(ustr, "join");
-        Py_DECREF(ustr);
+        joinfn = PyObject_GetAttrString(JSON_EmptyStr, "join");
         if (joinfn == NULL)
             return NULL;
     }
@@ -1026,7 +1024,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         if (chunk != NULL)
             rval = chunk;
         else {
-            rval = JSON_EmptyUnicode;
+            rval = JSON_EmptyStr;
             Py_INCREF(rval);
         }
     }
@@ -3331,6 +3329,9 @@ init_constants(void)
 #if PY_MAJOR_VERSION >= 3
     JSON_EmptyUnicode = PyUnicode_New(0, 127);
 #else /* PY_MAJOR_VERSION >= 3 */
+    JSON_EmptyStr = PyString_FromString("");
+    if (JSON_EmptyStr == NULL)
+        return 0;
     JSON_EmptyUnicode = PyUnicode_FromUnicode(NULL, 0);
 #endif /* PY_MAJOR_VERSION >= 3 */
     if (JSON_EmptyUnicode == NULL)
