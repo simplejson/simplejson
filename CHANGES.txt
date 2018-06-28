@@ -1,3 +1,13 @@
+Version 3.16.0 released 2018-06-28
+
+* Restore old behavior with regard to the type of decoded empty
+  strings with speedups enabled on Python 2.x
+  https://github.com/simplejson/simplejson/pull/225
+* Add python_requires to setup.py to help pip
+  https://github.com/simplejson/simplejson/pull/224
+* Fix CSS in docs when built locally
+  https://github.com/simplejson/simplejson/pull/222
+
 Version 3.15.0 released 2018-05-12
 
 * Clean up the C code

@@ -42,9 +42,9 @@ copyright = '2018, Bob Ippolito'
 # other places throughout the built documents.
 #
 # The short X.Y version.
-version = '3.15'
+version = '3.16'
 # The full version, including alpha/beta/rc tags.
-release = '3.15.0'
+release = '3.16.0'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
