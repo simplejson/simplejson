@@ -6,6 +6,7 @@ set -x
 if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     PYENV_ROOT="$HOME/.pyenv-simplejson"
     PATH="$PYENV_ROOT/bin:$PATH"
+    unset -f pyenv || true # travis brings its own pyenv, we want ours
     hash -r
     eval "$(pyenv init -)"
 fi
