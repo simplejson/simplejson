@@ -147,6 +147,9 @@ _default_encoder = JSONEncoder(
     for_json=False,
     ignore_nan=False,
     int_as_string_bitcount=None,
+    alternative_nan='NaN',
+    alternative_pos_inf='Infinity',
+    alternative_neg_inf='-Infinity',
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
@@ -155,7 +158,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
          namedtuple_as_object=True, tuple_as_array=True,
          bigint_as_string=False, sort_keys=False, item_sort_key=None,
          for_json=False, ignore_nan=False, int_as_string_bitcount=None,
-         iterable_as_array=False, **kw):
+         iterable_as_array=False, alternative_nan='NaN',
+         alternative_pos_inf='Infinity', alternative_neg_inf='-Infinity', **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
@@ -253,6 +257,8 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         and not bigint_as_string and not sort_keys
         and not item_sort_key and not for_json
         and not ignore_nan and int_as_string_bitcount is None
+        and alternative_nan == 'NaN' and alternative_pos_inf == 'Infinity'
+        and alternative_neg_inf == '-Infinity'
         and not kw
     ):
         iterable = _default_encoder.iterencode(obj)
@@ -272,6 +278,9 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             for_json=for_json,
             ignore_nan=ignore_nan,
             int_as_string_bitcount=int_as_string_bitcount,
+            alternative_nan=alternative_nan,
+            alternative_pos_inf=alternative_pos_inf,
+            alternative_neg_inf=alternative_neg_inf,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -285,7 +294,9 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
           namedtuple_as_object=True, tuple_as_array=True,
           bigint_as_string=False, sort_keys=False, item_sort_key=None,
           for_json=False, ignore_nan=False, int_as_string_bitcount=None,
-          iterable_as_array=False, **kw):
+          iterable_as_array=False, alternative_nan='NaN',
+          alternative_pos_inf='Infinity', alternative_neg_inf='-Infinity',
+          **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
     If ``skipkeys`` is false then ``dict`` keys that are not basic types
@@ -377,6 +388,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         and not bigint_as_string and not sort_keys
         and not item_sort_key and not for_json
         and not ignore_nan and int_as_string_bitcount is None
+        and alternative_nan == 'NaN' and alternative_pos_inf == 'Infinity'
+        and alternative_neg_inf == '-Infinity'
         and not kw
     ):
         return _default_encoder.encode(obj)
@@ -396,6 +409,9 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         for_json=for_json,
         ignore_nan=ignore_nan,
         int_as_string_bitcount=int_as_string_bitcount,
+        alternative_nan=alternative_nan,
+        alternative_pos_inf=alternative_pos_inf,
+        alternative_neg_inf=alternative_neg_inf,
         **kw).encode(obj)
 
 
