@@ -17,6 +17,10 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     python setup.py bdist_wheel
 fi
 
+if [[ $BUILD_WHEEL == 'true' ]]; then
+    cibuildwheel --output-dir dist
+fi
+
 if [[ $BUILD_SDIST == 'true' ]]; then
     python setup.py sdist
 fi
