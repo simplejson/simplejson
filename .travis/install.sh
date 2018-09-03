@@ -21,3 +21,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
     pyenv install -s $PYENV_VERSION
     pip install wheel
 fi
+
+if [[ $BUILD_WHEEL == 'true' ]]; then
+    pip install wheel cibuildwheel==0.9.4
+fi
