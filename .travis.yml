@@ -31,6 +31,13 @@ matrix:
     services:
       - docker
     python: '3.6'
+    env: BUILD_WHEEL=true
+  - os: linux
+    dist: trusty
+    sudo: required
+    services:
+      - docker
+    python: '3.7'
     env: BUILD_SDIST=true BUILD_WHEEL=true
   - os: linux
     sudo: false
@@ -43,7 +50,13 @@ matrix:
     env: PYENV_VERSION=2.7.12
   - os: osx
     language: objective-c
-    env: PYENV_VERSION=3.5.2
+    env: PYENV_VERSION=3.5.6
+  - os: osx
+    language: objective-c
+    env: PYENV_VERSION=3.6.6
+  - os: osx
+    language: objective-c
+    env: PYENV_VERSION=3.7.0
 install:
 - "./.travis/install.sh"
 script:
