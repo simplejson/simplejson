@@ -8,7 +8,7 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
       if [ -e "$HOME/.pyenv-simplejson" ]; then
         rm -rf ~/.pyenv-simplejson
       fi
-      git clone https://github.com/yyuu/pyenv.git ~/.pyenv-simplejson
+      git clone https://github.com/pyenv/pyenv.git ~/.pyenv-simplejson
     else
       (cd ~/.pyenv-simplejson; git pull)
     fi
