@@ -33,7 +33,7 @@ matrix:
     python: '3.6'
     env: BUILD_WHEEL=true
   - os: linux
-    dist: trusty
+    dist: xenial
     sudo: required
     services:
       - docker
