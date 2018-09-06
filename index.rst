@@ -124,6 +124,26 @@ Using :mod:`simplejson.tool` from the shell to validate and pretty-print::
 
 .. highlight:: python
 
+Parsing multiple documents serialized as JSON lines (newline-delimited JSON)::
+
+    >>> import simplejson as json
+    >>> def loads_lines(docs):
+    ...     for doc in docs.splitlines():
+    ...         yield json.loads(doc)
+    ...
+    >>> sum(doc["count"] for doc in loads_lines('{"count":1}\n{"count":2}\n{"count":3}\n'))
+    6
+
+Serializing multiple objects to JSON lines (newline-delimited JSON)::
+
+    >>> import simplejson as json
+    >>> def dumps_lines(objs):
+    ...     for obj in objs:
+    ...         yield json.dumps(obj, separators=(',',':')) + '\n'
+    ...
+    >>> ''.join(dumps_lines([{'count': 1}, {'count': 2}, {'count': 3}]))
+    '{"count":1}\n{"count":2}\n{"count":3}\n'
+
 .. note::
 
    JSON is a subset of `YAML <http://yaml.org/>`_ 1.2. The JSON produced by

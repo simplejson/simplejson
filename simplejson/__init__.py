@@ -87,7 +87,6 @@ Specializing JSON object encoding::
     >>> ''.join(json.JSONEncoder(default=encode_complex).iterencode(2 + 1j))
     '[2.0, 1.0]'
 
-
 Using simplejson.tool from the shell to validate and pretty-print::
 
     $ echo '{"json":"obj"}' | python -m simplejson.tool
@@ -96,9 +95,30 @@ Using simplejson.tool from the shell to validate and pretty-print::
     }
     $ echo '{ 1.2:3.4}' | python -m simplejson.tool
     Expecting property name: line 1 column 3 (char 2)
+
+Parsing multiple documents serialized as JSON lines (newline-delimited JSON)::
+
+    >>> import simplejson as json
+    >>> def loads_lines(docs):
+    ...     for doc in docs.splitlines():
+    ...         yield json.loads(doc)
+    ...
+    >>> sum(doc["count"] for doc in loads_lines('{"count":1}\n{"count":2}\n{"count":3}\n'))
+    6
+
+Serializing multiple objects to JSON lines (newline-delimited JSON)::
+
+    >>> import simplejson as json
+    >>> def dumps_lines(objs):
+    ...     for obj in objs:
+    ...         yield json.dumps(obj, separators=(',',':')) + '\n'
+    ...
+    >>> ''.join(dumps_lines([{'count': 1}, {'count': 2}, {'count': 3}]))
+    '{"count":1}\n{"count":2}\n{"count":3}\n'
+
 """
 from __future__ import absolute_import
-__version__ = '3.16.0'
+__version__ = '3.16.1'
 __all__ = [
     'dump', 'dumps', 'load', 'loads',
     'JSONDecoder', 'JSONDecodeError', 'JSONEncoder',
