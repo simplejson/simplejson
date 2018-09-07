@@ -1,3 +1,11 @@
+Version 3.16.1 released 2018-09-06
+
+* Added examples for JSON lines use cases
+* Add wheels for more Python versions and platforms
+  https://github.com/simplejson/simplejson/pull/234
+  https://github.com/simplejson/simplejson/pull/233
+  https://github.com/simplejson/simplejson/pull/231
+
 Version 3.16.0 released 2018-06-28
 
 * Restore old behavior with regard to the type of decoded empty
