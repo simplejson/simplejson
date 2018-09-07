@@ -4,6 +4,9 @@ simplejson
 .. image:: https://travis-ci.org/simplejson/simplejson.svg?branch=master
     :target: https://travis-ci.org/simplejson/simplejson
 
+.. image:: https://ci.appveyor.com/api/projects/status/3riqhss6vca680gi/branch/master?svg=true
+    :target: https://ci.appveyor.com/project/etrepum/simplejson/branch/master
+
 simplejson is a simple, fast, complete, correct and extensible
 JSON <http://json.org> encoder and decoder for Python 2.5+
 and Python 3.3+.  It is pure Python code with no dependencies,
