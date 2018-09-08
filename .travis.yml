@@ -31,11 +31,9 @@ matrix:
     python: '3.6'
   - os: linux
     dist: xenial
-    sudo: required
-    services:
-      - docker
+    sudo: false
     python: '3.7'
-    env: BUILD_SDIST=true BUILD_WHEEL=true
+    env: BUILD_SDIST=true
   - os: linux
     sudo: false
     python: pypy
