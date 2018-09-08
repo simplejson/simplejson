@@ -63,8 +63,7 @@ def upload_artifacts(version):
     args = ['twine', 'upload']
     for fn in artifacts:
         if matches(fn):
-            filename = os.path.join('dist', fn)
-            args.extend([filename, filename + '.asc'])
+            args.append(os.path.join('dist', fn))
     subprocess.check_call(args)
 
 
