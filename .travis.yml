@@ -4,18 +4,17 @@ cache:
   directories:
   - "$HOME/.cache/pip"
   - "$HOME/.pyenv"
-python:
-  - 2.7
-  - 3.4
-  - 3.5
-  - 3.6
-  - 3.7
 matrix:
   include:
-  - python: '2.6'
+  - python: 2.6
     dist: trusty
-  - python: '3.3'
+  - python: 2.7
+  - python: 3.3
     dist: trusty
+  - python: 3.4
+  - python: 3.5
+  - python: 3.6
+  - python: 3.7
   - python: pypy
     dist: trusty
   - python: pypy3
@@ -24,13 +23,16 @@ matrix:
     services:
       - docker
     env: BUILD_SDIST=true
-  - os: osx
+  - name: Python 2.7.12 on macOS
+    os: osx
     language: objective-c
     env: PYENV_VERSION=2.7.12
-  - os: osx
+  - name: Python 3.5.5 on macOS
+    os: osx
     language: objective-c
     env: PYENV_VERSION=3.5.5
-  - os: osx
+  - name: Python 3.6.5 on macOS
+    os: osx
     language: objective-c
     env: PYENV_VERSION=3.6.5
 install:
