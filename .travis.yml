@@ -1,45 +1,38 @@
 language: python
+dist: xenial  # required for Python >= 3.7
 cache:
   directories:
   - "$HOME/.cache/pip"
   - "$HOME/.pyenv"
 matrix:
   include:
-  - os: linux
+  - python: 2.6
     dist: trusty
-    python: '2.6'
-  - os: linux
+  - python: 2.7
+  - python: 3.3
     dist: trusty
-    python: '2.7'
-  - os: linux
+  - python: 3.4
+  - python: 3.5
+  - python: 3.6
+  - python: 3.7
+  - python: pypy
     dist: trusty
-    python: '3.3'
-  - os: linux
+  - python: pypy3
     dist: trusty
-    python: '3.4'
-  - os: linux
-    dist: trusty
-    python: '3.5'
-  - os: linux
-    dist: trusty
-    python: '3.6'
-  - os: linux
-    dist: xenial
+  - python: 3.7
     services:
       - docker
-    python: '3.7'
     env: BUILD_SDIST=true
-  - os: linux
-    python: pypy
-  - os: linux
-    python: pypy3
-  - os: osx
+  - name: Python 2.7.12 on macOS
+    os: osx
     language: objective-c
     env: PYENV_VERSION=2.7.12
-  - os: osx
+  - name: Python 3.5.5 on macOS
+    os: osx
     language: objective-c
     env: PYENV_VERSION=3.5.5
-  - os: osx
+  - name: Python 3.6.5 on macOS
+    os: osx
     language: objective-c
     env: PYENV_VERSION=3.6.5
 install:
