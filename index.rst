@@ -15,10 +15,11 @@ is a lightweight data interchange format inspired by
 
 :mod:`simplejson` exposes an API familiar to users of the standard library
 :mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
-version of the :mod:`json` library contained in Python 2.6, but maintains
-compatibility with Python 2.5 and (currently) has
+version of the :mod:`json` library contained in Python 3.3+ and (currently) has
 significant performance advantages, even without using the optional C
-extension for speedups. :mod:`simplejson` is also supported on Python 3.3+.
+extension for speedups. :mod:`simplejson` also has legacy support for Python 2.5+, 
+with the major difference being use of the class `unicode` rather than `str` in 
+most instances `str` is mentioned in this documentation. 
 
 Development of simplejson happens on Github:
 http://github.com/simplejson/simplejson
@@ -30,7 +31,7 @@ Encoding basic Python object hierarchies::
     '["foo", {"bar": ["baz", null, 1.0, 2]}]'
     >>> print(json.dumps("\"foo\bar"))
     "\"foo\bar"
-    >>> print(json.dumps(u'\u1234'))
+    >>> print(json.dumps('\u1234'))
     "\u1234"
     >>> print(json.dumps('\\'))
     "\\"
@@ -61,10 +62,10 @@ Pretty printing::
 Decoding JSON::
 
     >>> import simplejson as json
-    >>> obj = [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
+    >>> obj = ['foo', {'bar': ['baz', None, 1.0, 2]}]
     >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == obj
     True
-    >>> json.loads('"\\"foo\\bar"') == u'"foo\x08ar'
+    >>> json.loads('"\\"foo\\bar"') == '"foo\x08ar'
     True
     >>> from simplejson.compat import StringIO
     >>> io = StringIO('["streaming API"]')
@@ -168,20 +169,20 @@ Basic Usage
    file-like object) using this :ref:`conversion table <py-to-json-table>`.
 
    If *skipkeys* is true (default: ``False``), then dict keys that are not
-   of a basic type (:class:`str`, :class:`unicode`, :class:`int`, :class:`long`,
+   of a basic type (:class:`str`, :class:`int`, :class:`long`,
    :class:`float`, :class:`bool`, ``None``) will be skipped instead of raising a
    :exc:`TypeError`.
 
-   The :mod:`simplejson` module will produce :class:`str` objects in Python 3,
+   The :mod:`simplejson` module produces :class:`str` objects,
    not :class:`bytes` objects. Therefore, ``fp.write()`` must support
    :class:`str` input.
 
-   If *ensure_ascii* is false (default: ``True``), then some chunks written
-   to *fp* may be :class:`unicode` instances, subject to normal Python
+   In Python 2, if *ensure_ascii* is false (default: ``True``), then some chunks written
+   to *fp* may be :class:`unicode` instances, subject to normal Python 2
    :class:`str` to :class:`unicode` coercion rules.  Unless ``fp.write()``
-   explicitly understands :class:`unicode` (as in :func:`codecs.getwriter`) this
-   is likely to cause an error. It's best to leave the default settings, because
-   they are safe and it is highly optimized.
+   explicitly understands :class:`unicode` (as in Python 3 or as in 
+   :func:`codecs.getwriter`) this is likely to cause an error. It's best to 
+   leave the default settings, because they are safe and it is highly optimized.
 
    If *check_circular* is false (default: ``True``), then the circular
    reference check for container types will be skipped and a circular reference
@@ -341,7 +342,7 @@ Basic Usage
 
    Serialize *obj* to a JSON formatted :class:`str`.
 
-   If *ensure_ascii* is false, then the return value will be a
+   In Python 2, if *ensure_ascii* is false, then the return value will be a
    :class:`unicode` instance.  The other arguments have the same meaning as in
    :func:`dump`. Note that the default *ensure_ascii* setting has much
    better performance in Python 2.
@@ -363,13 +364,13 @@ Basic Usage
    UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be specified.
    Encodings that are not ASCII based (such as UCS-2) are not allowed, and
    should be wrapped with ``codecs.getreader(fp)(encoding)``, or simply decoded
-   to a :class:`unicode` object and passed to :func:`loads`. The default
+   to a :class:`str` object and passed to :func:`loads`. The default
    setting of ``'utf-8'`` is fastest and should be using whenever possible.
 
-   If *fp.read()* returns :class:`str` then decoded JSON strings that contain
+   In Python 2, if *fp.read()* returns :class:`str` then decoded JSON strings that contain
    only ASCII characters may be parsed as :class:`str` for performance and
    memory reasons. If your code expects only :class:`unicode` the appropriate
-   solution is to wrap fp with a reader as demonstrated above.
+   solution is to wrap fp with a reader as demonstrated above. 
 
    *object_hook* is an optional function that will be called with the result of
    any object literal decode (a :class:`dict`).  The return value of
@@ -440,7 +441,7 @@ Basic Usage
                     parse_constant=None, object_pairs_hook=None, \
                     use_decimal=None, **kw)
 
-   Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
+   Deserialize *s* (a :class:`str` instance containing a JSON
    document) to a Python object. :exc:`JSONDecodeError` will be
    raised if the given JSON document is not valid.
 
@@ -449,7 +450,7 @@ Basic Usage
    specified.  Encodings that are not ASCII based (such as UCS-2) are not
    allowed and should be decoded to :class:`unicode` first.
 
-   If *s* is a :class:`str` then decoded JSON strings that contain
+   In Python 2, if *s* is a :class:`str` then decoded JSON strings that contain
    only ASCII characters may be parsed as :class:`str` for performance and
    memory reasons. If your code expects only :class:`unicode` the appropriate
    solution is decode *s* to :class:`unicode` prior to calling loads.
@@ -494,11 +495,10 @@ Encoders and decoders
    corresponding ``float`` values, which is outside the JSON spec.
 
    *encoding* determines the encoding used to interpret any :class:`str` objects
-   decoded by this instance (``'utf-8'`` by default).  It has no effect when decoding
-   :class:`unicode` objects.
+   decoded by this instance (``'utf-8'`` by default).
 
    Note that currently only encodings that are a superset of ASCII work, strings
-   of other encodings should be passed in as :class:`unicode`.
+   of other encodings should be passed in as unicode characters.
 
    *object_hook* is an optional function that will be called with the result of
    every JSON object decoded and its return value will be used in place of the
@@ -537,10 +537,9 @@ Encoders and decoders
 
    .. method:: decode(s)
 
-      Return the Python representation of *s* (a :class:`str` or
-      :class:`unicode` instance containing a JSON document)
+      Return the Python representation of *s* (a :class:`str` instance containing a JSON document)
 
-      If *s* is a :class:`str` then decoded JSON strings that contain
+      In Python 2, if *s* is a :class:`str` then decoded JSON strings that contain
       only ASCII characters may be parsed as :class:`str` for performance and
       memory reasons. If your code expects only :class:`unicode` the
       appropriate solution is decode *s* to :class:`unicode` prior to calling
@@ -551,10 +550,9 @@ Encoders and decoders
 
    .. method:: raw_decode(s[, idx=0])
 
-      Decode a JSON document from *s* (a :class:`str` or :class:`unicode`
-      beginning with a JSON document) starting from the index *idx* and return
-      a 2-tuple of the Python representation and the index in *s* where the
-      document ended.
+      Decode a JSON document from *s* (a :class:`str` beginning with a JSON 
+      document) starting from the index *idx* and return a 2-tuple of the 
+      Python representation and the index in *s* where the document ended.
 
       This can be used to decode a JSON document from a string that may have
       extraneous data at the end, or to decode a string that has a series of
@@ -625,7 +623,7 @@ Encoders and decoders
    attempt encoding of keys that are not str, int, long, float, Decimal, bool,
    or None. If *skipkeys* is true, such items are simply skipped.
 
-   If *ensure_ascii* is true (the default), the output is guaranteed to be
+   In Python 2, if *ensure_ascii* is true (the default), the output is guaranteed to be
    :class:`str` objects with all incoming unicode characters escaped.  If
    *ensure_ascii* is false, the output will be a unicode object.
 
@@ -882,7 +880,7 @@ strings only contain ASCII characters.
 
 Other than the *ensure_ascii* parameter, this module is defined strictly in
 terms of conversion between Python objects and
-:class:`Unicode strings <str>`, and thus does not otherwise directly address
+:class:`strings <str>`, and thus does not otherwise directly address
 the issue of character encodings.
 
 The RFC prohibits adding a byte order mark (BOM) to the start of a JSON text,
