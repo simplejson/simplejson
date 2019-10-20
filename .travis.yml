@@ -17,7 +17,7 @@ matrix:
   - python: 3.8
   - python: pypy
   - python: pypy3
-  - python: 3.7
+  - python: 3.8
     services:
       - docker
     env: BUILD_SDIST=true
@@ -25,10 +25,10 @@ matrix:
     os: osx
     language: objective-c
     env: PYENV_VERSION=2.7.12
-  - name: Python 3.5.5 on macOS
+  - name: Python 3.6.5 on macOS
     os: osx
     language: objective-c
-    env: PYENV_VERSION=3.5.5
+    env: PYENV_VERSION=3.6.5
   - name: Python 3.7.4 on macOS
     os: osx
     osx_image: xcode11.2
