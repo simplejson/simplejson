@@ -1,5 +1,4 @@
 language: python
-dist: xenial  # required for Python >= 3.7
 cache:
   directories:
   - "$HOME/.cache/pip"
@@ -15,10 +14,9 @@ matrix:
   - python: 3.5
   - python: 3.6
   - python: 3.7
+  - python: 3.8
   - python: pypy
-    dist: trusty
   - python: pypy3
-    dist: trusty
   - python: 3.7
     services:
       - docker
