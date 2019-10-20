@@ -31,8 +31,9 @@ matrix:
     env: PYENV_VERSION=3.5.5
   - name: Python 3.6.5 on macOS
     os: osx
+    osx_image: xcode11.2
     language: objective-c
-    env: PYENV_VERSION=3.6.5
+    env: PYENV_VERSION=3.7.4
 install:
 - "./.travis/install.sh"
 script:
