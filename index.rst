@@ -13,12 +13,16 @@ is a lightweight data interchange format inspired by
 `JavaScript <http://en.wikipedia.org/wiki/JavaScript>`_ object literal syntax
 (although it is not a strict subset of JavaScript [#rfc-errata]_ ).
 
+:mod:`simplejson` is a simple, fast, complete, correct and extensible
+JSON encoder and decoder for Python. It is pure Python code
+with no dependencies, but includes an optional C extension
+for a serious speed boost.
+
 :mod:`simplejson` exposes an API familiar to users of the standard library
 :mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
-version of the :mod:`json` library contained in Python 2.6, but maintains
-compatibility with Python 2.5 and (currently) has
-significant performance advantages, even without using the optional C
-extension for speedups. :mod:`simplejson` is also supported on Python 3.3+.
+version of the :mod:`json` library, but maintains
+compatibility with the latest Python 3.8+ releases back to Python 3.3
+as well as the legacy Python 2.5 - Python 2.7 releases.
 
 Development of simplejson happens on Github:
 http://github.com/simplejson/simplejson
@@ -61,10 +65,10 @@ Pretty printing::
 Decoding JSON::
 
     >>> import simplejson as json
-    >>> obj = [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
+    >>> obj = ['foo', {'bar': ['baz', None, 1.0, 2]}]
     >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == obj
     True
-    >>> json.loads('"\\"foo\\bar"') == u'"foo\x08ar'
+    >>> json.loads('"\\"foo\\bar"') == '"foo\x08ar'
     True
     >>> from simplejson.compat import StringIO
     >>> io = StringIO('["streaming API"]')
