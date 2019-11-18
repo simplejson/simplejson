@@ -48,5 +48,5 @@ deploy:
     repo: simplejson/simplejson
     tags: true
   skip_cleanup: true
-  api-key:
-    secure: XeRc7+prvUTC4vzfOpf3pibqRAjlD642FyVYwuCxEz0QPHh7/qrdxBgK7c/YDvKpADukWxwZm1UofN/le1KLLiGtLlcDSwjd224kx6pVQS6b3Ng1Trg6QWpIt/m2yelGRT6jLIaQ9ljkuusjpy5IhXltPH/SkWI5H4FnKi8M9pQ=
+  api_key:
+    secure: FhcBCuL/33fsotaDLv157pQ0HpxYAXI9h4TNhT0CDgrh1i2J1m/hmJMqlrrn0j/E2TpYyXf1citLra6QrBP//FnFMGQ43el369tC3W9RPXYpfThzU6JcJecoWGQMMMiJgPLpOC7+tyDpphsNFKmySG/ITvX+OEZ4lzL8+1CWyRk=
