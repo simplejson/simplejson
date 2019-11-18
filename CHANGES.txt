@@ -1,3 +1,14 @@
+Version 3.17.0 released 2019-11-17
+
+* Updated documentation to be Python 3 first, and
+  have removed documentation notes about version changes
+  that occurred more than five years ago.
+  https://github.com/simplejson/simplejson/pull/257
+  https://github.com/simplejson/simplejson/pull/254
+* Update build matrix for Python 3.8
+  https://github.com/simplejson/simplejson/pull/255
+  https://github.com/simplejson/simplejson/pull/256
+
 Version 3.16.1 released 2018-09-07
 
 * Added examples for JSON lines use cases

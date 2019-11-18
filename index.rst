@@ -13,12 +13,16 @@ is a lightweight data interchange format inspired by
 `JavaScript <http://en.wikipedia.org/wiki/JavaScript>`_ object literal syntax
 (although it is not a strict subset of JavaScript [#rfc-errata]_ ).
 
+:mod:`simplejson` is a simple, fast, complete, correct and extensible
+JSON encoder and decoder for Python. It is pure Python code
+with no dependencies, but includes an optional C extension
+for a serious speed boost.
+
 :mod:`simplejson` exposes an API familiar to users of the standard library
 :mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
-version of the :mod:`json` library contained in Python 2.6, but maintains
-compatibility with Python 2.5 and (currently) has
-significant performance advantages, even without using the optional C
-extension for speedups. :mod:`simplejson` is also supported on Python 3.3+.
+version of the :mod:`json` library, but maintains
+compatibility with the latest Python 3.8+ releases back to Python 3.3
+as well as the legacy Python 2.5 - Python 2.7 releases.
 
 Development of simplejson happens on Github:
 http://github.com/simplejson/simplejson
@@ -61,10 +65,10 @@ Pretty printing::
 Decoding JSON::
 
     >>> import simplejson as json
-    >>> obj = [u'foo', {u'bar': [u'baz', None, 1.0, 2]}]
+    >>> obj = ['foo', {'bar': ['baz', None, 1.0, 2]}]
     >>> json.loads('["foo", {"bar":["baz", null, 1.0, 2]}]') == obj
     True
-    >>> json.loads('"\\"foo\\bar"') == u'"foo\x08ar'
+    >>> json.loads('"\\"foo\\bar"') == '"foo\x08ar'
     True
     >>> from simplejson.compat import StringIO
     >>> io = StringIO('["streaming API"]')
@@ -164,171 +168,27 @@ Basic Usage
                    item_sort_key=None, for_json=None, ignore_nan=False, \
                    int_as_string_bitcount=None, iterable_as_array=False, **kw)
 
-   Serialize *obj* as a JSON formatted stream to *fp* (a ``.write()``-supporting
-   file-like object) using this :ref:`conversion table <py-to-json-table>`.
+    Serialize *obj* as a JSON formatted stream to *fp*
+    (a ``.write()``-supporting file-like object) using this
+    :ref:`conversion table <py-to-json-table>`.
 
-   If *skipkeys* is true (default: ``False``), then dict keys that are not
-   of a basic type (:class:`str`, :class:`unicode`, :class:`int`, :class:`long`,
-   :class:`float`, :class:`bool`, ``None``) will be skipped instead of raising a
-   :exc:`TypeError`.
+    The :mod:`simplejson` module will produce :class:`str` objects in
+    Python 3, not :class:`bytes` objects. Therefore, ``fp.write()`` must
+    support :class:`str` input.
 
-   The :mod:`simplejson` module will produce :class:`str` objects in Python 3,
-   not :class:`bytes` objects. Therefore, ``fp.write()`` must support
-   :class:`str` input.
+    See :func:`dumps` for a description of each argument. The only difference
+    is that this function writes the resulting JSON document to *fp* instead
+    of returning it.
 
-   If *ensure_ascii* is false (default: ``True``), then some chunks written
-   to *fp* may be :class:`unicode` instances, subject to normal Python
-   :class:`str` to :class:`unicode` coercion rules.  Unless ``fp.write()``
-   explicitly understands :class:`unicode` (as in :func:`codecs.getwriter`) this
-   is likely to cause an error. It's best to leave the default settings, because
-   they are safe and it is highly optimized.
+    .. note::
 
-   If *check_circular* is false (default: ``True``), then the circular
-   reference check for container types will be skipped and a circular reference
-   will result in an :exc:`OverflowError` (or worse).
-
-   If *allow_nan* is false (default: ``True``), then it will be a
-   :exc:`ValueError` to serialize out of range :class:`float` values (``nan``,
-   ``inf``, ``-inf``) in strict compliance of the original JSON specification.
-   If *allow_nan* is true, their JavaScript equivalents will be used
-   (``NaN``, ``Infinity``, ``-Infinity``). See also *ignore_nan* for ECMA-262
-   compliant behavior.
-
-   If *indent* is a string, then JSON array elements and object members
-   will be pretty-printed with a newline followed by that string repeated
-   for each level of nesting. ``None`` (the default) selects the most compact
-   representation without any newlines. For backwards compatibility with
-   versions of simplejson earlier than 2.1.0, an integer is also accepted
-   and is converted to a string with that many spaces.
-
-   .. versionchanged:: 2.1.0
-      Changed *indent* from an integer number of spaces to a string.
-
-   If specified, *separators* should be an ``(item_separator, key_separator)``
-   tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
-   ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
-   you should specify ``(',', ':')`` to eliminate whitespace.
-
-   .. versionchanged:: 2.1.4
-      Use ``(',', ': ')`` as default if *indent* is not ``None``.
-
-   If *encoding* is not ``None``, then all input :class:`bytes` objects in
-   Python 3 and 8-bit strings in Python 2 will be transformed
-   into unicode using that encoding prior to JSON-encoding.  The default is
-   ``'utf-8'``.  If *encoding* is ``None``, then all :class:`bytes` objects
-   will be passed to the *default* function in Python 3
-
-   .. versionchanged:: 3.15.0
-      ``encoding=None`` disables serializing :class:`bytes` by default in
-      Python 3.
-
-
-   *default(obj)* is a function that should return a serializable version of
-   *obj* or raise :exc:`TypeError`. The default simply raises :exc:`TypeError`.
-
-   To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
-   :meth:`default` method to serialize additional types), specify it with the
-   *cls* kwarg.
-
-   .. note::
-
-        Subclassing is not recommended. Use the *default* kwarg
-        or *for_json* instead. This is faster and more portable.
-
-   If *use_decimal* is true (default: ``True``) then :class:`decimal.Decimal`
-   will be natively serialized to JSON with full precision.
-
-   .. versionchanged:: 2.1.0
-      *use_decimal* is new in 2.1.0.
-
-   .. versionchanged:: 2.2.0
-      The default of *use_decimal* changed to ``True`` in 2.2.0.
-
-   If *namedtuple_as_object* is true (default: ``True``),
-   objects with ``_asdict()`` methods will be encoded
-   as JSON objects.
-
-   .. versionchanged:: 2.2.0
-     *namedtuple_as_object* is new in 2.2.0.
-
-   .. versionchanged:: 2.3.0
-     *namedtuple_as_object* no longer requires that these objects be
-     subclasses of :class:`tuple`.
-
-   If *tuple_as_array* is true (default: ``True``),
-   :class:`tuple` (and subclasses) will be encoded as JSON arrays.
-
-  If *iterable_as_array* is true (default: ``False``),
-  any object not in the above table that implements ``__iter__()``
-  will be encoded as a JSON array.
-
-  .. versionchanged:: 3.8.0
-    *iterable_as_array* is new in 3.8.0.
-
-   .. versionchanged:: 2.2.0
-     *tuple_as_array* is new in 2.2.0.
-
-   If *bigint_as_string* is true (default: ``False``), :class:`int` ``2**53``
-   and higher or lower than ``-2**53`` will be encoded as strings. This is to
-   avoid the rounding that happens in Javascript otherwise. Note that this
-   option loses type information, so use with extreme caution.
-   See also *int_as_string_bitcount*.
-
-   .. versionchanged:: 2.4.0
-     *bigint_as_string* is new in 2.4.0.
-
-   If *sort_keys* is true (not the default), then the output of dictionaries
-   will be sorted by key; this is useful for regression tests to ensure that
-   JSON serializations can be compared on a day-to-day basis.
-
-   .. versionchanged:: 3.0.0
-      Sorting now happens after the keys have been coerced to
-      strings, to avoid comparison of heterogeneously typed objects
-      (since this does not work in Python 3.3+)
-
-   If *item_sort_key* is a callable (not the default), then the output of
-   dictionaries will be sorted with it. The callable will be used like this:
-   ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
-   over *sort_keys*.
-
-   .. versionchanged:: 2.5.0
-      *item_sort_key* is new in 2.5.0.
-
-   .. versionchanged:: 3.0.0
-      Sorting now happens after the keys have been coerced to
-      strings, to avoid comparison of heterogeneously typed objects
-      (since this does not work in Python 3.3+)
-
-   If *for_json* is true (not the default), objects with a ``for_json()``
-   method will use the return value of that method for encoding as JSON instead
-   of the object.
-
-   .. versionchanged:: 3.2.0
-      *for_json* is new in 3.2.0.
-
-   If *ignore_nan* is true (default: ``False``), then out of range
-   :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
-   ``null`` in compliance with the ECMA-262 specification. If true, this will
-   override *allow_nan*.
-
-   .. versionchanged:: 3.2.0
-      *ignore_nan* is new in 3.2.0.
-
-   If *int_as_string_bitcount* is a positive number ``n`` (default: ``None``),
-   :class:`int` ``2**n`` and higher or lower than ``-2**n`` will be encoded as strings. This is to
-   avoid the rounding that happens in Javascript otherwise. Note that this
-   option loses type information, so use with extreme caution.
-   See also *bigint_as_string* (which is equivalent to `int_as_string_bitcount=53`).
-
-   .. versionchanged:: 3.5.0
-     *int_as_string_bitcount* is new in 3.5.0.
-
-   .. note::
-
-        JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
-        does not make sense to serialize more than one JSON document without some
-        container protocol to delimit them.
-
+        When using Python 2, if *ensure_ascii* is set to false,
+        some chunks written to *fp* may be :class:`unicode` instances, subject
+        to normal Python :class:`str` to :class:`unicode` coercion rules.
+        Unless ``fp.write()`` explicitly understands :class:`unicode`
+        (as in :func:`codecs.getwriter`) this is likely to cause an error.
+        It's best to leave the default settings, because they are safe and it
+        is highly optimized.
 
 .. function:: dumps(obj, skipkeys=False, ensure_ascii=True, \
                     check_circular=True, allow_nan=True, cls=None, \
@@ -339,15 +199,127 @@ Basic Usage
                     item_sort_key=None, for_json=None, ignore_nan=False, \
                     int_as_string_bitcount=None, iterable_as_array=False, **kw)
 
-   Serialize *obj* to a JSON formatted :class:`str`.
+    Serialize *obj* to a JSON formatted :class:`str`.
 
-   If *ensure_ascii* is false, then the return value will be a
-   :class:`unicode` instance.  The other arguments have the same meaning as in
-   :func:`dump`. Note that the default *ensure_ascii* setting has much
-   better performance in Python 2.
+    If *skipkeys* is true (default: ``False``), then dict keys that are not
+    of a basic type (:class:`str`, :class:`int`, :class:`long`,
+    :class:`float`, :class:`bool`, ``None``) will be skipped instead of
+    raising a :exc:`TypeError`.
 
-   The other options have the same meaning as in :func:`dump`.
+    .. note::
 
+        When using Python 2, both :class:`str` and :class:`unicode` are
+        considered to be basic types that represent text.
+
+    If *ensure_ascii* is false (default: ``True``), then the output may
+    contain non-ASCII characters, so long as they do not need to be escaped
+    by JSON. When it is true, all non-ASCII characters are escaped.
+
+    .. note::
+
+        When using Python 2, if *ensure_ascii* is set to false,
+        the result may be a :class:`unicode` object. By default, as a memory
+        optimization, the result would be a :class:`str` object.
+
+    If *check_circular* is false (default: ``True``), then the circular
+    reference check for container types will be skipped and a circular
+    reference will result in an :exc:`OverflowError` (or worse).
+
+    If *allow_nan* is false (default: ``True``), then it will be a
+    :exc:`ValueError` to serialize out of range :class:`float` values
+    (``nan``, ``inf``, ``-inf``) in strict compliance of the original
+    JSON specification. If *allow_nan* is true, their JavaScript equivalents
+    will be used (``NaN``, ``Infinity``, ``-Infinity``). See also *ignore_nan*
+    for ECMA-262 compliant behavior.
+
+    If *indent* is a string, then JSON array elements and object members
+    will be pretty-printed with a newline followed by that string repeated
+    for each level of nesting. ``None`` (the default) selects the most compact
+    representation without any newlines. For backwards compatibility with
+    versions of simplejson earlier than 2.1.0, an integer is also accepted
+    and is converted to a string with that many spaces.
+
+    If specified, *separators* should be an
+    ``(item_separator, key_separator)`` tuple.  The default is
+    ``(', ', ': ')`` if *indent* is ``None`` and ``(',', ': ')``
+    otherwise.  To get the most compact JSON representation,
+    you should specify ``(',', ':')`` to eliminate whitespace.
+
+    If *encoding* is not ``None``, then all input :class:`bytes` objects in
+    Python 3 and 8-bit strings in Python 2 will be transformed
+    into unicode using that encoding prior to JSON-encoding.  The default is
+    ``'utf-8'``.  If *encoding* is ``None``, then all :class:`bytes` objects
+    will be passed to the *default* function in Python 3
+
+    .. versionchanged:: 3.15.0
+        ``encoding=None`` disables serializing :class:`bytes` by default in
+        Python 3.
+
+    *default(obj)* is a function that should return a serializable version of
+    *obj* or raise :exc:`TypeError`. The default implementation always raises
+    :exc:`TypeError`.
+
+    To use a custom :class:`JSONEncoder` subclass (e.g. one that overrides the
+    :meth:`default` method to serialize additional types), specify it with the
+    *cls* kwarg.
+
+    .. note::
+
+        Subclassing is not recommended. Use the *default* kwarg
+        or *for_json* instead. This is faster and more portable.
+
+    If *use_decimal* is true (default: ``True``) then :class:`decimal.Decimal`
+    will be natively serialized to JSON with full precision.
+
+    If *namedtuple_as_object* is true (default: ``True``),
+    objects with ``_asdict()`` methods will be encoded
+    as JSON objects.
+
+    If *tuple_as_array* is true (default: ``True``),
+    :class:`tuple` (and subclasses) will be encoded as JSON arrays.
+
+    If *iterable_as_array* is true (default: ``False``),
+    any object not in the above table that implements ``__iter__()``
+    will be encoded as a JSON array.
+
+    .. versionchanged:: 3.8.0
+        *iterable_as_array* is new in 3.8.0.
+
+    If *bigint_as_string* is true (default: ``False``), :class:`int` ``2**53``
+    and higher or lower than ``-2**53`` will be encoded as strings. This is to
+    avoid the rounding that happens in Javascript otherwise. Note that this
+    option loses type information, so use with extreme caution.
+    See also *int_as_string_bitcount*.
+
+    If *sort_keys* is true (not the default), then the output of dictionaries
+    will be sorted by key; this is useful for regression tests to ensure that
+    JSON serializations can be compared on a day-to-day basis.
+
+    If *item_sort_key* is a callable (not the default), then the output of
+    dictionaries will be sorted with it. The callable will be used like this:
+    ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
+    over *sort_keys*.
+
+    If *for_json* is true (not the default), objects with a ``for_json()``
+    method will use the return value of that method for encoding as JSON
+    instead of the object.
+
+    If *ignore_nan* is true (default: ``False``), then out of range
+    :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
+    ``null`` in compliance with the ECMA-262 specification. If true, this will
+    override *allow_nan*.
+
+    If *int_as_string_bitcount* is a positive number ``n`` (default: ``None``),
+    :class:`int` ``2**n`` and higher or lower than ``-2**n`` will be encoded as strings. This is to
+    avoid the rounding that happens in Javascript otherwise. Note that this
+    option loses type information, so use with extreme caution.
+    See also *bigint_as_string* (which is equivalent to `int_as_string_bitcount=53`).
+
+    .. note::
+
+        JSON is not a framed protocol so unlike :mod:`pickle` or :mod:`marshal` it
+        does not make sense to serialize more than one JSON document without some
+        container protocol to delimit them.
 
 .. function:: load(fp, encoding='utf-8', cls=None, object_hook=None, \
                    parse_float=None, parse_int=None, \
@@ -359,72 +331,8 @@ Basic Usage
    :ref:`conversion table <json-to-py-table>`. :exc:`JSONDecodeError` will be
    raised if the given JSON document is not valid.
 
-   If the contents of *fp* are encoded with an ASCII based encoding other than
-   UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be specified.
-   Encodings that are not ASCII based (such as UCS-2) are not allowed, and
-   should be wrapped with ``codecs.getreader(fp)(encoding)``, or simply decoded
-   to a :class:`unicode` object and passed to :func:`loads`. The default
-   setting of ``'utf-8'`` is fastest and should be using whenever possible.
-
-   If *fp.read()* returns :class:`str` then decoded JSON strings that contain
-   only ASCII characters may be parsed as :class:`str` for performance and
-   memory reasons. If your code expects only :class:`unicode` the appropriate
-   solution is to wrap fp with a reader as demonstrated above.
-
-   *object_hook* is an optional function that will be called with the result of
-   any object literal decode (a :class:`dict`).  The return value of
-   *object_hook* will be used instead of the :class:`dict`.  This feature can be used
-   to implement custom decoders (e.g. `JSON-RPC <http://www.jsonrpc.org>`_
-   class hinting).
-
-   *object_pairs_hook* is an optional function that will be called with the
-   result of any object literal decode with an ordered list of pairs.  The
-   return value of *object_pairs_hook* will be used instead of the
-   :class:`dict`.  This feature can be used to implement custom decoders that
-   rely on the order that the key and value pairs are decoded (for example,
-   :class:`collections.OrderedDict` will remember the order of insertion). If
-   *object_hook* is also defined, the *object_pairs_hook* takes priority.
-
-   .. versionchanged:: 2.1.0
-      Added support for *object_pairs_hook*.
-
-   *parse_float*, if specified, will be called with the string of every JSON
-   float to be decoded.  By default, this is equivalent to ``float(num_str)``.
-   This can be used to use another datatype or parser for JSON floats
-   (e.g. :class:`decimal.Decimal`).
-
-   *parse_int*, if specified, will be called with the string of every JSON int
-   to be decoded.  By default, this is equivalent to ``int(num_str)``.  This can
-   be used to use another datatype or parser for JSON integers
-   (e.g. :class:`float`).
-
-   *parse_constant*, if specified, will be called with one of the following
-   strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
-   raise an exception if invalid JSON numbers are encountered.
-
-   If *use_decimal* is true (default: ``False``) then *parse_float* is set to
-   :class:`decimal.Decimal`. This is a convenience for parity with the
-   :func:`dump` parameter.
-
-   .. versionchanged:: 2.1.0
-      *use_decimal* is new in 2.1.0.
-
-   If *iterable_as_array* is true (default: ``False``),
-   any object not in the above table that implements ``__iter__()``
-   will be encoded as a JSON array.
-
-   .. versionchanged:: 3.8.0
-     *iterable_as_array* is new in 3.8.0.
-
-
-   To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
-   kwarg.  Additional keyword arguments will be passed to the constructor of the
-   class. You probably shouldn't do this.
-
-    .. note::
-
-        Subclassing is not recommended. You should use *object_hook* or
-        *object_pairs_hook*. This is faster and more portable than subclassing.
+   If *fp.read()* returns :class:`bytes`, such as a file opened in binary mode,
+   then an appropriate *encoding* should be specified (the default is UTF-8).
 
     .. note::
 
@@ -434,28 +342,99 @@ Basic Usage
         other than whitespace after the document. Except for files containing
         only one JSON document, it is recommended to use :func:`loads`.
 
+    .. note::
+
+        In Python 2, :class:`str` is considered to be :class:`bytes` and this
+        is the default behavior of all :class:`file` objects. If the contents
+        of *fp* are encoded with an ASCII based encoding other than UTF-8
+        (e.g. latin-1), then an appropriate *encoding* name must be specified.
+        Encodings that are not ASCII based (such as UCS-2) are not allowed,
+        and should be wrapped with ``codecs.getreader(fp)(encoding)``, or
+        decoded to a :class:`unicode` object and passed to :func:`loads`.
+        The default setting of ``'utf-8'`` is fastest and should be using
+        whenever possible.
+
+        If *fp.read()* returns :class:`str` then decoded JSON strings that
+        contain only ASCII characters may be parsed as :class:`str` for
+        performance and memory reasons. If your code expects only
+        :class:`unicode` the appropriate solution is to wrap fp with a
+        reader as demonstrated above.
+
+   See :func:`loads` for a description of each argument. The only difference
+   is that this function reads the JSON document from a file-like object *fp*
+   instead of a :class:`str` or :class:`bytes`.
 
 .. function:: loads(s, encoding='utf-8', cls=None, object_hook=None, \
                     parse_float=None, parse_int=None, \
                     parse_constant=None, object_pairs_hook=None, \
                     use_decimal=None, **kw)
 
-   Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
-   document) to a Python object. :exc:`JSONDecodeError` will be
-   raised if the given JSON document is not valid.
+    Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
+    document) to a Python object. :exc:`JSONDecodeError` will be
+    raised if the given JSON document is not valid.
 
-   If *s* is a :class:`str` instance and is encoded with an ASCII based encoding
-   other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
-   specified.  Encodings that are not ASCII based (such as UCS-2) are not
-   allowed and should be decoded to :class:`unicode` first.
+    .. note::
 
-   If *s* is a :class:`str` then decoded JSON strings that contain
-   only ASCII characters may be parsed as :class:`str` for performance and
-   memory reasons. If your code expects only :class:`unicode` the appropriate
-   solution is decode *s* to :class:`unicode` prior to calling loads.
+        In Python 2, :class:`str` is considered to be :class:`bytes` as above,
+        if your JSON is using an encoding that is not ASCII based, then you must
+        decode to :class:`unicode` first.
 
-   The other arguments have the same meaning as in :func:`load`.
+        If *s* is a :class:`str` instance and is encoded with an ASCII based encoding
+        other than UTF-8 (e.g. latin-1), then an appropriate *encoding* name must be
+        specified.  Encodings that are not ASCII based (such as UCS-2) are not
+        allowed and should be decoded to :class:`unicode` first. Additionally,
+        decoded JSON strings that contain only ASCII characters may be parsed as
+        :class:`str` instead of :class:`unicode` for performance and memory
+        reasons. If your code expects only :class:`unicode` the appropriate
+        solution is decode *s* to :class:`unicode` prior to calling :func:`loads`.
 
+    *object_hook* is an optional function that will be called with the result of
+    any object literal decode (a :class:`dict`).  The return value of
+    *object_hook* will be used instead of the :class:`dict`.  This feature can be used
+    to implement custom decoders (e.g. `JSON-RPC <http://www.jsonrpc.org>`_
+    class hinting).
+
+    *object_pairs_hook* is an optional function that will be called with the
+    result of any object literal decode with an ordered list of pairs.  The
+    return value of *object_pairs_hook* will be used instead of the
+    :class:`dict`.  This feature can be used to implement custom decoders that
+    rely on the order that the key and value pairs are decoded (for example,
+    :class:`collections.OrderedDict` will remember the order of insertion). If
+    *object_hook* is also defined, the *object_pairs_hook* takes priority.
+
+    *parse_float*, if specified, will be called with the string of every JSON
+    float to be decoded.  By default, this is equivalent to ``float(num_str)``.
+    This can be used to use another datatype or parser for JSON floats
+    (e.g. :class:`decimal.Decimal`).
+
+    *parse_int*, if specified, will be called with the string of every JSON int
+    to be decoded.  By default, this is equivalent to ``int(num_str)``.  This can
+    be used to use another datatype or parser for JSON integers
+    (e.g. :class:`float`).
+
+    *parse_constant*, if specified, will be called with one of the following
+    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
+    raise an exception if invalid JSON numbers are encountered.
+
+    If *use_decimal* is true (default: ``False``) then *parse_float* is set to
+    :class:`decimal.Decimal`. This is a convenience for parity with the
+    :func:`dump` parameter.
+
+    If *iterable_as_array* is true (default: ``False``),
+    any object not in the above table that implements ``__iter__()``
+    will be encoded as a JSON array.
+
+    .. versionchanged:: 3.8.0
+        *iterable_as_array* is new in 3.8.0.
+
+    To use a custom :class:`JSONDecoder` subclass, specify it with the ``cls``
+    kwarg.  Additional keyword arguments will be passed to the constructor of the
+    class. You probably shouldn't do this.
+
+    .. note::
+
+        Subclassing is not recommended. You should use *object_hook* or
+        *object_pairs_hook*. This is faster and more portable than subclassing.
 
 Encoders and decoders
 ---------------------
@@ -513,9 +492,6 @@ Encoders and decoders
    :class:`collections.OrderedDict` will remember the order of insertion). If
    *object_hook* is also defined, the *object_pairs_hook* takes priority.
 
-   .. versionchanged:: 2.1.0
-      Added support for *object_pairs_hook*.
-
    *parse_float*, if specified, will be called with the string of every JSON
    float to be decoded.  By default, this is equivalent to ``float(num_str)``.
    This can be used to use another datatype or parser for JSON floats
@@ -537,17 +513,9 @@ Encoders and decoders
 
    .. method:: decode(s)
 
-      Return the Python representation of *s* (a :class:`str` or
-      :class:`unicode` instance containing a JSON document)
-
-      If *s* is a :class:`str` then decoded JSON strings that contain
-      only ASCII characters may be parsed as :class:`str` for performance and
-      memory reasons. If your code expects only :class:`unicode` the
-      appropriate solution is decode *s* to :class:`unicode` prior to calling
-      decode.
-
-      :exc:`JSONDecodeError` will be raised if the given JSON
-      document is not valid.
+      Return the Python representation of the JSON document *s*. See
+      :func:`loads` for details. It is preferable to use that rather
+      than this class.
 
    .. method:: raw_decode(s[, idx=0])
 
@@ -608,9 +576,6 @@ Encoders and decoders
    It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as their
    corresponding ``float`` values, which is outside the JSON spec.
 
-   .. versionchanged:: 2.2.0
-      Changed *namedtuple* encoding from JSON array to object.
-
    To extend this to recognize other objects, subclass and implement a
    :meth:`default` method with another method that returns a serializable object
    for ``o`` if possible, otherwise it should call the superclass implementation
@@ -644,23 +609,10 @@ Encoders and decoders
    will be sorted by key; this is useful for regression tests to ensure that
    JSON serializations can be compared on a day-to-day basis.
 
-   .. versionchanged:: 3.0.0
-      Sorting now happens after the keys have been coerced to
-      strings, to avoid comparison of heterogeneously typed objects
-      (since this does not work in Python 3.3+)
-
    If *item_sort_key* is a callable (not the default), then the output of
    dictionaries will be sorted with it. The callable will be used like this:
    ``sorted(dct.items(), key=item_sort_key)``. This option takes precedence
    over *sort_keys*.
-
-   .. versionchanged:: 2.5.0
-      *item_sort_key* is new in 2.5.0.
-
-   .. versionchanged:: 3.0.0
-      Sorting now happens after the keys have been coerced to
-      strings, to avoid comparison of heterogeneously typed objects
-      (since this does not work in Python 3.3+)
 
    If *indent* is a string, then JSON array elements and object members
    will be pretty-printed with a newline followed by that string repeated
@@ -669,16 +621,10 @@ Encoders and decoders
    versions of simplejson earlier than 2.1.0, an integer is also accepted
    and is converted to a string with that many spaces.
 
-   .. versionchanged:: 2.1.0
-      Changed *indent* from an integer number of spaces to a string.
-
    If specified, *separators* should be an ``(item_separator, key_separator)``
    tuple.  The default is ``(', ', ': ')`` if *indent* is ``None`` and
    ``(',', ': ')`` otherwise.  To get the most compact JSON representation,
    you should specify ``(',', ':')`` to eliminate whitespace.
-
-   .. versionchanged:: 2.1.4
-      Use ``(',', ': ')`` as default if *indent* is not ``None``.
 
    If specified, *default* should be a function that gets called for objects
    that can't otherwise be serialized.  It should return a JSON encodable
@@ -698,18 +644,8 @@ Encoders and decoders
    objects with ``_asdict()`` methods will be encoded
    as JSON objects.
 
-   .. versionchanged:: 2.2.0
-     *namedtuple_as_object* is new in 2.2.0.
-
-   .. versionchanged:: 2.3.0
-     *namedtuple_as_object* no longer requires that these objects be
-     subclasses of :class:`tuple`.
-
    If *tuple_as_array* is true (default: ``True``),
    :class:`tuple` (and subclasses) will be encoded as JSON arrays.
-
-   .. versionchanged:: 2.2.0
-     *tuple_as_array* is new in 2.2.0.
 
    If *iterable_as_array* is true (default: ``False``),
    any object not in the above table that implements ``__iter__()``
@@ -723,34 +659,25 @@ Encoders and decoders
    avoid the rounding that happens in Javascript otherwise. Note that this
    option loses type information, so use with extreme caution.
 
-   .. versionchanged:: 2.4.0
-     *bigint_as_string* is new in 2.4.0.
-
    If *for_json* is true (default: ``False``), objects with a ``for_json()``
    method will use the return value of that method for encoding as JSON instead
    of the object.
-
-   .. versionchanged:: 3.2.0
-     *for_json* is new in 3.2.0.
 
    If *ignore_nan* is true (default: ``False``), then out of range
    :class:`float` values (``nan``, ``inf``, ``-inf``) will be serialized as
    ``null`` in compliance with the ECMA-262 specification. If true, this will
    override *allow_nan*.
 
-   .. versionchanged:: 3.2.0
-      *ignore_nan* is new in 3.2.0.
-
    .. method:: default(o)
 
-      Implement this method in a subclass such that it returns a serializable
-      object for *o*, or calls the base implementation (to raise a
-      :exc:`TypeError`).
+    Implement this method in a subclass such that it returns a serializable
+    object for *o*, or calls the base implementation (to raise a
+    :exc:`TypeError`).
 
-      For example, to support arbitrary iterators, you could implement default
-      like this::
+    For example, to support arbitrary iterators, you could implement default
+    like this::
 
-         def default(self, o):
+        def default(self, o):
             try:
                 iterable = iter(o)
             except TypeError:
@@ -805,9 +732,6 @@ Encoders and decoders
    U+2029 (PARAGRAPH SEPARATOR), irrespective of the *ensure_ascii* setting,
    as these characters are not valid in JavaScript strings (see
    http://timelessrepo.com/json-isnt-a-javascript-subset).
-
-   .. versionchanged:: 2.1.0
-      New in 2.1.0
 
 Exceptions
 ----------
@@ -890,9 +814,6 @@ and this module's serializer does not add a BOM to its output.
 The RFC permits, but does not require, JSON deserializers to ignore an initial
 BOM in their input.  This module's deserializer will ignore an initial BOM, if
 present.
-
-.. versionchanged:: 3.6.0
-  Older versions would raise :exc:`ValueError` when an initial BOM is present
 
 The RFC does not explicitly forbid JSON strings which contain byte sequences
 that don't correspond to valid Unicode characters (e.g. unpaired UTF-16
