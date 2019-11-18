@@ -1,4 +1,4 @@
-Version 3.18.0 released 2019-11-17
+Version 3.17.0 released 2019-11-17
 
 * Updated documentation to be Python 3 first, and
   have removed documentation notes about version changes
