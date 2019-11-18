@@ -19,7 +19,7 @@ matrix:
   - python: pypy3
   - python: 3.8
     services:
-      - docker
+    - docker
     env: BUILD_SDIST=true
   - name: Python 2.7.12 on macOS
     os: osx
@@ -43,10 +43,12 @@ deploy:
   api_key:
     secure: QiadMGAmtPw+Ut7LWqa3U/tImPIgiPH79mM9o8DGBckcacp9HkDYvCGuOjs5hZbCBBuQ6IAkikotS8iCSwHey1GK9jSDbpgKvVGiACdp8HNhitY8V/S3e1UukDlMeu+Q7vCJtynSGX0BJuiOQB8ZQyQ2HEZ7kMQgTLCEO1Uljhc=
   file:
-    - dist/*.whl
-    - dist/*.tar.gz
+  - dist/*.whl
+  - dist/*.tar.gz
   file_glob: true
   on:
     repo: simplejson/simplejson
     tags: true
   skip_cleanup: true
+  api-key:
+    secure: XeRc7+prvUTC4vzfOpf3pibqRAjlD642FyVYwuCxEz0QPHh7/qrdxBgK7c/YDvKpADukWxwZm1UofN/le1KLLiGtLlcDSwjd224kx6pVQS6b3Ng1Trg6QWpIt/m2yelGRT6jLIaQ9ljkuusjpy5IhXltPH/SkWI5H4FnKi8M9pQ=
