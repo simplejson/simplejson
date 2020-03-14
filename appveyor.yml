@@ -72,7 +72,7 @@ build: off
 test_script:
   - "%WITH_COMPILER% %PYTHON%/python setup.py build_ext -i"
   - "%WITH_COMPILER% %PYTHON%/python setup.py test"
-  - "%WITH_COMPILER% %PYTHON%/python setup.py bdist_wheel bdist_wininst"
+  - "%WITH_COMPILER% %PYTHON%/python setup.py bdist_wheel"
 
 artifacts:
   - path: dist\*.exe
