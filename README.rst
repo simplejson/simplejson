@@ -34,7 +34,7 @@ that have a richer type system than JSON itself.
 
 For those of you that have legacy systems to maintain, there is a
 very old fork of simplejson in the `python2.2`_ branch that supports
-Python 2.2. This is based off of a very old version of simplejson,
+Python 2.2. This is based on a very old version of simplejson,
 is not maintained, and should only be used as a last resort.
 
 .. _python2.2: https://github.com/simplejson/simplejson/tree/python2.2
