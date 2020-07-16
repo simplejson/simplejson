@@ -1,3 +1,12 @@
+Version 3.17.1 released 2020-07-16
+
+* Added arm64 to build matrix
+  https://github.com/simplejson/simplejson/pull/264
+* No more bdist_wininst builds per PEP 527
+  https://github.com/simplejson/simplejson/pull/260
+* Minor grammatical issue fixed in README
+  https://github.com/simplejson/simplejson/pull/261
+
 Version 3.17.0 released 2019-11-17
 
 * Updated documentation to be Python 3 first, and
