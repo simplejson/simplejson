@@ -13,14 +13,25 @@ matrix:
   - python: 3.4
   - python: 3.5
   - python: 3.6
+  - python: 3.6
+    arch: arm64
   - python: 3.7
+  - python: 3.7
+    arch: arm64
   - python: 3.8
+  - python: 3.8
+    arch: arm64
   - python: pypy
   - python: pypy3
   - python: 3.8
     services:
     - docker
     env: BUILD_SDIST=true
+  - python: 3.8
+    arch: arm64
+    services:
+    - docker
+    env: BUILD_WHEEL=true
   - name: Python 2.7.17 on macOS
     os: osx
     language: objective-c

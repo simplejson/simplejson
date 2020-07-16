@@ -23,5 +23,5 @@ if [[ $TRAVIS_OS_NAME == 'osx' ]]; then
 fi
 
 if [[ $BUILD_WHEEL == 'true' ]]; then
-    pip install wheel cibuildwheel==0.9.4
+    pip install wheel cibuildwheel==1.5.2
 fi
