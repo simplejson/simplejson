@@ -360,7 +360,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
 
     If specified, *item_sort_key* is a callable used to sort the items in
     each dictionary. This is useful if you want to sort items other than
-    in alphabetical order by key. This option takes precendence over
+    in alphabetical order by key. This option takes precedence over
     *sort_keys*.
 
     If *sort_keys* is true (default: ``False``), the output of dictionaries
