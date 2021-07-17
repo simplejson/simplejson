@@ -386,6 +386,9 @@ static int
 _is_namedtuple(PyObject *obj)
 {
     int rval = 0;
+    if (!PyTuple_Check(obj)) {
+        return 0;
+    }
     PyObject *_asdict = PyObject_GetAttrString(obj, "_asdict");
     if (_asdict == NULL) {
         PyErr_Clear();
@@ -2953,6 +2956,9 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *encoded = NULL;
     Py_ssize_t idx;
 
+    if (!PyDict_Check(dct)) {
+        return -1;
+    }
     if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
         open_dict = JSON_InternFromString("{");
         close_dict = JSON_InternFromString("}");
