@@ -1,3 +1,8 @@
+Version 3.17.4 released 2021-08-19
+
+* Upgrade cibuildwheel
+  https://github.com/simplejson/simplejson/pull/287
+
 Version 3.17.3 released 2021-07-09
 
 * Replaced Travis-CI and AppVeyor with Github Actions,
