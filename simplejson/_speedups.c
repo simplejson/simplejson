@@ -386,9 +386,8 @@ static int
 _is_namedtuple(PyObject *obj)
 {
     int rval = 0;
-    if (!PyTuple_Check(obj)) {
-        return 0;
-    }
+    /* We intentionally accept anything with a duck typed _asdict method rather
+     * than requiring it to pass PyTuple_Check(obj). */
     PyObject *_asdict = PyObject_GetAttrString(obj, "_asdict");
     if (_asdict == NULL) {
         PyErr_Clear();
@@ -2856,6 +2855,10 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
                 return rv;
             newobj = PyObject_CallMethod(obj, "_asdict", NULL);
             if (newobj != NULL) {
+                if (!PyDict_Check(newobj)) {
+                    Py_DECREF(newobj);
+                    return -1;
+                }
                 rv = encoder_listencode_dict(s, rval, newobj, indent_level);
                 Py_DECREF(newobj);
             }
@@ -2956,9 +2959,6 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *encoded = NULL;
     Py_ssize_t idx;
 
-    if (!PyDict_Check(dct)) {
-        return -1;
-    }
     if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
         open_dict = JSON_InternFromString("{");
         close_dict = JSON_InternFromString("}");
