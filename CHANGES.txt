@@ -1,7 +1,15 @@
+Version 3.17.5 released 2021-08-XX
+
 * Fix the C extension module to harden is_namedtuple against looks-a-likes such
   as Mocks. Also prevent dict encoding from causing an unraised SystemError when
   encountering a non-Dict. Noticed by running user tests against a CPython
   interpreter with C asserts enabled (COPTS += -UNDEBUG).
+  https://github.com/simplejson/simplejson/pull/284
+
+Version 3.17.4 released 2021-08-19
+
+* Upgrade cibuildwheel
+  https://github.com/simplejson/simplejson/pull/287
 
 Version 3.17.3 released 2021-07-09
 
