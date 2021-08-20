@@ -40,6 +40,9 @@ jobs:
           CIBW_ARCHS_WINDOWS: "auto"
           CIBW_ARCHS_LINUX: "x86_64 i686 aarch64"
           CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
+          CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
+          CIBW_MANYLINUX_I686_IMAGE: manylinux2010
+          CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
 
       - name: Build Python 2.7 wheels
         if: runner.os != 'Windows'
