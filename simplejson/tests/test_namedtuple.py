@@ -145,5 +145,5 @@ class TestNamedTuple(unittest.TestCase):
         # potential for internal data corruption.  Getting it to crash in
         # a debug build is not always easy either as it requires an
         # assert(!PyErr_Occurred()) that could fire later on.
-        self.assertRaises(TypeError):
+        with self.assertRaises(TypeError):
             json.dumps({23: fake}, namedtuple_as_object=True, for_json=False)
