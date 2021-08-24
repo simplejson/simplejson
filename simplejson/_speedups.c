@@ -2856,6 +2856,11 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             newobj = PyObject_CallMethod(obj, "_asdict", NULL);
             if (newobj != NULL) {
                 if (!PyDict_Check(newobj)) {
+                    PyErr_Format(
+                        PyExc_TypeError,
+                        "_asdict() must return a dict, not %.80s",
+                        Py_TYPE(newobj)->tp_name
+                    );
                     Py_DECREF(newobj);
                     return -1;
                 }
