@@ -1,4 +1,4 @@
-Version 3.17.5 released 2021-08-XX
+Version 3.17.5 released 2021-08-23
 
 * Fix the C extension module to harden is_namedtuple against looks-a-likes such
   as Mocks. Also prevent dict encoding from causing an unraised SystemError when
