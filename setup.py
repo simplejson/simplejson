@@ -12,7 +12,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '3.17.2'
+VERSION = '3.17.6'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
 with open('README.rst', 'r') as f:
@@ -36,6 +36,9 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: Implementation :: CPython',
     'Programming Language :: Python :: Implementation :: PyPy',
     'Topic :: Software Development :: Libraries :: Python Modules',
@@ -116,7 +119,7 @@ def run_setup(with_binary):
 try:
     run_setup(not IS_PYPY)
 except BuildFailed:
-    if os.environ.get('REQUIRE_SPEEDUPS'):
+    if os.environ.get('REQUIRE_SPEEDUPS') or os.environ.get('CIBUILDWHEEL', '0') == '1':
         raise
     BUILD_EXT_WARNING = ("WARNING: The C extension could not be compiled, "
                          "speedups are not enabled.")
