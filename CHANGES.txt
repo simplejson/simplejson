@@ -1,3 +1,9 @@
+Version 3.17.7 released XXXX-XX-XX
+
+* Raise JSONDecodeError instead of ValueError in invalid unicode escape
+  sequence edge case
+  https://github.com/simplejson/simplejson/pull/298
+
 Version 3.17.6 released 2021-11-15
 
 * Declare support for Python 3.10 and add wheels
