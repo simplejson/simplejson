@@ -300,7 +300,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
           iterable_as_array=False, **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
-    If ``skipkeys`` is false then ``dict`` keys that are not basic types
+    If ``skipkeys`` is true then ``dict`` keys that are not basic types
     (``str``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
 
