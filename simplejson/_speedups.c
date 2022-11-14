@@ -2805,7 +2805,8 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         PyObject *newobj;
         if (obj == Py_None || obj == Py_True || obj == Py_False) {
             PyObject *cstr = _encoded_const(obj);
-            return cstr != NULL ? _steal_accumulate(rval, cstr) : -1;
+            if (cstr != NULL)
+                rv = _steal_accumulate(rval, cstr);
         }
         else if ((PyBytes_Check(obj) && s->encoding != NULL) ||
                  PyUnicode_Check(obj))
