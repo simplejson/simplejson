@@ -396,13 +396,13 @@ static int
 _call_json_method(PyObject *obj, const char *method_name, PyObject **result)
 {
     int rval = 0;
-    PyObject *_asdict = PyObject_GetAttrString(obj, method_name);
-    if (_asdict == NULL) {
+    PyObject *method = PyObject_GetAttrString(obj, method_name);
+    if (method == NULL) {
         PyErr_Clear();
         return 0;
     }
-    if (PyCallable_Check(_asdict)) {
-        PyObject *tmp = PyObject_CallNoArgs(_asdict);
+    if (PyCallable_Check(method)) {
+        PyObject *tmp = PyObject_CallNoArgs(method);
         if (tmp == NULL && PyErr_ExceptionMatches(PyExc_TypeError)) {
             PyErr_Clear();
         } else {
@@ -412,7 +412,7 @@ _call_json_method(PyObject *obj, const char *method_name, PyObject **result)
             rval = 1;
         }
     }
-    Py_DECREF(_asdict);
+    Py_DECREF(method);
     return rval;
 }
 
