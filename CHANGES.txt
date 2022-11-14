@@ -1,5 +1,8 @@
-Version 3.17.7 released XXXX-XX-XX
+Version 3.18.0 released 2022-11-14
 
+* Allow serialization of classes that implement for_json or _asdict by
+  ignoring TypeError when those methods are called
+  https://github.com/simplejson/simplejson/pull/302
 * Raise JSONDecodeError instead of ValueError in invalid unicode escape
   sequence edge case
   https://github.com/simplejson/simplejson/pull/298

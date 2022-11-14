@@ -25,6 +25,15 @@
 #define JSON_InternFromString PyString_InternFromString
 #endif /* PY_MAJOR_VERSION < 3 */
 
+#if PY_VERSION_HEX < 0x03090000
+#if !defined(PyObject_CallNoArgs)
+#define PyObject_CallNoArgs(callable) PyObject_CallFunctionObjArgs(callable, NULL);
+#endif
+#if !defined(PyObject_CallOneArg)
+#define PyObject_CallOneArg(callable, arg) PyObject_CallFunctionObjArgs(callable, arg, NULL);
+#endif
+#endif /* PY_VERSION_HEX < 0x03090000 */
+
 #if PY_VERSION_HEX < 0x02070000
 #if !defined(PyOS_string_to_double)
 #define PyOS_string_to_double json_PyOS_string_to_double
@@ -108,6 +117,9 @@ JSON_Accu_Destroy(JSON_Accu *acc);
 #define ERR_STRING_CONTROL "Invalid control character %r at"
 #define ERR_STRING_ESC1 "Invalid \\X escape sequence %r"
 #define ERR_STRING_ESC4 "Invalid \\uXXXX escape sequence"
+#define FOR_JSON_METHOD_NAME "for_json"
+#define ASDICT_METHOD_NAME "_asdict"
+
 
 typedef struct _PyScannerObject {
     PyObject_HEAD
@@ -243,12 +255,10 @@ static int
 _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr);
 static PyObject *
 _convertPyInt_FromSsize_t(Py_ssize_t *size_ptr);
+static int
+_call_json_method(PyObject *obj, const char *method_name, PyObject **result);
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
-static int
-_is_namedtuple(PyObject *obj);
-static int
-_has_for_json_hook(PyObject *obj);
 static PyObject *
 moduleinit(void);
 
@@ -383,32 +393,26 @@ maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 }
 
 static int
-_is_namedtuple(PyObject *obj)
+_call_json_method(PyObject *obj, const char *method_name, PyObject **result)
 {
     int rval = 0;
-    /* We intentionally accept anything with a duck typed _asdict method rather
-     * than requiring it to pass PyTuple_Check(obj). */
-    PyObject *_asdict = PyObject_GetAttrString(obj, "_asdict");
-    if (_asdict == NULL) {
+    PyObject *method = PyObject_GetAttrString(obj, method_name);
+    if (method == NULL) {
         PyErr_Clear();
         return 0;
     }
-    rval = PyCallable_Check(_asdict);
-    Py_DECREF(_asdict);
-    return rval;
-}
-
-static int
-_has_for_json_hook(PyObject *obj)
-{
-    int rval = 0;
-    PyObject *for_json = PyObject_GetAttrString(obj, "for_json");
-    if (for_json == NULL) {
-        PyErr_Clear();
-        return 0;
+    if (PyCallable_Check(method)) {
+        PyObject *tmp = PyObject_CallNoArgs(method);
+        if (tmp == NULL && PyErr_ExceptionMatches(PyExc_TypeError)) {
+            PyErr_Clear();
+        } else {
+            // This will set result to NULL if a TypeError occurred,
+            // which must be checked by the caller
+            *result = tmp;
+            rval = 1;
+        }
     }
-    rval = PyCallable_Check(for_json);
-    Py_DECREF(for_json);
+    Py_DECREF(method);
     return rval;
 }
 
@@ -640,7 +644,7 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
         if (!(PyInt_CheckExact(key) || PyLong_CheckExact(key))) {
             /* See #118, do not trust custom str/repr */
             PyObject *res;
-            PyObject *tmp = PyObject_CallFunctionObjArgs((PyObject *)&PyLong_Type, key, NULL);
+            PyObject *tmp = PyObject_CallOneArg((PyObject *)&PyLong_Type, key);
             if (tmp == NULL) {
                 return NULL;
             }
@@ -794,7 +798,7 @@ join_list_string(PyObject *lst)
         if (joinfn == NULL)
             return NULL;
     }
-    return PyObject_CallFunctionObjArgs(joinfn, lst, NULL);
+    return PyObject_CallOneArg(joinfn, lst);
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
@@ -1486,7 +1490,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
 
     /* if pairs_hook is not None: rval = object_pairs_hook(pairs) */
     if (s->pairs_hook != Py_None) {
-        val = PyObject_CallFunctionObjArgs(s->pairs_hook, pairs, NULL);
+        val = PyObject_CallOneArg(s->pairs_hook, pairs);
         if (val == NULL)
             goto bail;
         Py_DECREF(pairs);
@@ -1496,7 +1500,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
 
     /* if object_hook is not None: rval = object_hook(rval) */
     if (s->object_hook != Py_None) {
-        val = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
+        val = PyObject_CallOneArg(s->object_hook, rval);
         if (val == NULL)
             goto bail;
         Py_DECREF(rval);
@@ -1650,7 +1654,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
 
     /* if pairs_hook is not None: rval = object_pairs_hook(pairs) */
     if (s->pairs_hook != Py_None) {
-        val = PyObject_CallFunctionObjArgs(s->pairs_hook, pairs, NULL);
+        val = PyObject_CallOneArg(s->pairs_hook, pairs);
         if (val == NULL)
             goto bail;
         Py_DECREF(pairs);
@@ -1660,7 +1664,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
 
     /* if object_hook is not None: rval = object_hook(rval) */
     if (s->object_hook != Py_None) {
-        val = PyObject_CallFunctionObjArgs(s->object_hook, rval, NULL);
+        val = PyObject_CallOneArg(s->object_hook, rval);
         if (val == NULL)
             goto bail;
         Py_DECREF(rval);
@@ -1853,7 +1857,7 @@ _parse_constant(PyScannerObject *s, PyObject *constant, Py_ssize_t idx, Py_ssize
     PyObject *rval;
 
     /* rval = parse_constant(constant) */
-    rval = PyObject_CallFunctionObjArgs(s->parse_constant, constant, NULL);
+    rval = PyObject_CallOneArg(s->parse_constant, constant);
     idx += PyString_GET_SIZE(constant);
     *next_idx_ptr = idx;
     return rval;
@@ -1939,7 +1943,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     if (is_float) {
         /* parse as a float using a fast path if available, otherwise call user defined method */
         if (s->parse_float != (PyObject *)&PyFloat_Type) {
-            rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+            rval = PyObject_CallOneArg(s->parse_float, numstr);
         }
         else {
             /* rval = PyFloat_FromDouble(PyOS_ascii_atof(PyString_AS_STRING(numstr))); */
@@ -1953,7 +1957,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     else {
         /* parse as an int using a fast path if available, otherwise call user defined method */
         if (s->parse_int != (PyObject *)&PyInt_Type) {
-            rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
+            rval = PyObject_CallOneArg(s->parse_int, numstr);
         }
         else {
             rval = PyInt_FromString(PyString_AS_STRING(numstr), NULL, 10);
@@ -2057,7 +2061,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     if (is_float) {
         /* parse as a float using a fast path if available, otherwise call user defined method */
         if (s->parse_float != (PyObject *)&PyFloat_Type) {
-            rval = PyObject_CallFunctionObjArgs(s->parse_float, numstr, NULL);
+            rval = PyObject_CallOneArg(s->parse_float, numstr);
         }
         else {
 #if PY_MAJOR_VERSION >= 3
@@ -2069,7 +2073,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     }
     else {
         /* no fast path for unicode -> int, just call */
-        rval = PyObject_CallFunctionObjArgs(s->parse_int, numstr, NULL);
+        rval = PyObject_CallOneArg(s->parse_int, numstr);
     }
     Py_DECREF(numstr);
     *next_idx_ptr = idx;
@@ -2748,7 +2752,7 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
     else {
         /* See #118, do not trust custom str/repr */
         PyObject *res;
-        PyObject *tmp = PyObject_CallFunctionObjArgs((PyObject *)&PyFloat_Type, obj, NULL);
+        PyObject *tmp = PyObject_CallOneArg((PyObject *)&PyFloat_Type, obj);
         if (tmp == NULL) {
             return NULL;
         }
@@ -2767,7 +2771,7 @@ encoder_encode_string(PyEncoderObject *s, PyObject *obj)
     if (s->fast_encode) {
         return py_encode_basestring_ascii(NULL, obj);
     }
-    encoded = PyObject_CallFunctionObjArgs(s->encoder, obj, NULL);
+    encoded = PyObject_CallOneArg(s->encoder, obj);
     if (encoded != NULL &&
 #if PY_MAJOR_VERSION < 3
         !PyString_Check(encoded) &&
@@ -2798,6 +2802,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
     /* Encode Python object obj to a JSON term, rval is a PyList */
     int rv = -1;
     do {
+        PyObject *newobj;
         if (obj == Py_None || obj == Py_True || obj == Py_False) {
             PyObject *cstr = _encoded_const(obj);
             if (cstr != NULL)
@@ -2817,7 +2822,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             }
             else {
                 /* See #118, do not trust custom str/repr */
-                PyObject *tmp = PyObject_CallFunctionObjArgs((PyObject *)&PyLong_Type, obj, NULL);
+                PyObject *tmp = PyObject_CallOneArg((PyObject *)&PyLong_Type, obj);
                 if (tmp == NULL) {
                     encoded = NULL;
                 }
@@ -2838,35 +2843,37 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
         }
-        else if (s->for_json && _has_for_json_hook(obj)) {
-            PyObject *newobj;
-            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
-                return rv;
-            newobj = PyObject_CallMethod(obj, "for_json", NULL);
-            if (newobj != NULL) {
-                rv = encoder_listencode_obj(s, rval, newobj, indent_level);
-                Py_DECREF(newobj);
+        else if (s->for_json && _call_json_method(obj, FOR_JSON_METHOD_NAME, &newobj)) {
+            if (newobj == NULL) {
+                return -1;
             }
+            if (Py_EnterRecursiveCall(" while encoding a JSON object")) {
+                Py_DECREF(newobj);
+                return rv;
+            }
+            rv = encoder_listencode_obj(s, rval, newobj, indent_level);
+            Py_DECREF(newobj);
             Py_LeaveRecursiveCall();
         }
-        else if (s->namedtuple_as_object && _is_namedtuple(obj)) {
-            PyObject *newobj;
-            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
-                return rv;
-            newobj = PyObject_CallMethod(obj, "_asdict", NULL);
-            if (newobj != NULL) {
-                if (!PyDict_Check(newobj)) {
-                    PyErr_Format(
-                        PyExc_TypeError,
-                        "_asdict() must return a dict, not %.80s",
-                        Py_TYPE(newobj)->tp_name
-                    );
-                    Py_DECREF(newobj);
-                    return -1;
-                }
-                rv = encoder_listencode_dict(s, rval, newobj, indent_level);
-                Py_DECREF(newobj);
+        else if (s->namedtuple_as_object && _call_json_method(obj, ASDICT_METHOD_NAME, &newobj)) {
+            if (newobj == NULL) {
+                return -1;
             }
+            if (Py_EnterRecursiveCall(" while encoding a JSON object")) {
+                Py_DECREF(newobj);
+                return rv;
+            }
+            if (PyDict_Check(newobj)) {
+                rv = encoder_listencode_dict(s, rval, newobj, indent_level);
+            } else {
+                PyErr_Format(
+                    PyExc_TypeError,
+                    "_asdict() must return a dict, not %.80s",
+                    Py_TYPE(newobj)->tp_name
+                );
+                rv = -1;
+            }
+            Py_DECREF(newobj);
             Py_LeaveRecursiveCall();
         }
         else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
@@ -2924,7 +2931,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             }
             if (Py_EnterRecursiveCall(" while encoding a JSON object"))
                 return rv;
-            newobj = PyObject_CallFunctionObjArgs(s->defaultfn, obj, NULL);
+            newobj = PyObject_CallOneArg(s->defaultfn, obj);
             if (newobj == NULL) {
                 Py_XDECREF(ident);
                 Py_LeaveRecursiveCall();
