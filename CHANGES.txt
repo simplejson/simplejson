@@ -1,3 +1,8 @@
+Version 3.18.1 released 2022-XX-XX
+
+* Remove unnecessary `i` variable from encoder module namespace
+  https://github.com/simplejson/simplejson/pull/303
+
 Version 3.18.0 released 2022-11-14
 
 * Allow serialization of classes that implement for_json or _asdict by
