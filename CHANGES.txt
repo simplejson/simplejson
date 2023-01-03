@@ -1,7 +1,9 @@
-Version 3.18.1 released 2022-XX-XX
+Version 3.18.1 released 2023-01-03
 
 * Remove unnecessary `i` variable from encoder module namespace
   https://github.com/simplejson/simplejson/pull/303
+* Declare support for Python 3.11 and add wheels
+  https://github.com/simplejson/simplejson/pull/305
 
 Version 3.18.0 released 2022-11-14
 
