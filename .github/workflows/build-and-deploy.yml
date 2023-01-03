@@ -32,7 +32,7 @@ jobs:
           platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.2.2
+        uses: pypa/cibuildwheel@v2.11.4
         env:
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"
