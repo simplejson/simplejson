@@ -67,13 +67,18 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Build sdist
-        run: python setup.py sdist
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip setuptools wheel
+
+      - name: Build sdist and wheel
+        run: DISABLE_SPEEDUPS=1 python setup.py sdist bdist_wheel
 
       - uses: actions/upload-artifact@v2
         if: "github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')"
         with:
-          path: dist/*.tar.gz
+          path: |
+            dist/*.tar.gz
+            dist/*-none-any.whl
 
   upload_pypi:
     needs: [build_wheels, build_sdist]

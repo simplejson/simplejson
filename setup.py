@@ -12,7 +12,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
-VERSION = '3.18.1'
+VERSION = '3.18.2'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
 with open('README.rst', 'r') as f:
@@ -118,7 +118,7 @@ def run_setup(with_binary):
         **kw)
 
 try:
-    run_setup(not IS_PYPY)
+    run_setup(not IS_PYPY and os.environ.get('DISABLE_SPEEDUPS') != '1')
 except BuildFailed:
     if os.environ.get('REQUIRE_SPEEDUPS') or os.environ.get('CIBUILDWHEEL', '0') == '1':
         raise
