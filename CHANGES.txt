@@ -1,3 +1,8 @@
+Version 3.18.4 released 2023-XX-XX
+
+* Test the sdist to prevent future regressions
+  https://github.com/simplejson/simplejson/pull/311
+
 Version 3.18.3 released 2023-02-05
 
 * Fix regression in sdist archive
