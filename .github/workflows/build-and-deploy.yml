@@ -76,6 +76,14 @@ jobs:
       - name: Build wheel
         run: DISABLE_SPEEDUPS=1 python setup.py bdist_wheel
 
+      - name: Test sdist
+        run: |
+          mkdir tmp
+          cd tmp
+          tar zxf ../dist/simplejson-*.tar.gz
+          cd simplejson-*
+          REQUIRE_SPEEDUPS=1 python setup.py build build_ext -i test
+
       - uses: actions/upload-artifact@v2
         if: "github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')"
         with:
