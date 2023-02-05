@@ -1,3 +1,8 @@
+Version 3.18.3 released 2023-02-05
+
+* Fix regression in sdist archive
+  https://github.com/simplejson/simplejson/pull/310
+
 Version 3.18.2 released 2023-02-04
 
 * Distribute a pure python wheel for Pyodide
