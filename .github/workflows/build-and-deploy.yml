@@ -38,7 +38,7 @@ jobs:
             python -m simplejson.tests._cibw_runner "{project}"
           CIBW_SKIP: "pp*"
           CIBW_ARCHS_WINDOWS: "auto"
-          CIBW_ARCHS_LINUX: "auto aarch64"
+          CIBW_ARCHS_LINUX: "auto aarch64 ppc64le"
           CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
 
       - name: Build Python 2.7 wheels
