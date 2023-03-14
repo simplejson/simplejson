@@ -1,7 +1,9 @@
-Version 3.18.4 released 2023-XX-XX
+Version 3.18.4 released 2023-03-14
 
 * Test the sdist to prevent future regressions
   https://github.com/simplejson/simplejson/pull/311
+* Enable ppc64le wheels
+  https://github.com/simplejson/simplejson/pull/312
 
 Version 3.18.3 released 2023-02-05
 
