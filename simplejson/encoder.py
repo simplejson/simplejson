@@ -145,7 +145,9 @@ class JSONEncoder(object):
                  use_decimal=True, namedtuple_as_object=True,
                  tuple_as_array=True, bigint_as_string=False,
                  item_sort_key=None, for_json=False, ignore_nan=False,
-                 int_as_string_bitcount=None, iterable_as_array=False):
+                 int_as_string_bitcount=None, iterable_as_array=False,
+                 alternative_nan='NaN', alternative_pos_inf='Infinity',
+                 alternative_neg_inf='-Infinity'):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -241,6 +243,9 @@ class JSONEncoder(object):
         self.for_json = for_json
         self.ignore_nan = ignore_nan
         self.int_as_string_bitcount = int_as_string_bitcount
+        self.alternative_nan = alternative_nan
+        self.alternative_pos_inf = alternative_pos_inf
+        self.alternative_neg_inf = alternative_neg_inf
         if indent is not None and not isinstance(indent, string_types):
             indent = indent * ' '
         self.indent = indent
@@ -333,11 +338,11 @@ class JSONEncoder(object):
             # the internals.
 
             if o != o:
-                text = 'NaN'
+                text = self.alternative_nan
             elif o == _inf:
-                text = 'Infinity'
+                text = self.alternative_pos_inf
             elif o == _neginf:
-                text = '-Infinity'
+                text = self.alternative_neg_inf
             else:
                 if type(o) != float:
                     # See #118, do not trust custom str/repr
