@@ -5,7 +5,7 @@ import re
 from operator import itemgetter
 # Do not import Decimal directly to avoid reload issues
 import decimal
-from .compat import unichr, binary_type, text_type, string_types, integer_types, PY3
+from .compat import binary_type, text_type, string_types, integer_types, PY3
 def _import_speedups():
     try:
         from . import _speedups

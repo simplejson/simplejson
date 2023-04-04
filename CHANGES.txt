@@ -8,6 +8,7 @@ Version 3.19.0 released 2023-04-XX
   limit quadratic number parsing (SJ-PT-23-03)
 * Fix inconsistencies with error messages between the C and Python
   implementations (SJ-PT-23-100)
+* Remove unused unichr import from encoder (SJ-PT-23-101)
 
 Version 3.18.4 released 2023-03-14
 
