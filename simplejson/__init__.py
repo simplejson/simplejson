@@ -442,12 +442,12 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
     takes priority.
 
     *parse_float*, if specified, will be called with the string of every
-    JSON float to be decoded.  By default, this is equivalent to
+    JSON float to be decoded. By default, this is equivalent to
     ``float(num_str)``. This can be used to use another datatype or parser
     for JSON floats (e.g. :class:`decimal.Decimal`).
 
     *parse_int*, if specified, will be called with the string of every
-    JSON int to be decoded.  By default, this is equivalent to
+    JSON int to be decoded. By default, this is equivalent to
     ``int(num_str)``.  This can be used to use another datatype or parser
     for JSON integers (e.g. :class:`float`).
 

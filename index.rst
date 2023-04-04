@@ -412,6 +412,13 @@ Basic Usage
     be used to use another datatype or parser for JSON integers
     (e.g. :class:`float`).
 
+    .. versionchanged:: 3.19.0
+        The integer to string conversion length limitation introduced in
+        Python 3.11 has been backported. An attempt to parse an integer
+        with more than 4300 digits will result in an exception unless a
+        suitable alternative parser is specified
+        (e.g. :class:`decimal.Decimal`)
+
     *parse_constant*, if specified, will be called with one of the following
     strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
     raise an exception if invalid JSON numbers are encountered.
@@ -501,6 +508,13 @@ Encoders and decoders
    to be decoded.  By default, this is equivalent to ``int(num_str)``.  This can
    be used to use another datatype or parser for JSON integers
    (e.g. :class:`float`).
+
+    .. versionchanged:: 3.19.0
+        The integer to string conversion length limitation introduced in
+        Python 3.11 has been backported. An attempt to parse an integer
+        with more than 4300 digits will result in an exception unless a
+        suitable alternative parser is specified
+        (e.g. :class:`decimal.Decimal`)
 
    *parse_constant*, if specified, will be called with one of the following
    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to

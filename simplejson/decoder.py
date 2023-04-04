@@ -46,6 +46,19 @@ BACKSLASH = {
 
 DEFAULT_ENCODING = "utf-8"
 
+if hasattr(sys, 'get_int_max_str_digits'):
+    bounded_int = int
+else:
+    def bounded_int(s, INT_MAX_STR_DIGITS=4300):
+        """Backport of the integer string length conversion limitation
+
+        https://docs.python.org/3/library/stdtypes.html#int-max-str-digits
+        """
+        if len(s) > INT_MAX_STR_DIGITS:
+            raise ValueError("Exceeds the limit (%s) for integer string conversion: value has %s digits" % (INT_MAX_STR_DIGITS, len(s)))
+        return int(s)
+
+
 def scan_four_digit_hex(s, end, _m=re.compile(r'^[0-9a-fA-F]{4}$').match):
     """Scan a four digit hex number from s[end:end + 4]
     """
@@ -349,7 +362,7 @@ class JSONDecoder(object):
         self.object_hook = object_hook
         self.object_pairs_hook = object_pairs_hook
         self.parse_float = parse_float or float
-        self.parse_int = parse_int or int
+        self.parse_int = parse_int or bounded_int
         self.parse_constant = parse_constant or _CONSTANTS.__getitem__
         self.strict = strict
         self.parse_object = JSONObject
