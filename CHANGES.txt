@@ -1,3 +1,8 @@
+Version 3.19.0 released 2023-04-XX
+
+* Fix invalid handling of unicode escape sequences in the pure Python
+  implementation of the decoder (SJ-PT-23-01)
+
 Version 3.18.4 released 2023-03-14
 
 * Test the sdist to prevent future regressions
