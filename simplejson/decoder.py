@@ -93,6 +93,7 @@ def py_scanstring(s, end, encoding=None, strict=True,
         if chunk is None:
             raise JSONDecodeError(
                 "Unterminated string starting at", s, begin)
+        prev_end = end
         end = chunk.end()
         content, terminator = chunk.groups()
         # Content is contains zero or more unescaped string characters
@@ -107,7 +108,7 @@ def py_scanstring(s, end, encoding=None, strict=True,
         elif terminator != '\\':
             if strict:
                 msg = "Invalid control character %r at"
-                raise JSONDecodeError(msg, s, end)
+                raise JSONDecodeError(msg, s, prev_end)
             else:
                 _append(terminator)
                 continue
@@ -178,7 +179,7 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
             return pairs, end + 1
         elif nextchar != '"':
             raise JSONDecodeError(
-                "Expecting property name enclosed in double quotes",
+                "Expecting property name enclosed in double quotes or '}'",
                 s, end)
     end += 1
     while True:

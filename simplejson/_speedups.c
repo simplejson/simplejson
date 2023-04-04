@@ -1886,7 +1886,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     /* read a sign if it's there, make sure it's not the end of the string */
     if (str[idx] == '-') {
         if (idx >= end_idx) {
-            raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
+            raise_errmsg(ERR_EXPECTING_VALUE, pystr, start);
             return NULL;
         }
         idx++;
@@ -1903,7 +1903,7 @@ _match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssiz
     }
     /* no integer digits, error */
     else {
-        raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
+        raise_errmsg(ERR_EXPECTING_VALUE, pystr, start);
         return NULL;
     }
 
@@ -1995,7 +1995,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     /* read a sign if it's there, make sure it's not the end of the string */
     if (PyUnicode_READ(kind, str, idx) == '-') {
         if (idx >= end_idx) {
-            raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
+            raise_errmsg(ERR_EXPECTING_VALUE, pystr, start);
             return NULL;
         }
         idx++;
@@ -2015,7 +2015,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     }
     else {
         /* no integer digits, error */
-        raise_errmsg(ERR_EXPECTING_VALUE, pystr, idx);
+        raise_errmsg(ERR_EXPECTING_VALUE, pystr, start);
         return NULL;
     }
 

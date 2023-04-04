@@ -6,6 +6,8 @@ Version 3.19.0 released 2023-04-XX
   an exception in Python 2.x; was probably unreachable (SJ-PT-23-02)
 * Backport the integer string length limitation from Python 3.11 to
   limit quadratic number parsing (SJ-PT-23-03)
+* Fix inconsistencies with error messages between the C and Python
+  implementations (SJ-PT-23-100)
 
 Version 3.18.4 released 2023-03-14
 
