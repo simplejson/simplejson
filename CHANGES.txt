@@ -2,6 +2,8 @@ Version 3.19.0 released 2023-04-XX
 
 * Fix invalid handling of unicode escape sequences in the pure Python
   implementation of the decoder (SJ-PT-23-01)
+* Fix missing reference count decrease if PyOS_string_to_double raises
+  an exception in Python 2.x; was probably unreachable (SJ-PT-23-02)
 
 Version 3.18.4 released 2023-03-14
 
