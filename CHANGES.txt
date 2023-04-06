@@ -9,6 +9,11 @@ Version 3.19.0 released 2023-04-XX
 * Fix inconsistencies with error messages between the C and Python
   implementations (SJ-PT-23-100)
 * Remove unused unichr import from encoder (SJ-PT-23-101)
+* Remove unused namedtuple_as_object and tuple_as_array arguments from
+  simplejson.load (SJ-PT-23-102)
+* Remove vestigial _one_shot code from iterencode (SJ-PT-23-103)
+* Change default of allow_nan from True to False and add allow_nan
+  to decoder (SJ-PT-23-107)
 
 Version 3.18.4 released 2023-03-14
 

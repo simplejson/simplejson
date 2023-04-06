@@ -306,14 +306,15 @@ class JSONDecoder(object):
     | null          | None              |
     +---------------+-------------------+
 
-    It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as
+    When allow_nan=True, it also understands
+    ``NaN``, ``Infinity``, and ``-Infinity`` as
     their corresponding ``float`` values, which is outside the JSON spec.
 
     """
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
             parse_int=None, parse_constant=None, strict=True,
-            object_pairs_hook=None):
+            object_pairs_hook=None, allow_nan=False):
         """
         *encoding* determines the encoding used to interpret any
         :class:`str` objects decoded by this instance (``'utf-8'`` by
@@ -346,10 +347,13 @@ class JSONDecoder(object):
         ``int(num_str)``.  This can be used to use another datatype or parser
         for JSON integers (e.g. :class:`float`).
 
-        *parse_constant*, if specified, will be called with one of the
-        following strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This
-        can be used to raise an exception if invalid JSON numbers are
-        encountered.
+        *allow_nan*, if True (default false), will allow the parser to
+        accept the non-standard floats ``NaN``, ``Infinity``, and ``-Infinity``.
+
+        *parse_constant*, if specified, will be
+        called with one of the following strings: ``'-Infinity'``,
+        ``'Infinity'``, ``'NaN'``. It is not recommended to use this feature,
+        as it is rare to parse non-compliant JSON containing these values.
 
         *strict* controls the parser's behavior when it encounters an
         invalid control character in a string. The default setting of
@@ -364,7 +368,7 @@ class JSONDecoder(object):
         self.object_pairs_hook = object_pairs_hook
         self.parse_float = parse_float or float
         self.parse_int = parse_int or bounded_int
-        self.parse_constant = parse_constant or _CONSTANTS.__getitem__
+        self.parse_constant = parse_constant or (allow_nan and _CONSTANTS.__getitem__ or None)
         self.strict = strict
         self.parse_object = JSONObject
         self.parse_array = JSONArray
