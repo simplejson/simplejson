@@ -1,4 +1,4 @@
-Version 3.19.0 released 2023-04-06
+Version 3.19.1 released 2023-04-06
 
 * This release contains security hardening measures based on recommendations
   by a security audit sponsored by OSTIF and conducted by X41 D-Sec GmbH.
