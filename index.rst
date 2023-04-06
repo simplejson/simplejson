@@ -160,7 +160,7 @@ Basic Usage
 -----------
 
 .. function:: dump(obj, fp, skipkeys=False, ensure_ascii=True, \
-                   check_circular=True, allow_nan=True, cls=None, \
+                   check_circular=True, allow_nan=False, cls=None, \
                    indent=None, separators=None, encoding='utf-8', \
                    default=None, use_decimal=True, \
                    namedtuple_as_object=True, tuple_as_array=True, \
@@ -191,7 +191,7 @@ Basic Usage
         is highly optimized.
 
 .. function:: dumps(obj, skipkeys=False, ensure_ascii=True, \
-                    check_circular=True, allow_nan=True, cls=None, \
+                    check_circular=True, allow_nan=False, cls=None, \
                     indent=None, separators=None, encoding='utf-8', \
                     default=None, use_decimal=True, \
                     namedtuple_as_object=True, tuple_as_array=True, \
@@ -225,12 +225,16 @@ Basic Usage
     reference check for container types will be skipped and a circular
     reference will result in an :exc:`OverflowError` (or worse).
 
-    If *allow_nan* is false (default: ``True``), then it will be a
+    If *allow_nan* is false (default: ``False``), then it will be a
     :exc:`ValueError` to serialize out of range :class:`float` values
     (``nan``, ``inf``, ``-inf``) in strict compliance of the original
     JSON specification. If *allow_nan* is true, their JavaScript equivalents
     will be used (``NaN``, ``Infinity``, ``-Infinity``). See also *ignore_nan*
     for ECMA-262 compliant behavior.
+
+    .. versionchanged:: 3.19.0
+        The default for *allow_nan* was changed to False for better spec
+        compliance.
 
     If *indent* is a string, then JSON array elements and object members
     will be pretty-printed with a newline followed by that string repeated
@@ -324,7 +328,7 @@ Basic Usage
 .. function:: load(fp, encoding='utf-8', cls=None, object_hook=None, \
                    parse_float=None, parse_int=None, \
                    parse_constant=None, object_pairs_hook=None, \
-                   use_decimal=None, **kw)
+                   use_decimal=None, allow_nan=False, **kw)
 
    Deserialize *fp* (a ``.read()``-supporting file-like object containing a JSON
    document) to a Python object using this
@@ -367,7 +371,7 @@ Basic Usage
 .. function:: loads(s, encoding='utf-8', cls=None, object_hook=None, \
                     parse_float=None, parse_int=None, \
                     parse_constant=None, object_pairs_hook=None, \
-                    use_decimal=None, **kw)
+                    use_decimal=None, allow_nan=False, **kw)
 
     Deserialize *s* (a :class:`str` or :class:`unicode` instance containing a JSON
     document) to a Python object. :exc:`JSONDecodeError` will be
@@ -412,9 +416,12 @@ Basic Usage
     be used to use another datatype or parser for JSON integers
     (e.g. :class:`float`).
 
-    *parse_constant*, if specified, will be called with one of the following
-    strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
-    raise an exception if invalid JSON numbers are encountered.
+    .. versionchanged:: 3.19.0
+        The integer to string conversion length limitation introduced in
+        Python 3.11 has been backported. An attempt to parse an integer
+        with more than 4300 digits will result in an exception unless a
+        suitable alternative parser is specified
+        (e.g. :class:`decimal.Decimal`)
 
     If *use_decimal* is true (default: ``False``) then *parse_float* is set to
     :class:`decimal.Decimal`. This is a convenience for parity with the
@@ -436,12 +443,28 @@ Basic Usage
         Subclassing is not recommended. You should use *object_hook* or
         *object_pairs_hook*. This is faster and more portable than subclassing.
 
+
+    *allow_nan*, if True (default false), will allow the parser to
+    accept the non-standard floats
+    ``NaN``, ``Infinity``, and ``-Infinity``.
+
+    .. versionchanged:: 3.19.0
+
+        This argument was added to make it possible to use the legacy behavior
+        now that the parser is more strict about compliance to the standard.
+
+    *parse_constant*, if specified, will be
+    called with one of the following strings: ``'-Infinity'``,
+    ``'Infinity'``, ``'NaN'``. It is not recommended to use this feature,
+    as it is rare to parse non-compliant JSON containing these values.
+
+
 Encoders and decoders
 ---------------------
 
 .. class:: JSONDecoder(encoding='utf-8', object_hook=None, parse_float=None, \
                        parse_int=None, parse_constant=None, \
-                       object_pairs_hook=None, strict=True)
+                       object_pairs_hook=None, strict=True, allow_nan=False)
 
    Simple JSON decoder.
 
@@ -469,7 +492,8 @@ Encoders and decoders
    | null          | None      | None      |
    +---------------+-----------+-----------+
 
-   It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as their
+   When *allow_nan* is True, it also understands
+   ``NaN``, ``Infinity``, and ``-Infinity`` as their
    corresponding ``float`` values, which is outside the JSON spec.
 
    *encoding* determines the encoding used to interpret any :class:`str` objects
@@ -502,14 +526,30 @@ Encoders and decoders
    be used to use another datatype or parser for JSON integers
    (e.g. :class:`float`).
 
-   *parse_constant*, if specified, will be called with one of the following
-   strings: ``'-Infinity'``, ``'Infinity'``, ``'NaN'``.  This can be used to
-   raise an exception if invalid JSON numbers are encountered.
+    .. versionchanged:: 3.19.0
+        The integer to string conversion length limitation introduced in
+        Python 3.11 has been backported. An attempt to parse an integer
+        with more than 4300 digits will result in an exception unless a
+        suitable alternative parser is specified
+        (e.g. :class:`decimal.Decimal`)
+
+    *parse_constant*, if specified, will be
+    called with one of the following strings: ``'-Infinity'``,
+    ``'Infinity'``, ``'NaN'``. It is not recommended to use this feature,
+    as it is rare to parse non-compliant JSON containing these values.
 
    *strict* controls the parser's behavior when it encounters an invalid
    control character in a string. The default setting of ``True`` means that
    unescaped control characters are parse errors, if ``False`` then control
    characters will be allowed in strings.
+
+   *allow_nan* when True (not the default), the decoder will allow
+   ``NaN``, ``Infinity``, and ``-Infinity`` as their corresponding floats.
+
+    .. versionchanged:: 3.19.0
+        This argument was added to make it behave closer to the spec by
+        default. The previous behavior can be restored by setting this to
+        False.
 
    .. method:: decode(s)
 
@@ -532,7 +572,7 @@ Encoders and decoders
       document is not valid.
 
 .. class:: JSONEncoder(skipkeys=False, ensure_ascii=True, \
-                       check_circular=True, allow_nan=True, sort_keys=False, \
+                       check_circular=True, allow_nan=False, sort_keys=False, \
                        indent=None, separators=None, encoding='utf-8', \
                        default=None, use_decimal=True, \
                        namedtuple_as_object=True, tuple_as_array=True, \
@@ -573,7 +613,8 @@ Encoders and decoders
       wrapped in another type with an appropriate `for_json` method to
       transform the keys during encoding.
 
-   It also understands ``NaN``, ``Infinity``, and ``-Infinity`` as their
+   When *allow_nan* is True, it also understands
+   ``NaN``, ``Infinity``, and ``-Infinity`` as their
    corresponding ``float`` values, which is outside the JSON spec.
 
    To extend this to recognize other objects, subclass and implement a
@@ -599,11 +640,15 @@ Encoders and decoders
    prevent an infinite recursion (which would cause an :exc:`OverflowError`).
    Otherwise, no such check takes place.
 
-   If *allow_nan* is true (the default), then ``NaN``, ``Infinity``, and
+   If *allow_nan* is true (not the default), then ``NaN``, ``Infinity``, and
    ``-Infinity`` will be encoded as such. This behavior is not JSON
-   specification compliant, but is consistent with most JavaScript based
-   encoders and decoders.  Otherwise, it will be a :exc:`ValueError` to encode
+   specification compliant. Otherwise, it will be a :exc:`ValueError` to encode
    such floats. See also *ignore_nan* for ECMA-262 compliant behavior.
+
+    .. versionchanged:: 3.19.0
+        This default is now False to make it behave closer to the spec.
+        The previous behavior can be restored by setting this to
+        False.
 
    If *sort_keys* is true (not the default), then the output of dictionaries
    will be sorted by key; this is useful for regression tests to ensure that
@@ -716,7 +761,7 @@ Encoders and decoders
       :meth:`iterencode`.
 
 .. class:: JSONEncoderForHTML(skipkeys=False, ensure_ascii=True, \
-                              check_circular=True, allow_nan=True, \
+                              check_circular=True, allow_nan=False, \
                               sort_keys=False, indent=None, separators=None, \
                               encoding='utf-8', \
                               default=None, use_decimal=True, \
@@ -826,22 +871,28 @@ Infinite and NaN Number Values
 
 The RFC does not permit the representation of infinite or NaN number values.
 Despite that, by default, this module accepts and outputs ``Infinity``,
-``-Infinity``, and ``NaN`` as if they were valid JSON number literal values::
+``-Infinity``, and ``NaN`` as if they were valid JSON number literal values
+if the allow_nan flag is enabled::
 
    >>> # Neither of these calls raises an exception, but the results are not valid JSON
-   >>> json.dumps(float('-inf'))
+   >>> json.dumps(float('-inf'), allow_nan=True)
    '-Infinity'
-   >>> json.dumps(float('nan'))
+   >>> json.dumps(float('nan'), allow_nan=True)
    'NaN'
    >>> # Same when deserializing
-   >>> json.loads('-Infinity')
+   >>> json.loads('-Infinity', allow_nan=True)
    -inf
-   >>> json.loads('NaN')
+   >>> json.loads('NaN', allow_nan=True)
    nan
+   >>> # ignore_nan uses the ECMA-262 behavior to serialize these as null
+   >>> json.dumps(float('-inf'), ignore_nan=True)
+   'null'
+   >>> json.dumps(float('nan'), ignore_nan=True)
+   'null'
 
 In the serializer, the *allow_nan* parameter can be used to alter this
-behavior.  In the deserializer, the *parse_constant* parameter can be used to
-alter this behavior.
+behavior. In the deserializer, the *allow_nan* and
+*parse_constant* parameters can be used to alter this behavior.
 
 
 Repeated Names Within an Object
