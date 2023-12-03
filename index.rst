@@ -148,13 +148,6 @@ Serializing multiple objects to JSON lines (newline-delimited JSON)::
     >>> ''.join(dumps_lines([{'count': 1}, {'count': 2}, {'count': 3}]))
     '{"count":1}\n{"count":2}\n{"count":3}\n'
 
-.. note::
-
-   JSON is a subset of `YAML <http://yaml.org/>`_ 1.2. The JSON produced by
-   this module's default settings (in particular, the default *separators*
-   value) is also a subset of YAML 1.0 and 1.1. This module can thus also be
-   used as a YAML serializer.
-
 
 Basic Usage
 -----------
