@@ -1,6 +1,8 @@
-Version 3.19.3 released 2024-MM-DD
+Version 3.19.3 released 2024-08-14
 
-* Updated test & build matrix to include Python 3.13
+* Updated test & build matrix to include Python 3.13.
+  Dropped wheel support for Python 2.7 on macOS.
+  https://github.com/simplejson/simplejson/pull/326
 
 Version 3.19.2 released 2023-10-05
 
