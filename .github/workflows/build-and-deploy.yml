@@ -42,7 +42,7 @@ jobs:
           CIBW_ARCHS_MACOS: "x86_64 universal2 arm64"
 
       - name: Build Python 2.7 wheels
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux'
         uses: pypa/cibuildwheel@v1.12.0
         env:
           CIBW_TEST_COMMAND: >-
