@@ -51,8 +51,9 @@ jobs:
           CIBW_SKIP: "pp*"
           CIBW_ARCHS_LINUX: "auto aarch64"
 
-      - uses: actions/upload-artifact@v2
-        if: "github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
+        name: wheels
         with:
           path: ./wheelhouse/*.whl
 
@@ -65,7 +66,7 @@ jobs:
       - uses: actions/setup-python@v5
         name: Install Python
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install dependencies
         run: python -m pip install --upgrade pip setuptools wheel
@@ -84,9 +85,10 @@ jobs:
           cd simplejson-*
           REQUIRE_SPEEDUPS=1 python setup.py build build_ext -i test
 
-      - uses: actions/upload-artifact@v2
-        if: "github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
         with:
+          name: sdist
           path: |
             dist/*.tar.gz
             dist/*-none-any.whl
@@ -100,16 +102,16 @@ jobs:
     permissions:
       id-token: write
     # upload to PyPI on every tag starting with 'v'
-    if: "github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')"
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
     # alternatively, to publish when a GitHub Release is created, use the following rule:
     # if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
-          name: artifact
+          merge-multiple: true
           path: dist
 
-      - uses: pypa/gh-action-pypi-publish@v1.8.10
+      - uses: pypa/gh-action-pypi-publish@release/v1
 
   upload_pypi_test:
     needs: [build_wheels, build_sdist]
@@ -120,15 +122,15 @@ jobs:
     permissions:
       id-token: write
     # upload to test PyPI on every tag starting with 'test-v'
-    if: "github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/test-v')"
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/test-v')
     # alternatively, to publish when a GitHub Release is created, use the following rule:
     # if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
-          name: artifact
+          merge-multiple: true
           path: dist
 
-      - uses: pypa/gh-action-pypi-publish@v1.8.10
+      - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
