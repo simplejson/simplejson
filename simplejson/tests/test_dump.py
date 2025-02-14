@@ -73,8 +73,9 @@ class TestDump(TestCase):
                  {True: False, False: True}, sort_keys=True),
                  '{"false": true, "true": false}')
         self.assertEqual(
-            json.dumps({'k1': {False: 5}, 'k2': {0: 5}}),
-            '{"k1": {"false": 5}, "k2": {"0": 5}}'
+            # load first because the keys are not sorted
+            json.loads(json.dumps({'k1': {False: 5}, 'k2': {0: 5}})),
+            {'k1': {'false': 5}, 'k2': {'0': 5}},
         )
 
         self.assertEqual(
