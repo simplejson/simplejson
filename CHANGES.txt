@@ -1,3 +1,8 @@
+Version 3.20.0 released 2025-02-14
+
+* Do not memoize keys before they are coerced to string
+  https://github.com/simplejson/simplejson/pull/329
+
 Version 3.19.3 released 2024-08-14
 
 * Updated test & build matrix to include Python 3.13.
