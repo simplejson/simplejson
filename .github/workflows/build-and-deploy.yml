@@ -53,8 +53,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
-        name: wheels-${{ matrix.os }}
         with:
+          name: wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
   build_sdist:
