@@ -144,6 +144,7 @@ class JSONEncoder(object):
                  indent=None, separators=None, encoding='utf-8', default=None,
                  use_decimal=True, namedtuple_as_object=True,
                  tuple_as_array=True, bigint_as_string=False,
+                 big_floats_as_string=False,
                  item_sort_key=None, for_json=False, ignore_nan=False,
                  int_as_string_bitcount=None, iterable_as_array=False):
         """Constructor for JSONEncoder, with sensible defaults.
@@ -209,6 +210,10 @@ class JSONEncoder(object):
         or lower than -2**53 will be encoded as strings. This is to avoid the
         rounding that happens in Javascript otherwise.
 
+        If big_floats_as_string is true (not the default), Infinity, -Infinity,
+        and NaN will be encoded as strings. This is to avoid the parser error
+        in valid JSON decoders.
+
         If int_as_string_bitcount is a positive number (n), then int of size
         greater than or equal to 2**n or lower than or equal to -2**n will be
         encoded as strings.
@@ -238,6 +243,7 @@ class JSONEncoder(object):
         self.tuple_as_array = tuple_as_array
         self.iterable_as_array = iterable_as_array
         self.bigint_as_string = bigint_as_string
+        self.big_floats_as_string = big_floats_as_string
         self.item_sort_key = item_sort_key
         self.for_json = for_json
         self.ignore_nan = ignore_nan
@@ -328,7 +334,7 @@ class JSONEncoder(object):
                 return _orig_encoder(o)
 
         def floatstr(o, allow_nan=self.allow_nan, ignore_nan=self.ignore_nan,
-                _repr=FLOAT_REPR, _inf=PosInf, _neginf=-PosInf):
+                _repr=FLOAT_REPR, _inf=PosInf, _neginf=-PosInf, big_floats_as_string=self.big_floats_as_string):
             # Check for specials. Note that this type of test is processor
             # and/or platform-specific, so do tests which don't depend on
             # the internals.
@@ -351,6 +357,8 @@ class JSONEncoder(object):
                 raise ValueError(
                     "Out of range float values are not JSON compliant: " +
                     repr(o))
+            elif big_floats_as_string:
+                text = self.encode(text)
 
             return text
 
