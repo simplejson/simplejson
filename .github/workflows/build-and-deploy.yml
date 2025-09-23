@@ -11,6 +11,25 @@ on: [push, pull_request]
 #       - published
 
 jobs:
+  test_pure_python:
+    name: Tests without speedup on ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+        - 'ubuntu-latest'
+        python:
+          - 3.13
+          - pypy-3.11
+          - graalpy-25.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m simplejson.tests._cibw_runner .
+
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
