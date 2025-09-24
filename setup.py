@@ -12,6 +12,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
+IS_GRAALPY = getattr(getattr(sys, "implementation", None), "name", None) == "graalpy"
 VERSION = '3.20.1'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
@@ -124,7 +125,7 @@ def run_setup(with_binary):
         **kw)
 
 
-DISABLE_SPEEDUPS = IS_PYPY or os.environ.get('DISABLE_SPEEDUPS') == '1'
+DISABLE_SPEEDUPS = IS_PYPY or IS_GRAALPY or os.environ.get('DISABLE_SPEEDUPS') == '1'
 CIBUILDWHEEL = os.environ.get('CIBUILDWHEEL') == '1'
 REQUIRE_SPEEDUPS = CIBUILDWHEEL or os.environ.get('REQUIRE_SPEEDUPS') == '1'
 try:
