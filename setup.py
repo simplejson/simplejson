@@ -13,7 +13,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
 IS_GRAALPY = getattr(getattr(sys, "implementation", None), "name", None) == "graalpy"
-VERSION = '3.20.1'
+VERSION = '3.20.2'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
 with open('README.rst', 'r') as f:
