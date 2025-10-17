@@ -54,7 +54,6 @@ jobs:
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.2.1
         env:
-          CIBW_BUILD: "cp3{8,9,10,11,12,13,14}-*"
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"
           CIBW_SKIP: "pp*"
