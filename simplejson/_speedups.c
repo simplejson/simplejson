@@ -3318,6 +3318,13 @@ static PyMethodDef speedups_methods[] = {
 PyDoc_STRVAR(module_doc,
 "simplejson speedups\n");
 
+#if PY_VERSION_HEX >= 0x030D0000
+static struct PyModuleDef_Slot module_slots[] = {
+    {Py_mod_gil, Py_MOD_GIL_USED},
+    {0, NULL}
+};
+#endif
+
 #if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
@@ -3325,7 +3332,11 @@ static struct PyModuleDef moduledef = {
     module_doc,         /* m_doc */
     -1,                 /* m_size */
     speedups_methods,   /* m_methods */
-    NULL,               /* m_reload */
+#if PY_VERSION_HEX >= 0x030D0000
+    module_slots,       /* m_slots */
+#else
+    NULL,               /* m_slots */
+#endif
     NULL,               /* m_traverse */
     NULL,               /* m_clear*/
     NULL,               /* m_free */

@@ -5,8 +5,11 @@ import re
 from operator import itemgetter
 # Do not import Decimal directly to avoid reload issues
 import decimal
-from .compat import binary_type, text_type, string_types, integer_types, PY3
+from .compat import binary_type, text_type, string_types, integer_types, PY3, is_gil_enabled
+
 def _import_speedups():
+    if not is_gil_enabled():
+        return None, None
     try:
         from . import _speedups
         return _speedups.encode_basestring_ascii, _speedups.make_encoder
