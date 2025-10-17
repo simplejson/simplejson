@@ -3414,7 +3414,12 @@ moduleinit(void)
 PyMODINIT_FUNC
 PyInit__speedups(void)
 {
+#if PY_VERSION_HEX >= 0x030D0000
+    /* Ensure GIL declaration is honored on free-threaded builds */
+    return PyModuleDef_Init(&moduledef);
+#else
     return moduleinit();
+#endif
 }
 #else
 void
