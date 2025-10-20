@@ -113,14 +113,6 @@ compat_PyType_GetModuleState(PyTypeObject *type)
 #define PyType_GetModuleState compat_PyType_GetModuleState
 #endif
 
-/* Compatibility shims for free-threading support */
-#if PY_VERSION_HEX < 0x030D0000
-#define Py_BEGIN_CRITICAL_SECTION(op) {
-#define Py_END_CRITICAL_SECTION() }
-#define Py_BEGIN_CRITICAL_SECTION2(op1, op2) {
-#define Py_END_CRITICAL_SECTION2() }
-#endif
-
 #if PY_VERSION_HEX < 0x030D0000
 /* Compatibility wrapper for PyDict_GetItemRef for Python < 3.13 */
 static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObject **result)
