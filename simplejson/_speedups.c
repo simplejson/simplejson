@@ -67,26 +67,50 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
 #endif
 #endif /* PY_VERSION_HEX < 0x02060000 */
 
-/* Forward declaration for module state type (defined later in the file) */
-typedef struct speedups_modulestate_struct speedups_modulestate;
+/* Module state structure to hold per-interpreter global objects */
+typedef struct speedups_modulestate_struct {
+    PyObject *JSON_Infinity;
+    PyObject *JSON_NegInfinity;
+    PyObject *JSON_NaN;
+    PyObject *JSON_EmptyUnicode;
+#if PY_MAJOR_VERSION < 3
+    PyObject *JSON_EmptyStr;
+    PyObject *JSON_StringJoinFn;
+#endif
+    PyObject *JSON_OpenDict;
+    PyObject *JSON_CloseDict;
+    PyObject *JSON_EmptyDict;
+    PyObject *JSON_OpenArray;
+    PyObject *JSON_CloseArray;
+    PyObject *JSON_EmptyArray;
+    PyObject *JSON_ConstNull;
+    PyObject *JSON_ConstTrue;
+    PyObject *JSON_ConstFalse;
+    PyObject *JSON_SortArgs;
+    PyObject *JSON_ItemGetter0;
+    PyObject *RawJSONType;
+    PyObject *JSONDecodeError;
+    PyTypeObject *ScannerType;
+    PyTypeObject *EncoderType;
+} speedups_modulestate;
 
-/* Compatibility shim for PyType_GetModuleState for Python < 3.10 with static types */
-#if PY_VERSION_HEX < 0x030A0000
-/* Global module state for Python < 3.10 where static types can't use PyType_GetModuleState.
- * On Python 3.9, PyModule_AddType exists but doesn't actually associate static types
- * with the module in a way that PyType_GetModuleState can retrieve. That only works
- * with heap types created via PyType_FromModuleAndSpec, or with PyType_GetModuleByDef
- * which was added in Python 3.10. */
+/*
+ * CPython did not expose PyType_GetModuleState before 3.9.  For those versions we
+ * keep a single global pointer so the existing call sites continue to work.  Once
+ * we only build against 3.9+ the real API is used and provides proper per-module
+ * state resolution.
+ */
+#if PY_VERSION_HEX < 0x03090000
 static speedups_modulestate *global_module_state = NULL;
 
-static inline void *_compat_PyType_GetModuleState(PyTypeObject *type)
+static inline void *
+compat_PyType_GetModuleState(PyTypeObject *type)
 {
-    /* For static types on Python < 3.10, we can't get the module from the type,
-     * so we use the global module state */
-    (void)type;  /* Unused parameter */
+    (void)type;
     return global_module_state;
 }
-#define PyType_GetModuleState _compat_PyType_GetModuleState
+
+#define PyType_GetModuleState compat_PyType_GetModuleState
 #endif
 
 /* Compatibility shims for free-threading support */
@@ -124,67 +148,82 @@ static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObjec
 
 #define DEFAULT_ENCODING "utf-8"
 
-#define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
-#define PyScanner_CheckExact(op) (Py_TYPE(op) == &PyScannerType)
-#define PyEncoder_Check(op) PyObject_TypeCheck(op, &PyEncoderType)
-#define PyEncoder_CheckExact(op) (Py_TYPE(op) == &PyEncoderType)
+static inline speedups_modulestate *
+module_state_from_type(PyTypeObject *type)
+{
+    return (speedups_modulestate *)PyType_GetModuleState(type);
+}
+
+static inline PyTypeObject *
+scanner_type_from_object(PyObject *op)
+{
+    speedups_modulestate *st = module_state_from_type(Py_TYPE(op));
+#if PY_VERSION_HEX < 0x03090000
+    if (st == NULL)
+        st = global_module_state;
+#endif
+    if (st == NULL)
+        return NULL;
+    return st->ScannerType;
+}
+
+static inline PyTypeObject *
+encoder_type_from_object(PyObject *op)
+{
+    speedups_modulestate *st = module_state_from_type(Py_TYPE(op));
+#if PY_VERSION_HEX < 0x03090000
+    if (st == NULL)
+        st = global_module_state;
+#endif
+    if (st == NULL)
+        return NULL;
+    return st->EncoderType;
+}
+
+static inline int
+PyScanner_Check(PyObject *op)
+{
+    PyTypeObject *type = scanner_type_from_object(op);
+    if (type == NULL)
+        return 0;
+    return PyObject_TypeCheck(op, type);
+}
+
+static inline int
+PyScanner_CheckExact(PyObject *op)
+{
+    PyTypeObject *type = scanner_type_from_object(op);
+    if (type == NULL)
+        return 0;
+    return Py_TYPE(op) == type;
+}
+
+static inline int
+PyEncoder_Check(PyObject *op)
+{
+    PyTypeObject *type = encoder_type_from_object(op);
+    if (type == NULL)
+        return 0;
+    return PyObject_TypeCheck(op, type);
+}
+
+static inline int
+PyEncoder_CheckExact(PyObject *op)
+{
+    PyTypeObject *type = encoder_type_from_object(op);
+    if (type == NULL)
+        return 0;
+    return Py_TYPE(op) == type;
+}
 
 #define JSON_ALLOW_NAN 1
 #define JSON_IGNORE_NAN 2
-
-/* Module state structure to hold per-interpreter global objects */
-struct speedups_modulestate_struct {
-    PyObject *JSON_Infinity;
-    PyObject *JSON_NegInfinity;
-    PyObject *JSON_NaN;
-    PyObject *JSON_EmptyUnicode;
-#if PY_MAJOR_VERSION < 3
-    PyObject *JSON_EmptyStr;
-    PyObject *JSON_StringJoinFn;
-#endif
-    PyObject *JSON_OpenDict;
-    PyObject *JSON_CloseDict;
-    PyObject *JSON_EmptyDict;
-    PyObject *JSON_OpenArray;
-    PyObject *JSON_CloseArray;
-    PyObject *JSON_EmptyArray;
-    PyObject *JSON_ConstNull;
-    PyObject *JSON_ConstTrue;
-    PyObject *JSON_ConstFalse;
-    PyObject *JSON_SortArgs;
-    PyObject *JSON_ItemGetter0;
-    PyObject *RawJSONType;
-    PyObject *JSONDecodeError;
-};
-
-static PyTypeObject PyScannerType;
-static PyTypeObject PyEncoderType;
 
 /* Helper function to get module state - forward declare moduledef */
 #if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef;
 #endif
 
-static inline speedups_modulestate *
-get_module_state_by_type(PyTypeObject *type)
-{
-#if PY_MAJOR_VERSION >= 3 && PY_VERSION_HEX >= 0x030D0000
-    /* Python 3.13+: Use PyType_GetModuleByDef for static types */
-    PyObject *module = PyType_GetModuleByDef(type, &moduledef);
-#elif PY_MAJOR_VERSION >= 3 && PY_VERSION_HEX >= 0x030A0000
-    /* Python 3.10-3.12: Use PyType_GetModule for types associated via PyModule_AddType.
-     * For static types, PyType_GetModuleByDef is used on 3.10+. */
-    PyObject *module = PyType_GetModule(type);
-#else
-    /* Python < 3.10: No way to get module from static type.
-     * PyModule_AddType exists in 3.9 but doesn't associate static types properly.
-     * We use the global module state set during module initialization. */
-    PyObject *module = NULL;
-#endif
-    if (module == NULL)
-        return NULL;
-    return (speedups_modulestate *)PyModule_GetState(module);
-}
 
 typedef struct {
     PyObject *large_strings;  /* A list of previously accumulated large strings */
@@ -770,7 +809,7 @@ encoder_stringify_key(speedups_modulestate *st, PyEncoderObject *s, PyObject *ke
 static PyObject *
 encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 {
-    speedups_modulestate *st = (speedups_modulestate *)PyType_GetModuleState(Py_TYPE(s));
+    speedups_modulestate *st = module_state_from_type(Py_TYPE(s));
     PyObject *items;
     PyObject *iter = NULL;
     PyObject *lst = NULL;
@@ -778,6 +817,10 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     PyObject *kstr = NULL;
     PyObject *sortfun = NULL;
     PyObject *sortres;
+    if (st == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "failed to get module state");
+        return NULL;
+    }
     if (st->JSON_SortArgs == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "simplejson sort args not initialized");
         return NULL;
@@ -2561,47 +2604,23 @@ bail:
 
 PyDoc_STRVAR(scanner_doc, "JSON scanner object");
 
-static
-PyTypeObject PyScannerType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "simplejson._speedups.Scanner",       /* tp_name */
-    sizeof(PyScannerObject), /* tp_basicsize */
-    0,                    /* tp_itemsize */
-    scanner_dealloc, /* tp_dealloc */
-    0,                    /* tp_print */
-    0,                    /* tp_getattr */
-    0,                    /* tp_setattr */
-    0,                    /* tp_compare */
-    0,                    /* tp_repr */
-    0,                    /* tp_as_number */
-    0,                    /* tp_as_sequence */
-    0,                    /* tp_as_mapping */
-    0,                    /* tp_hash */
-    scanner_call,         /* tp_call */
-    0,                    /* tp_str */
-    0,/* PyObject_GenericGetAttr, */                    /* tp_getattro */
-    0,/* PyObject_GenericSetAttr, */                    /* tp_setattro */
-    0,                    /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,   /* tp_flags */
-    scanner_doc,          /* tp_doc */
-    scanner_traverse,                    /* tp_traverse */
-    scanner_clear,                    /* tp_clear */
-    0,                    /* tp_richcompare */
-    0,                    /* tp_weaklistoffset */
-    0,                    /* tp_iter */
-    0,                    /* tp_iternext */
-    0,                    /* tp_methods */
-    scanner_members,                    /* tp_members */
-    0,                    /* tp_getset */
-    0,                    /* tp_base */
-    0,                    /* tp_dict */
-    0,                    /* tp_descr_get */
-    0,                    /* tp_descr_set */
-    0,                    /* tp_dictoffset */
-    0,                    /* tp_init */
-    0,/* PyType_GenericAlloc, */        /* tp_alloc */
-    scanner_new,          /* tp_new */
-    0,/* PyObject_GC_Del, */              /* tp_free */
+static PyType_Slot scanner_slots[] = {
+    {Py_tp_dealloc, (void *)scanner_dealloc},
+    {Py_tp_call, (void *)scanner_call},
+    {Py_tp_doc, (void *)scanner_doc},
+    {Py_tp_traverse, (void *)scanner_traverse},
+    {Py_tp_clear, (void *)scanner_clear},
+    {Py_tp_members, (void *)scanner_members},
+    {Py_tp_new, (void *)scanner_new},
+    {0, NULL},
+};
+
+static PyType_Spec scanner_spec = {
+    .name = "simplejson._speedups.Scanner",
+    .basicsize = sizeof(PyScannerObject),
+    .itemsize = 0,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .slots = scanner_slots,
 };
 
 static PyObject *
@@ -3362,47 +3381,23 @@ encoder_clear(PyObject *self)
 
 PyDoc_STRVAR(encoder_doc, "_iterencode(obj, _current_indent_level) -> iterable");
 
-static
-PyTypeObject PyEncoderType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    "simplejson._speedups.Encoder",       /* tp_name */
-    sizeof(PyEncoderObject), /* tp_basicsize */
-    0,                    /* tp_itemsize */
-    encoder_dealloc, /* tp_dealloc */
-    0,                    /* tp_print */
-    0,                    /* tp_getattr */
-    0,                    /* tp_setattr */
-    0,                    /* tp_compare */
-    0,                    /* tp_repr */
-    0,                    /* tp_as_number */
-    0,                    /* tp_as_sequence */
-    0,                    /* tp_as_mapping */
-    0,                    /* tp_hash */
-    encoder_call,         /* tp_call */
-    0,                    /* tp_str */
-    0,                    /* tp_getattro */
-    0,                    /* tp_setattro */
-    0,                    /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,   /* tp_flags */
-    encoder_doc,          /* tp_doc */
-    encoder_traverse,     /* tp_traverse */
-    encoder_clear,        /* tp_clear */
-    0,                    /* tp_richcompare */
-    0,                    /* tp_weaklistoffset */
-    0,                    /* tp_iter */
-    0,                    /* tp_iternext */
-    0,                    /* tp_methods */
-    encoder_members,      /* tp_members */
-    0,                    /* tp_getset */
-    0,                    /* tp_base */
-    0,                    /* tp_dict */
-    0,                    /* tp_descr_get */
-    0,                    /* tp_descr_set */
-    0,                    /* tp_dictoffset */
-    0,                    /* tp_init */
-    0,                    /* tp_alloc */
-    encoder_new,          /* tp_new */
-    0,                    /* tp_free */
+static PyType_Slot encoder_slots[] = {
+    {Py_tp_dealloc, (void *)encoder_dealloc},
+    {Py_tp_call, (void *)encoder_call},
+    {Py_tp_doc, (void *)encoder_doc},
+    {Py_tp_traverse, (void *)encoder_traverse},
+    {Py_tp_clear, (void *)encoder_clear},
+    {Py_tp_members, (void *)encoder_members},
+    {Py_tp_new, (void *)encoder_new},
+    {0, NULL},
+};
+
+static PyType_Spec encoder_spec = {
+    .name = "simplejson._speedups.Encoder",
+    .basicsize = sizeof(PyEncoderObject),
+    .itemsize = 0,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
+    .slots = encoder_slots,
 };
 
 static PyMethodDef speedups_methods[] = {
@@ -3475,6 +3470,8 @@ speedups_clear(PyObject *m)
     Py_CLEAR(st->JSON_ItemGetter0);
     Py_CLEAR(st->RawJSONType);
     Py_CLEAR(st->JSONDecodeError);
+    st->ScannerType = NULL;
+    st->EncoderType = NULL;
 
     return 0;
 }
@@ -3583,73 +3580,82 @@ moduleinit(void)
 {
     PyObject *m;
     speedups_modulestate *st;
+    PyObject *scanner_type = NULL;
+    PyObject *encoder_type = NULL;
 
-    if (PyType_Ready(&PyScannerType) < 0)
-        return NULL;
-    if (PyType_Ready(&PyEncoderType) < 0)
-        return NULL;
-
-#if PY_MAJOR_VERSION >= 3
     m = PyModule_Create(&moduledef);
-#else
-    m = Py_InitModule3("_speedups", speedups_methods, module_doc);
-#endif
     if (m == NULL)
         return NULL;
 
-#if PY_MAJOR_VERSION >= 3
     st = (speedups_modulestate *)PyModule_GetState(m);
-    if (st == NULL)
+    if (st == NULL) {
+        Py_DECREF(m);
         return NULL;
-#else
-    /* For Python 2, we would still use globals - but simplejson supports Py3 only now */
-    st = NULL;
-#endif
+    }
 
-#if PY_VERSION_HEX < 0x030A0000
-    /* For Python < 3.10, store module state globally since PyType_GetModuleState
-     * doesn't work with static types (it only works with heap types created via
-     * PyType_FromModuleAndSpec or with PyType_GetModuleByDef added in 3.10) */
+#if PY_VERSION_HEX < 0x03090000
     global_module_state = st;
 #endif
 
+#if PY_VERSION_HEX >= 0x03090000
+    scanner_type = PyType_FromModuleAndSpec(m, &scanner_spec, NULL);
+#else
+    scanner_type = PyType_FromSpec(&scanner_spec);
+#endif
+    if (scanner_type == NULL)
+        goto fail;
+
+    st->ScannerType = (PyTypeObject *)scanner_type;
+
+    if (PyModule_AddObject(m, "Scanner", scanner_type) < 0) {
+        Py_DECREF(scanner_type);
+        goto fail;
+    }
+    Py_INCREF(scanner_type);
+    if (PyModule_AddObject(m, "make_scanner", scanner_type) < 0) {
+        Py_DECREF(scanner_type);
+        goto fail;
+    }
+
+#if PY_VERSION_HEX >= 0x03090000
+    encoder_type = PyType_FromModuleAndSpec(m, &encoder_spec, NULL);
+#else
+    encoder_type = PyType_FromSpec(&encoder_spec);
+#endif
+    if (encoder_type == NULL)
+        goto fail;
+
+    st->EncoderType = (PyTypeObject *)encoder_type;
+
+    if (PyModule_AddObject(m, "Encoder", encoder_type) < 0) {
+        Py_DECREF(encoder_type);
+        goto fail;
+    }
+    Py_INCREF(encoder_type);
+    if (PyModule_AddObject(m, "make_encoder", encoder_type) < 0) {
+        Py_DECREF(encoder_type);
+        goto fail;
+    }
+
     if (!init_constants(st))
-        return NULL;
+        goto fail;
 
 #ifdef Py_GIL_DISABLED
     PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED);
 #endif
 
-#if PY_VERSION_HEX >= 0x030A0000
-    /* Python 3.10+: Use PyModule_AddType to associate type with module.
-     * For static types, PyType_GetModuleByDef (added in 3.10) can then retrieve
-     * the module. On Python < 3.10, PyModule_AddType either doesn't exist (< 3.9)
-     * or doesn't work with static types (3.9), so we use global_module_state. */
-    if (PyModule_AddType(m, &PyScannerType) < 0)
-        return NULL;
-    if (PyModule_AddType(m, &PyEncoderType) < 0)
-        return NULL;
-    /* Also add with the old names for compatibility */
-    Py_INCREF((PyObject*)&PyScannerType);
-    PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
-    Py_INCREF((PyObject*)&PyEncoderType);
-    PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType);
-#else
-    /* Python < 3.10: Just add to module namespace.
-     * We use global_module_state for PyType_GetModuleState compatibility. */
-    Py_INCREF((PyObject*)&PyScannerType);
-    PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
-    Py_INCREF((PyObject*)&PyEncoderType);
-    PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType);
-#endif
-
     st->RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
     if (st->RawJSONType == NULL)
-        return NULL;
+        goto fail;
     st->JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
     if (st->JSONDecodeError == NULL)
-        return NULL;
+        goto fail;
+
     return m;
+
+fail:
+    Py_DECREF(m);
+    return NULL;
 }
 
 #if PY_MAJOR_VERSION >= 3
