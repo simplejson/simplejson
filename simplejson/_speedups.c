@@ -29,10 +29,10 @@
 
 #if PY_VERSION_HEX < 0x03090000
 #if !defined(PyObject_CallNoArgs)
-#define PyObject_CallNoArgs(callable) PyObject_CallFunctionObjArgs(callable, NULL);
+#define PyObject_CallNoArgs(callable) PyObject_CallFunctionObjArgs(callable, NULL)
 #endif
 #if !defined(PyObject_CallOneArg)
-#define PyObject_CallOneArg(callable, arg) PyObject_CallFunctionObjArgs(callable, arg, NULL);
+#define PyObject_CallOneArg(callable, arg) PyObject_CallFunctionObjArgs(callable, arg, NULL)
 #endif
 #endif /* PY_VERSION_HEX < 0x03090000 */
 
@@ -2603,6 +2603,7 @@ static PyType_Slot scanner_slots[] = {
     {0, NULL},
 };
 
+#if PY_MAJOR_VERSION >= 3
 static PyType_Spec scanner_spec = {
     .name = "simplejson._speedups.Scanner",
     .basicsize = sizeof(PyScannerObject),
@@ -2610,6 +2611,50 @@ static PyType_Spec scanner_spec = {
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .slots = scanner_slots,
 };
+#else
+/* Static type definition for Python 2.7 */
+static PyTypeObject PyScannerType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "simplejson._speedups.Scanner",       /* tp_name */
+    sizeof(PyScannerObject), /* tp_basicsize */
+    0,                    /* tp_itemsize */
+    scanner_dealloc, /* tp_dealloc */
+    0,                    /* tp_print */
+    0,                    /* tp_getattr */
+    0,                    /* tp_setattr */
+    0,                    /* tp_compare */
+    0,                    /* tp_repr */
+    0,                    /* tp_as_number */
+    0,                    /* tp_as_sequence */
+    0,                    /* tp_as_mapping */
+    0,                    /* tp_hash */
+    scanner_call,         /* tp_call */
+    0,                    /* tp_str */
+    0,                    /* tp_getattro */
+    0,                    /* tp_setattro */
+    0,                    /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,   /* tp_flags */
+    scanner_doc,          /* tp_doc */
+    scanner_traverse,                    /* tp_traverse */
+    scanner_clear,                    /* tp_clear */
+    0,                    /* tp_richcompare */
+    0,                    /* tp_weaklistoffset */
+    0,                    /* tp_iter */
+    0,                    /* tp_iternext */
+    0,                    /* tp_methods */
+    scanner_members,                    /* tp_members */
+    0,                    /* tp_getset */
+    0,                    /* tp_base */
+    0,                    /* tp_dict */
+    0,                    /* tp_descr_get */
+    0,                    /* tp_descr_set */
+    0,                    /* tp_dictoffset */
+    0,                    /* tp_init */
+    0,        /* tp_alloc */
+    scanner_new,          /* tp_new */
+    0,              /* tp_free */
+};
+#endif
 
 static PyObject *
 encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -3380,6 +3425,7 @@ static PyType_Slot encoder_slots[] = {
     {0, NULL},
 };
 
+#if PY_MAJOR_VERSION >= 3
 static PyType_Spec encoder_spec = {
     .name = "simplejson._speedups.Encoder",
     .basicsize = sizeof(PyEncoderObject),
@@ -3387,6 +3433,50 @@ static PyType_Spec encoder_spec = {
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,
     .slots = encoder_slots,
 };
+#else
+/* Static type definition for Python 2.7 */
+static PyTypeObject PyEncoderType = {
+    PyVarObject_HEAD_INIT(NULL, 0)
+    "simplejson._speedups.Encoder",       /* tp_name */
+    sizeof(PyEncoderObject), /* tp_basicsize */
+    0,                    /* tp_itemsize */
+    encoder_dealloc, /* tp_dealloc */
+    0,                    /* tp_print */
+    0,                    /* tp_getattr */
+    0,                    /* tp_setattr */
+    0,                    /* tp_compare */
+    0,                    /* tp_repr */
+    0,                    /* tp_as_number */
+    0,                    /* tp_as_sequence */
+    0,                    /* tp_as_mapping */
+    0,                    /* tp_hash */
+    encoder_call,         /* tp_call */
+    0,                    /* tp_str */
+    0,                    /* tp_getattro */
+    0,                    /* tp_setattro */
+    0,                    /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC,   /* tp_flags */
+    encoder_doc,          /* tp_doc */
+    encoder_traverse,     /* tp_traverse */
+    encoder_clear,        /* tp_clear */
+    0,                    /* tp_richcompare */
+    0,                    /* tp_weaklistoffset */
+    0,                    /* tp_iter */
+    0,                    /* tp_iternext */
+    0,                    /* tp_methods */
+    encoder_members,      /* tp_members */
+    0,                    /* tp_getset */
+    0,                    /* tp_base */
+    0,                    /* tp_dict */
+    0,                    /* tp_descr_get */
+    0,                    /* tp_descr_set */
+    0,                    /* tp_dictoffset */
+    0,                    /* tp_init */
+    0,                    /* tp_alloc */
+    encoder_new,          /* tp_new */
+    0,                    /* tp_free */
+};
+#endif
 
 static PyMethodDef speedups_methods[] = {
     {"encode_basestring_ascii",
@@ -3611,6 +3701,8 @@ moduleinit(void)
     }
 #endif
 
+#if PY_MAJOR_VERSION >= 3
+    /* Python 3: Use heap types */
 #if PY_VERSION_HEX >= 0x03090000
     scanner_type = PyType_FromModuleAndSpec(m, &scanner_spec, NULL);
 #else
@@ -3650,6 +3742,40 @@ moduleinit(void)
         Py_DECREF(encoder_type);
         goto fail;
     }
+#else
+    /* Python 2: Use static types */
+    if (PyType_Ready(&PyScannerType) < 0)
+        goto fail;
+
+    st->ScannerType = &PyScannerType;
+
+    Py_INCREF(&PyScannerType);
+    if (PyModule_AddObject(m, "Scanner", (PyObject *)&PyScannerType) < 0) {
+        Py_DECREF(&PyScannerType);
+        goto fail;
+    }
+    Py_INCREF(&PyScannerType);
+    if (PyModule_AddObject(m, "make_scanner", (PyObject *)&PyScannerType) < 0) {
+        Py_DECREF(&PyScannerType);
+        goto fail;
+    }
+
+    if (PyType_Ready(&PyEncoderType) < 0)
+        goto fail;
+
+    st->EncoderType = &PyEncoderType;
+
+    Py_INCREF(&PyEncoderType);
+    if (PyModule_AddObject(m, "Encoder", (PyObject *)&PyEncoderType) < 0) {
+        Py_DECREF(&PyEncoderType);
+        goto fail;
+    }
+    Py_INCREF(&PyEncoderType);
+    if (PyModule_AddObject(m, "make_encoder", (PyObject *)&PyEncoderType) < 0) {
+        Py_DECREF(&PyEncoderType);
+        goto fail;
+    }
+#endif
 
     if (!init_constants(st))
         goto fail;
