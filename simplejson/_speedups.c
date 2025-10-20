@@ -3323,12 +3323,17 @@ static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "_speedups",        /* m_name */
     module_doc,         /* m_doc */
-    -1,                 /* m_size */
+#if PY_VERSION_HEX >= 0x030D0000
+    0,                  /* m_size: must be non-negative for PEP 489 (Python >= 3.13) */
+#else
+    -1,                 /* m_size: legacy single-phase module initialization */
+#endif
     speedups_methods,   /* m_methods */
-    NULL,               /* m_reload */
+    NULL,               /* m_slots: removed (no multi-phase init) */
     NULL,               /* m_traverse */
-    NULL,               /* m_clear*/
-    NULL,               /* m_free */
+    NULL,               /* m_clear */
+    /* m_free (module deallocator) was removed from PyModuleDef in Python >= 3.14.
+   Only used by modules with per-interpreter state (m_size > 0); not needed here. */
 };
 #endif
 
@@ -3386,10 +3391,20 @@ moduleinit(void)
 #else
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
 #endif
+    if (m == NULL)
+        return NULL;
     Py_INCREF((PyObject*)&PyScannerType);
-    PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
+    if (PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType) < 0) {
+        Py_DECREF((PyObject*)&PyScannerType);
+        Py_DECREF(m);
+        return NULL;
+    }
     Py_INCREF((PyObject*)&PyEncoderType);
-    PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType);
+    if (PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType) < 0) {
+        Py_DECREF((PyObject*)&PyEncoderType);
+        Py_DECREF(m);
+        return NULL;
+    }
     RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
     if (RawJSONType == NULL)
         return NULL;
