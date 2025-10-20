@@ -67,6 +67,33 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
 #endif
 #endif /* PY_VERSION_HEX < 0x02060000 */
 
+/* Compatibility shims for free-threading support */
+#if PY_VERSION_HEX < 0x030D0000
+#define Py_BEGIN_CRITICAL_SECTION(op) {
+#define Py_END_CRITICAL_SECTION() }
+#define Py_BEGIN_CRITICAL_SECTION2(op1, op2) {
+#define Py_END_CRITICAL_SECTION2() }
+#endif
+
+#if PY_VERSION_HEX < 0x030D0000
+/* Compatibility wrapper for PyDict_GetItemRef for Python < 3.13 */
+static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObject **result)
+{
+    PyObject *item = PyDict_GetItem(mp, key);
+    if (item != NULL) {
+        Py_INCREF(item);
+        *result = item;
+        return 1;  /* found */
+    }
+    *result = NULL;
+    if (PyErr_Occurred()) {
+        return -1;  /* error */
+    }
+    return 0;  /* not found */
+}
+#define PyDict_GetItemRef _compat_PyDict_GetItemRef
+#endif
+
 #ifdef __GNUC__
 #define UNUSED __attribute__((__unused__))
 #else
@@ -89,7 +116,19 @@ static PyObject *JSON_NaN = NULL;
 static PyObject *JSON_EmptyUnicode = NULL;
 #if PY_MAJOR_VERSION < 3
 static PyObject *JSON_EmptyStr = NULL;
+static PyObject *JSON_StringJoinFn = NULL;
 #endif
+static PyObject *JSON_OpenDict = NULL;
+static PyObject *JSON_CloseDict = NULL;
+static PyObject *JSON_EmptyDict = NULL;
+static PyObject *JSON_OpenArray = NULL;
+static PyObject *JSON_CloseArray = NULL;
+static PyObject *JSON_EmptyArray = NULL;
+static PyObject *JSON_ConstNull = NULL;
+static PyObject *JSON_ConstTrue = NULL;
+static PyObject *JSON_ConstFalse = NULL;
+static PyObject *JSON_SortArgs = NULL;
+static PyObject *JSON_ItemGetter0 = NULL;
 
 static PyTypeObject PyScannerType;
 static PyTypeObject PyEncoderType;
@@ -290,7 +329,10 @@ JSON_Accu_Init(JSON_Accu *acc)
 static int
 flush_accumulator(JSON_Accu *acc)
 {
-    Py_ssize_t nsmall = PyList_GET_SIZE(acc->small_strings);
+    Py_ssize_t nsmall;
+    Py_BEGIN_CRITICAL_SECTION(acc->small_strings);
+    nsmall = PyList_GET_SIZE(acc->small_strings);
+    Py_END_CRITICAL_SECTION();
     if (nsmall) {
         int ret;
         PyObject *joined;
@@ -329,7 +371,9 @@ JSON_Accu_Accumulate(JSON_Accu *acc, PyObject *unicode)
 
     if (PyList_Append(acc->small_strings, unicode))
         return -1;
+    Py_BEGIN_CRITICAL_SECTION(acc->small_strings);
     nsmall = PyList_GET_SIZE(acc->small_strings);
+    Py_END_CRITICAL_SECTION();
     /* Each item in a list of unicode objects has an overhead (in 64-bit
      * builds) of:
      *   - 8 bytes for the list slot
@@ -681,12 +725,9 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     PyObject *kstr = NULL;
     PyObject *sortfun = NULL;
     PyObject *sortres;
-    static PyObject *sortargs = NULL;
-
-    if (sortargs == NULL) {
-        sortargs = PyTuple_New(0);
-        if (sortargs == NULL)
-            return NULL;
+    if (JSON_SortArgs == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "simplejson sort args not initialized");
+        return NULL;
     }
 
     if (PyDict_CheckExact(dct))
@@ -751,7 +792,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     sortfun = PyObject_GetAttrString(lst, "sort");
     if (sortfun == NULL)
         goto bail;
-    sortres = PyObject_Call(sortfun, sortargs, s->item_sort_kw);
+    sortres = PyObject_Call(sortfun, JSON_SortArgs, s->item_sort_kw);
     if (!sortres)
         goto bail;
     Py_DECREF(sortres);
@@ -794,13 +835,11 @@ static PyObject *
 join_list_string(PyObject *lst)
 {
     /* return ''.join(lst) */
-    static PyObject *joinfn = NULL;
-    if (joinfn == NULL) {
-        joinfn = PyObject_GetAttrString(JSON_EmptyStr, "join");
-        if (joinfn == NULL)
-            return NULL;
+    if (JSON_StringJoinFn == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "simplejson join helper uninitialized");
+        return NULL;
     }
-    return PyObject_CallOneArg(joinfn, lst);
+    return PyObject_CallOneArg(JSON_StringJoinFn, lst);
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
@@ -1410,9 +1449,9 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             key = scanstring_str(pystr, idx + 1, encoding, s->strict, &next_idx);
             if (key == NULL)
                 goto bail;
-            memokey = PyDict_GetItem(s->memo, key);
+            if (PyDict_GetItemRef(s->memo, key, &memokey) < 0)
+                goto bail;
             if (memokey != NULL) {
-                Py_INCREF(memokey);
                 Py_DECREF(key);
                 key = memokey;
             }
@@ -1571,9 +1610,9 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
             key = scanstring_unicode(pystr, idx + 1, s->strict, &next_idx);
             if (key == NULL)
                 goto bail;
-            memokey = PyDict_GetItem(s->memo, key);
+            if (PyDict_GetItemRef(s->memo, key, &memokey) < 0)
+                goto bail;
             if (memokey != NULL) {
-                Py_INCREF(memokey);
                 Py_DECREF(key);
                 key = memokey;
             }
@@ -1748,7 +1787,11 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
 
     /* verify that idx < end_idx, str[idx] should be ']' */
     if (idx > end_idx || str[idx] != ']') {
-        if (PyList_GET_SIZE(rval)) {
+        Py_ssize_t rval_size;
+        Py_BEGIN_CRITICAL_SECTION(rval);
+        rval_size = PyList_GET_SIZE(rval);
+        Py_END_CRITICAL_SECTION();
+        if (rval_size) {
             raise_errmsg(ERR_ARRAY_DELIMITER, pystr, idx);
         } else {
             raise_errmsg(ERR_ARRAY_VALUE_FIRST, pystr, idx);
@@ -1829,7 +1872,11 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
 
     /* verify that idx < end_idx, str[idx] should be ']' */
     if (idx > end_idx || PyUnicode_READ(kind, str, idx) != ']') {
-        if (PyList_GET_SIZE(rval)) {
+        Py_ssize_t rval_size;
+        Py_BEGIN_CRITICAL_SECTION(rval);
+        rval_size = PyList_GET_SIZE(rval);
+        Py_END_CRITICAL_SECTION();
+        if (rval_size) {
             raise_errmsg(ERR_ARRAY_DELIMITER, pystr, idx);
         } else {
             raise_errmsg(ERR_ARRAY_VALUE_FIRST, pystr, idx);
@@ -2628,15 +2675,11 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         if (is_true < 0)
             goto bail;
         if (is_true) {
-            static PyObject *itemgetter0 = NULL;
-            if (!itemgetter0) {
-                PyObject *operator = PyImport_ImportModule("operator");
-                if (!operator)
-                    goto bail;
-                itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
-                Py_DECREF(operator);
+            if (JSON_ItemGetter0 == NULL) {
+                PyErr_SetString(PyExc_RuntimeError, "simplejson itemgetter helper not initialized");
+                goto bail;
             }
-            item_sort_key = itemgetter0;
+            item_sort_key = JSON_ItemGetter0;
             if (!item_sort_key)
                 goto bail;
         }
@@ -2697,28 +2740,28 @@ _encoded_const(PyObject *obj)
 {
     /* Return the JSON string representation of None, True, False */
     if (obj == Py_None) {
-        static PyObject *s_null = NULL;
-        if (s_null == NULL) {
-            s_null = JSON_InternFromString("null");
+        if (JSON_ConstNull == NULL) {
+            PyErr_SetString(PyExc_RuntimeError, "simplejson null constant not initialized");
+            return NULL;
         }
-        Py_INCREF(s_null);
-        return s_null;
+        Py_INCREF(JSON_ConstNull);
+        return JSON_ConstNull;
     }
     else if (obj == Py_True) {
-        static PyObject *s_true = NULL;
-        if (s_true == NULL) {
-            s_true = JSON_InternFromString("true");
+        if (JSON_ConstTrue == NULL) {
+            PyErr_SetString(PyExc_RuntimeError, "simplejson true constant not initialized");
+            return NULL;
         }
-        Py_INCREF(s_true);
-        return s_true;
+        Py_INCREF(JSON_ConstTrue);
+        return JSON_ConstTrue;
     }
     else if (obj == Py_False) {
-        static PyObject *s_false = NULL;
-        if (s_false == NULL) {
-            s_false = JSON_InternFromString("false");
+        if (JSON_ConstFalse == NULL) {
+            PyErr_SetString(PyExc_RuntimeError, "simplejson false constant not initialized");
+            return NULL;
         }
-        Py_INCREF(s_false);
-        return s_false;
+        Py_INCREF(JSON_ConstFalse);
+        return JSON_ConstFalse;
     }
     else {
         PyErr_SetString(PyExc_ValueError, "not a const");
@@ -2968,9 +3011,6 @@ static int
 encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_ssize_t indent_level)
 {
     /* Encode Python dict dct a JSON term */
-    static PyObject *open_dict = NULL;
-    static PyObject *close_dict = NULL;
-    static PyObject *empty_dict = NULL;
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
@@ -2979,15 +3019,13 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *encoded = NULL;
     Py_ssize_t idx;
 
-    if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
-        open_dict = JSON_InternFromString("{");
-        close_dict = JSON_InternFromString("}");
-        empty_dict = JSON_InternFromString("{}");
-        if (open_dict == NULL || close_dict == NULL || empty_dict == NULL)
-            return -1;
+    if (JSON_OpenDict == NULL || JSON_CloseDict == NULL || JSON_EmptyDict == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "simplejson dict delimiters not initialized");
+        return -1;
     }
+
     if (PyDict_Size(dct) == 0)
-        return JSON_Accu_Accumulate(rval, empty_dict);
+        return JSON_Accu_Accumulate(rval, JSON_EmptyDict);
 
     if (s->markers != Py_None) {
         int has_key;
@@ -3005,7 +3043,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
         }
     }
 
-    if (JSON_Accu_Accumulate(rval, open_dict))
+    if (JSON_Accu_Accumulate(rval, JSON_OpenDict))
         goto bail;
 
     if (s->indent != Py_None) {
@@ -3030,9 +3068,9 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             goto bail;
         }
         key = PyTuple_GET_ITEM(item, 0);
+        value = PyTuple_GET_ITEM(item, 1);
         if (key == NULL)
             goto bail;
-        value = PyTuple_GET_ITEM(item, 1);
         if (value == NULL)
             goto bail;
 
@@ -3054,9 +3092,9 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
          * indistinguishable from 0 and 1 in a dictionary lookup and there
          * may be other quirks with user defined subclasses.
          */
-        encoded = PyDict_GetItem(s->key_memo, kstr);
+        if (PyDict_GetItemRef(s->key_memo, kstr, &encoded) < 0)
+            goto bail;
         if (encoded != NULL) {
-            Py_INCREF(encoded);
             Py_CLEAR(kstr);
         } else {
             encoded = encoder_encode_string(s, kstr);
@@ -3092,7 +3130,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             yield '\n' + (_indent * _current_indent_level)
         */
     }
-    if (JSON_Accu_Accumulate(rval, close_dict))
+    if (JSON_Accu_Accumulate(rval, JSON_CloseDict))
         goto bail;
     return 0;
 
@@ -3111,28 +3149,22 @@ static int
 encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_ssize_t indent_level)
 {
     /* Encode Python list seq to a JSON term */
-    static PyObject *open_array = NULL;
-    static PyObject *close_array = NULL;
-    static PyObject *empty_array = NULL;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *obj = NULL;
     int is_true;
     int i = 0;
 
-    if (open_array == NULL || close_array == NULL || empty_array == NULL) {
-        open_array = JSON_InternFromString("[");
-        close_array = JSON_InternFromString("]");
-        empty_array = JSON_InternFromString("[]");
-        if (open_array == NULL || close_array == NULL || empty_array == NULL)
-            return -1;
+    if (JSON_OpenArray == NULL || JSON_CloseArray == NULL || JSON_EmptyArray == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "simplejson array delimiters not initialized");
+        return -1;
     }
     ident = NULL;
     is_true = PyObject_IsTrue(seq);
     if (is_true == -1)
         return -1;
     else if (is_true == 0)
-        return JSON_Accu_Accumulate(rval, empty_array);
+        return JSON_Accu_Accumulate(rval, JSON_EmptyArray);
 
     if (s->markers != Py_None) {
         int has_key;
@@ -3154,7 +3186,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     if (iter == NULL)
         goto bail;
 
-    if (JSON_Accu_Accumulate(rval, open_array))
+    if (JSON_Accu_Accumulate(rval, JSON_OpenArray))
         goto bail;
     if (s->indent != Py_None) {
         /* TODO: DOES NOT RUN */
@@ -3190,7 +3222,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
             yield '\n' + (_indent * _current_indent_level)
         */
     }
-    if (JSON_Accu_Accumulate(rval, close_array))
+    if (JSON_Accu_Accumulate(rval, JSON_CloseArray))
         goto bail;
     return 0;
 
@@ -3319,13 +3351,14 @@ PyDoc_STRVAR(module_doc,
 "simplejson speedups\n");
 
 #if PY_MAJOR_VERSION >= 3
+
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "_speedups",        /* m_name */
     module_doc,         /* m_doc */
     -1,                 /* m_size */
     speedups_methods,   /* m_methods */
-    NULL,               /* m_reload */
+    NULL,               /* m_slots or m_reload */
     NULL,               /* m_traverse */
     NULL,               /* m_clear*/
     NULL,               /* m_free */
@@ -3347,6 +3380,8 @@ import_dependency(char *module_name, char *attr_name)
 static int
 init_constants(void)
 {
+    PyObject *operator_module = NULL;
+
     JSON_NaN = JSON_InternFromString("NaN");
     if (JSON_NaN == NULL)
         return 0;
@@ -3363,8 +3398,54 @@ init_constants(void)
     if (JSON_EmptyStr == NULL)
         return 0;
     JSON_EmptyUnicode = PyUnicode_FromUnicode(NULL, 0);
+    if (JSON_EmptyUnicode == NULL)
+        return 0;
+    JSON_StringJoinFn = PyObject_GetAttrString(JSON_EmptyStr, "join");
+    if (JSON_StringJoinFn == NULL)
+        return 0;
 #endif /* PY_MAJOR_VERSION >= 3 */
     if (JSON_EmptyUnicode == NULL)
+        return 0;
+
+    JSON_OpenDict = JSON_InternFromString("{");
+    if (JSON_OpenDict == NULL)
+        return 0;
+    JSON_CloseDict = JSON_InternFromString("}");
+    if (JSON_CloseDict == NULL)
+        return 0;
+    JSON_EmptyDict = JSON_InternFromString("{}");
+    if (JSON_EmptyDict == NULL)
+        return 0;
+    JSON_OpenArray = JSON_InternFromString("[");
+    if (JSON_OpenArray == NULL)
+        return 0;
+    JSON_CloseArray = JSON_InternFromString("]");
+    if (JSON_CloseArray == NULL)
+        return 0;
+    JSON_EmptyArray = JSON_InternFromString("[]");
+    if (JSON_EmptyArray == NULL)
+        return 0;
+
+    JSON_ConstNull = JSON_InternFromString("null");
+    if (JSON_ConstNull == NULL)
+        return 0;
+    JSON_ConstTrue = JSON_InternFromString("true");
+    if (JSON_ConstTrue == NULL)
+        return 0;
+    JSON_ConstFalse = JSON_InternFromString("false");
+    if (JSON_ConstFalse == NULL)
+        return 0;
+
+    JSON_SortArgs = PyTuple_New(0);
+    if (JSON_SortArgs == NULL)
+        return 0;
+
+    operator_module = PyImport_ImportModule("operator");
+    if (operator_module == NULL)
+        return 0;
+    JSON_ItemGetter0 = PyObject_CallMethod(operator_module, "itemgetter", "i", 0);
+    Py_DECREF(operator_module);
+    if (JSON_ItemGetter0 == NULL)
         return 0;
 
     return 1;
@@ -3386,6 +3467,13 @@ moduleinit(void)
 #else
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
 #endif
+    if (m == NULL)
+        return NULL;
+
+#ifdef Py_GIL_DISABLED
+    PyUnstable_Module_SetGIL(m, Py_MOD_GIL_NOT_USED);
+#endif
+
     Py_INCREF((PyObject*)&PyScannerType);
     PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
     Py_INCREF((PyObject*)&PyEncoderType);
