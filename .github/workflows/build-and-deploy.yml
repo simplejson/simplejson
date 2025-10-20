@@ -31,13 +31,13 @@ jobs:
       - run: python -m simplejson.tests._cibw_runner .
 
   test_free_threading:
-    name: Tests with free-threading on Python 3.13t
+    name: Tests with free-threading on Python 3.14t
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13t'
+          python-version: '3.14t'
       - name: Build extension with free-threading support
         run: |
           python -m pip install --upgrade pip setuptools wheel

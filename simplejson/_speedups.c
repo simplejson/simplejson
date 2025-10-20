@@ -421,9 +421,7 @@ static int
 flush_accumulator(speedups_modulestate *st, JSON_Accu *acc)
 {
     Py_ssize_t nsmall;
-    Py_BEGIN_CRITICAL_SECTION(acc->small_strings);
     nsmall = PyList_GET_SIZE(acc->small_strings);
-    Py_END_CRITICAL_SECTION();
     if (nsmall) {
         int ret;
         PyObject *joined;
@@ -462,9 +460,7 @@ JSON_Accu_Accumulate(speedups_modulestate *st, JSON_Accu *acc, PyObject *unicode
 
     if (PyList_Append(acc->small_strings, unicode))
         return -1;
-    Py_BEGIN_CRITICAL_SECTION(acc->small_strings);
     nsmall = PyList_GET_SIZE(acc->small_strings);
-    Py_END_CRITICAL_SECTION();
     /* Each item in a list of unicode objects has an overhead (in 64-bit
      * builds) of:
      *   - 8 bytes for the list slot
@@ -1888,11 +1884,7 @@ _parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t
 
     /* verify that idx < end_idx, str[idx] should be ']' */
     if (idx > end_idx || str[idx] != ']') {
-        Py_ssize_t rval_size;
-        Py_BEGIN_CRITICAL_SECTION(rval);
-        rval_size = PyList_GET_SIZE(rval);
-        Py_END_CRITICAL_SECTION();
-        if (rval_size) {
+        if (PyList_GET_SIZE(rval)) {
             raise_errmsg(st, ERR_ARRAY_DELIMITER, pystr, idx);
         } else {
             raise_errmsg(st, ERR_ARRAY_VALUE_FIRST, pystr, idx);
@@ -1974,11 +1966,7 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
 
     /* verify that idx < end_idx, str[idx] should be ']' */
     if (idx > end_idx || PyUnicode_READ(kind, str, idx) != ']') {
-        Py_ssize_t rval_size;
-        Py_BEGIN_CRITICAL_SECTION(rval);
-        rval_size = PyList_GET_SIZE(rval);
-        Py_END_CRITICAL_SECTION();
-        if (rval_size) {
+        if (PyList_GET_SIZE(rval)) {
             raise_errmsg(st, ERR_ARRAY_DELIMITER, pystr, idx);
         } else {
             raise_errmsg(st, ERR_ARRAY_VALUE_FIRST, pystr, idx);
