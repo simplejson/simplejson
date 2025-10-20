@@ -146,6 +146,25 @@ static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObjec
 #define PyDict_GetItemRef _compat_PyDict_GetItemRef
 #endif
 
+#if PY_VERSION_HEX >= 0x030D0000
+#include "critical_section.h"
+#endif
+
+#ifndef Py_BEGIN_CRITICAL_SECTION
+#define Py_BEGIN_CRITICAL_SECTION(op) ((void)(op))
+#define Py_END_CRITICAL_SECTION() ((void)0)
+#endif
+
+#ifndef Py_BEGIN_CRITICAL_SECTION2
+#define Py_BEGIN_CRITICAL_SECTION2(op1, op2) ((void)(op1)), ((void)(op2))
+#define Py_END_CRITICAL_SECTION2() ((void)0)
+#endif
+
+#ifndef Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST
+#define Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST(op) ((void)(op))
+#define Py_END_CRITICAL_SECTION_SEQUENCE_FAST() ((void)0)
+#endif
+
 #ifdef __GNUC__
 #define UNUSED __attribute__((__unused__))
 #else
@@ -812,13 +831,11 @@ static PyObject *
 encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 {
     speedups_modulestate *st = module_state_from_type(Py_TYPE(s));
-    PyObject *items;
-    PyObject *iter = NULL;
+    PyObject *items = NULL;
     PyObject *lst = NULL;
-    PyObject *item = NULL;
     PyObject *kstr = NULL;
     PyObject *sortfun = NULL;
-    PyObject *sortres;
+    PyObject *sortres = NULL;
     if (st == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "failed to get module state");
         return NULL;
@@ -834,16 +851,13 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
         items = PyMapping_Items(dct);
     if (items == NULL)
         return NULL;
-    iter = PyObject_GetIter(items);
-    Py_DECREF(items);
-    if (iter == NULL)
-        return NULL;
     if (s->item_sort_kw == Py_None)
-        return iter;
+        return items;
     lst = PyList_New(0);
     if (lst == NULL)
         goto bail;
-    while ((item = PyIter_Next(iter))) {
+    for (Py_ssize_t i = 0; i < PyList_GET_SIZE(items); i++) {
+        PyObject *item = PyList_GET_ITEM(items, i);
         PyObject *key, *value;
         if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
             PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
@@ -859,51 +873,46 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 #endif /* PY_MAJOR_VERSION < 3 */
         else if (PyUnicode_Check(key)) {
             /* item can be added as-is */
+            if (PyList_Append(lst, item))
+                goto bail;
+            continue;
         }
-        else {
-            PyObject *tpl;
-            kstr = encoder_stringify_key(st, s, key);
-            if (kstr == NULL)
-                goto bail;
-            else if (kstr == Py_None) {
-                /* skipkeys */
-                Py_DECREF(kstr);
-                continue;
-            }
-            value = PyTuple_GET_ITEM(item, 1);
-            if (value == NULL)
-                goto bail;
-            tpl = PyTuple_Pack(2, kstr, value);
-            if (tpl == NULL)
-                goto bail;
-            Py_CLEAR(kstr);
-            Py_DECREF(item);
-            item = tpl;
-        }
-        if (PyList_Append(lst, item))
+        kstr = encoder_stringify_key(st, s, key);
+        if (kstr == NULL)
             goto bail;
-        Py_DECREF(item);
+        if (kstr == Py_None) {
+            Py_DECREF(kstr);
+            kstr = NULL;
+            continue;
+        }
+        value = PyTuple_GET_ITEM(item, 1);
+        if (value == NULL)
+            goto bail;
+        PyObject *tpl = PyTuple_Pack(2, kstr, value);
+        Py_CLEAR(kstr);
+        if (tpl == NULL)
+            goto bail;
+        if (PyList_Append(lst, tpl)) {
+            Py_DECREF(tpl);
+            goto bail;
+        }
+        Py_DECREF(tpl);
     }
-    Py_CLEAR(iter);
-    if (PyErr_Occurred())
-        goto bail;
     sortfun = PyObject_GetAttrString(lst, "sort");
     if (sortfun == NULL)
         goto bail;
     sortres = PyObject_Call(sortfun, st->JSON_SortArgs, s->item_sort_kw);
-    if (!sortres)
+    if (sortres == NULL)
         goto bail;
     Py_DECREF(sortres);
-    Py_CLEAR(sortfun);
-    iter = PyObject_GetIter(lst);
-    Py_CLEAR(lst);
-    return iter;
+    Py_DECREF(sortfun);
+    Py_DECREF(items);
+    return lst;
 bail:
     Py_XDECREF(sortfun);
     Py_XDECREF(kstr);
-    Py_XDECREF(item);
     Py_XDECREF(lst);
-    Py_XDECREF(iter);
+    Py_XDECREF(items);
     return NULL;
 }
 
@@ -3141,11 +3150,9 @@ encoder_listencode_dict(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
     /* Encode Python dict dct a JSON term */
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
-    PyObject *iter = NULL;
-    PyObject *item = NULL;
     PyObject *items = NULL;
-    PyObject *encoded = NULL;
     Py_ssize_t idx;
+    int error = 0;
 
     if (st->JSON_OpenDict == NULL || st->JSON_CloseDict == NULL || st->JSON_EmptyDict == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "simplejson dict delimiters not initialized");
@@ -3184,36 +3191,48 @@ encoder_listencode_dict(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
         */
     }
 
-    iter = encoder_dict_iteritems(s, dct);
-    if (iter == NULL)
+    items = encoder_dict_iteritems(s, dct);
+    if (items == NULL)
         goto bail;
 
     idx = 0;
-    while ((item = PyIter_Next(iter))) {
-        PyObject *encoded, *key, *value;
+    Py_BEGIN_CRITICAL_SECTION(items);
+    for (Py_ssize_t i = 0; i < PyList_GET_SIZE(items); i++) {
+        PyObject *item = PyList_GET_ITEM(items, i);
+        PyObject *encoded = NULL, *key, *value;
+#ifdef Py_GIL_DISABLED
+        Py_INCREF(item);
+#endif
         if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
             PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
-            goto bail;
+            error = 1;
+#ifdef Py_GIL_DISABLED
+            Py_DECREF(item);
+#endif
+            break;
         }
         key = PyTuple_GET_ITEM(item, 0);
         value = PyTuple_GET_ITEM(item, 1);
         if (key == NULL)
-            goto bail;
+            goto item_error;
         if (value == NULL)
-            goto bail;
+            goto item_error;
 
         kstr = encoder_stringify_key(st, s, key);
         if (kstr == NULL)
-            goto bail;
+            goto item_error;
         else if (kstr == Py_None) {
             /* skipkeys */
-            Py_DECREF(item);
             Py_DECREF(kstr);
+            kstr = NULL;
+#ifdef Py_GIL_DISABLED
+            Py_DECREF(item);
+#endif
             continue;
         }
         if (idx) {
             if (JSON_Accu_Accumulate(st, rval, s->item_separator))
-                goto bail;
+                goto item_error;
         }
         /*
          * Only cache the encoding of string keys. False and True are
@@ -3221,31 +3240,45 @@ encoder_listencode_dict(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
          * may be other quirks with user defined subclasses.
          */
         if (PyDict_GetItemRef(s->key_memo, kstr, &encoded) < 0)
-            goto bail;
+            goto item_error;
         if (encoded != NULL) {
             Py_CLEAR(kstr);
         } else {
             encoded = encoder_encode_string(s, kstr);
             Py_CLEAR(kstr);
             if (encoded == NULL)
-                goto bail;
+                goto item_error;
             if (PyDict_SetItem(s->key_memo, key, encoded))
-                goto bail;
+                goto item_error;
         }
         if (JSON_Accu_Accumulate(st, rval, encoded)) {
-            goto bail;
+            goto item_error;
         }
         Py_CLEAR(encoded);
         if (JSON_Accu_Accumulate(st, rval, s->key_separator))
-            goto bail;
+            goto item_error;
         if (encoder_listencode_obj(st, s, rval, value, indent_level))
-            goto bail;
-        Py_CLEAR(item);
+            goto item_error;
+#ifdef Py_GIL_DISABLED
+        Py_DECREF(item);
+#endif
         idx += 1;
+        continue;
+
+item_error:
+        error = 1;
+        Py_XDECREF(encoded);
+        Py_XDECREF(kstr);
+        kstr = NULL;
+#ifdef Py_GIL_DISABLED
+        Py_DECREF(item);
+#endif
+        break;
     }
-    Py_CLEAR(iter);
-    if (PyErr_Occurred())
+    Py_END_CRITICAL_SECTION();
+    if (error || PyErr_Occurred())
         goto bail;
+    Py_CLEAR(items);
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
@@ -3263,10 +3296,7 @@ encoder_listencode_dict(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
     return 0;
 
 bail:
-    Py_XDECREF(encoded);
     Py_XDECREF(items);
-    Py_XDECREF(item);
-    Py_XDECREF(iter);
     Py_XDECREF(kstr);
     Py_XDECREF(ident);
     return -1;
@@ -3278,10 +3308,9 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
 {
     /* Encode Python list seq to a JSON term */
     PyObject *ident = NULL;
-    PyObject *iter = NULL;
-    PyObject *obj = NULL;
+    PyObject *s_fast = NULL;
     int is_true;
-    int i = 0;
+    int error = 0;
 
     if (st->JSON_OpenArray == NULL || st->JSON_CloseArray == NULL || st->JSON_EmptyArray == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "simplejson array delimiters not initialized");
@@ -3310,8 +3339,8 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
         }
     }
 
-    iter = PyObject_GetIter(seq);
-    if (iter == NULL)
+    s_fast = PySequence_Fast(seq, "encoder_listencode_list needs a sequence");
+    if (s_fast == NULL)
         goto bail;
 
     if (JSON_Accu_Accumulate(st, rval, st->JSON_OpenArray))
@@ -3325,19 +3354,38 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
             buf += newline_indent
         */
     }
-    while ((obj = PyIter_Next(iter))) {
+    Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST(seq);
+    for (Py_ssize_t i = 0; i < PySequence_Fast_GET_SIZE(s_fast); i++) {
+        PyObject *obj = PySequence_Fast_GET_ITEM(s_fast, i);
+#ifdef Py_GIL_DISABLED
+        Py_INCREF(obj);
+#endif
         if (i) {
             if (JSON_Accu_Accumulate(st, rval, s->item_separator))
-                goto bail;
+            {
+#ifdef Py_GIL_DISABLED
+                Py_DECREF(obj);
+#endif
+                error = 1;
+                break;
+            }
         }
         if (encoder_listencode_obj(st, s, rval, obj, indent_level))
-            goto bail;
-        i++;
-        Py_CLEAR(obj);
+        {
+#ifdef Py_GIL_DISABLED
+            Py_DECREF(obj);
+#endif
+            error = 1;
+            break;
+        }
+#ifdef Py_GIL_DISABLED
+        Py_DECREF(obj);
+#endif
     }
-    Py_CLEAR(iter);
-    if (PyErr_Occurred())
+    Py_END_CRITICAL_SECTION_SEQUENCE_FAST();
+    if (PyErr_Occurred() || error)
         goto bail;
+    Py_CLEAR(s_fast);
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
@@ -3355,8 +3403,7 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
     return 0;
 
 bail:
-    Py_XDECREF(obj);
-    Py_XDECREF(iter);
+    Py_XDECREF(s_fast);
     Py_XDECREF(ident);
     return -1;
 }
