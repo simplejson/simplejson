@@ -113,6 +113,20 @@ compat_PyType_GetModuleState(PyTypeObject *type)
 #define PyType_GetModuleState compat_PyType_GetModuleState
 #endif
 
+#if PY_MAJOR_VERSION < 3
+static inline void *
+compat_PyModule_GetState(PyObject *module)
+{
+    (void)module;
+    if (global_module_state == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "module state not initialized");
+    }
+    return global_module_state;
+}
+
+#define PyModule_GetState compat_PyModule_GetState
+#endif
+
 #if PY_VERSION_HEX < 0x030D0000
 /* Compatibility wrapper for PyDict_GetItemRef for Python < 3.13 */
 static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObject **result)
@@ -334,7 +348,7 @@ static PyObject *
 py_encode_basestring_ascii(PyObject* self, PyObject *pystr);
 #if PY_MAJOR_VERSION < 3
 static PyObject *
-join_list_string(PyObject *lst);
+join_list_string(speedups_modulestate *st, PyObject *lst);
 static PyObject *
 scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
@@ -425,7 +439,7 @@ flush_accumulator(speedups_modulestate *st, JSON_Accu *acc)
 #if PY_MAJOR_VERSION >= 3
         joined = join_list_unicode(st, acc->small_strings);
 #else /* PY_MAJOR_VERSION >= 3 */
-        joined = join_list_string(acc->small_strings);
+        joined = join_list_string(st, acc->small_strings);
 #endif /* PY_MAJOR_VERSION < 3 */
         if (joined == NULL)
             return -1;
@@ -912,17 +926,17 @@ join_list_unicode(speedups_modulestate *st, PyObject *lst)
 }
 
 #if PY_MAJOR_VERSION >= 3
-#define join_list_string join_list_unicode
+#define join_list_string(st, lst) join_list_unicode(st, lst)
 #else /* PY_MAJOR_VERSION >= 3 */
 static PyObject *
-join_list_string(PyObject *lst)
+join_list_string(speedups_modulestate *st, PyObject *lst)
 {
     /* return ''.join(lst) */
-    if (JSON_StringJoinFn == NULL) {
+    if (st->JSON_StringJoinFn == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "simplejson join helper uninitialized");
         return NULL;
     }
-    return PyObject_CallOneArg(JSON_StringJoinFn, lst);
+    return PyObject_CallOneArg(st->JSON_StringJoinFn, lst);
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
@@ -1154,13 +1168,13 @@ scanstring_str(speedups_modulestate *st, PyObject *pystr, Py_ssize_t end, char *
         if (chunk != NULL)
             rval = chunk;
         else {
-            rval = JSON_EmptyStr;
+            rval = st->JSON_EmptyStr;
             Py_INCREF(rval);
         }
     }
     else {
         APPEND_OLD_CHUNK
-        rval = join_list_string(chunks);
+        rval = join_list_string(st, chunks);
         if (rval == NULL) {
             goto bail;
         }
@@ -2584,6 +2598,7 @@ bail:
 
 PyDoc_STRVAR(scanner_doc, "JSON scanner object");
 
+#if PY_MAJOR_VERSION >= 3
 static PyType_Slot scanner_slots[] = {
     {Py_tp_dealloc, (void *)scanner_dealloc},
     {Py_tp_call, (void *)scanner_call},
@@ -2595,7 +2610,6 @@ static PyType_Slot scanner_slots[] = {
     {0, NULL},
 };
 
-#if PY_MAJOR_VERSION >= 3
 static PyType_Spec scanner_spec = {
     .name = "simplejson._speedups.Scanner",
     .basicsize = sizeof(PyScannerObject),
@@ -3406,6 +3420,7 @@ encoder_clear(PyObject *self)
 
 PyDoc_STRVAR(encoder_doc, "_iterencode(obj, _current_indent_level) -> iterable");
 
+#if PY_MAJOR_VERSION >= 3
 static PyType_Slot encoder_slots[] = {
     {Py_tp_dealloc, (void *)encoder_dealloc},
     {Py_tp_call, (void *)encoder_call},
@@ -3417,7 +3432,6 @@ static PyType_Slot encoder_slots[] = {
     {0, NULL},
 };
 
-#if PY_MAJOR_VERSION >= 3
 static PyType_Spec encoder_spec = {
     .name = "simplejson._speedups.Encoder",
     .basicsize = sizeof(PyEncoderObject),
