@@ -3570,7 +3570,11 @@ moduleinit(void)
     speedups_modulestate *st;
     PyObject *scanner_type = NULL;
     PyObject *encoder_type = NULL;
+#if PY_MAJOR_VERSION < 3
+    int new_state = 0;
+#endif
 
+#if PY_MAJOR_VERSION >= 3
     m = PyModule_Create(&moduledef);
     if (m == NULL)
         return NULL;
@@ -3583,6 +3587,28 @@ moduleinit(void)
 
 #if PY_VERSION_HEX < 0x03090000
     global_module_state = st;
+#endif
+#else
+    st = global_module_state;
+    if (st == NULL) {
+        st = PyMem_Malloc(sizeof(speedups_modulestate));
+        if (st == NULL) {
+            PyErr_NoMemory();
+            return NULL;
+        }
+        new_state = 1;
+    }
+    memset(st, 0, sizeof(speedups_modulestate));
+    global_module_state = st;
+
+    m = Py_InitModule3("_speedups", speedups_methods, module_doc);
+    if (m == NULL) {
+        if (new_state) {
+            PyMem_Free(st);
+            global_module_state = NULL;
+        }
+        return NULL;
+    }
 #endif
 
 #if PY_VERSION_HEX >= 0x03090000
@@ -3642,7 +3668,15 @@ moduleinit(void)
     return m;
 
 fail:
+#if PY_MAJOR_VERSION >= 3
     Py_DECREF(m);
+#else
+    if (new_state) {
+        PyMem_Free(st);
+        global_module_state = NULL;
+    }
+    Py_DECREF(m);
+#endif
     return NULL;
 }
 
