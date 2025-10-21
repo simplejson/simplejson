@@ -160,11 +160,6 @@ static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObjec
 #define Py_END_CRITICAL_SECTION2() ((void)0)
 #endif
 
-#ifndef Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST
-#define Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST(op) ((void)(op))
-#define Py_END_CRITICAL_SECTION_SEQUENCE_FAST() ((void)0)
-#endif
-
 #ifdef __GNUC__
 #define UNUSED __attribute__((__unused__))
 #else
@@ -3196,6 +3191,8 @@ encoder_listencode_dict(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
         goto bail;
 
     idx = 0;
+    /* CPython exposes no public helper for PySequence_Fast iteration.
+       Lock the concrete list we are iterating to avoid races on free-threaded builds. */
     Py_BEGIN_CRITICAL_SECTION(items);
     for (Py_ssize_t i = 0; i < PyList_GET_SIZE(items); i++) {
         PyObject *item = PyList_GET_ITEM(items, i);
@@ -3354,7 +3351,9 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
             buf += newline_indent
         */
     }
-    Py_BEGIN_CRITICAL_SECTION_SEQUENCE_FAST(seq);
+    /* Keep iteration stable for free-threaded builds by locking the
+       list materialized by PySequence_Fast(). */
+    Py_BEGIN_CRITICAL_SECTION(s_fast);
     for (Py_ssize_t i = 0; i < PySequence_Fast_GET_SIZE(s_fast); i++) {
         PyObject *obj = PySequence_Fast_GET_ITEM(s_fast, i);
 #ifdef Py_GIL_DISABLED
@@ -3382,7 +3381,7 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
         Py_DECREF(obj);
 #endif
     }
-    Py_END_CRITICAL_SECTION_SEQUENCE_FAST();
+    Py_END_CRITICAL_SECTION();
     if (PyErr_Occurred() || error)
         goto bail;
     Py_CLEAR(s_fast);
