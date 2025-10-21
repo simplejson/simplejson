@@ -1470,9 +1470,7 @@ scanner_dealloc(PyObject *self)
 static int
 scanner_traverse(PyObject *self, visitproc visit, void *arg)
 {
-    PyScannerObject *s;
-    assert(PyScanner_Check(self));
-    s = (PyScannerObject *)self;
+    PyScannerObject *s = (PyScannerObject *)self;
     Py_VISIT(s->encoding);
     Py_VISIT(s->strict_bool);
     Py_VISIT(s->object_hook);
@@ -1487,9 +1485,7 @@ scanner_traverse(PyObject *self, visitproc visit, void *arg)
 static int
 scanner_clear(PyObject *self)
 {
-    PyScannerObject *s;
-    assert(PyScanner_Check(self));
-    s = (PyScannerObject *)self;
+    PyScannerObject *s = (PyScannerObject *)self;
     Py_CLEAR(s->encoding);
     Py_CLEAR(s->strict_bool);
     Py_CLEAR(s->object_hook);
@@ -3419,9 +3415,7 @@ encoder_dealloc(PyObject *self)
 static int
 encoder_traverse(PyObject *self, visitproc visit, void *arg)
 {
-    PyEncoderObject *s;
-    assert(PyEncoder_Check(self));
-    s = (PyEncoderObject *)self;
+    PyEncoderObject *s = (PyEncoderObject *)self;
     Py_VISIT(s->markers);
     Py_VISIT(s->defaultfn);
     Py_VISIT(s->encoder);
@@ -3443,9 +3437,7 @@ static int
 encoder_clear(PyObject *self)
 {
     /* Deallocate Encoder */
-    PyEncoderObject *s;
-    assert(PyEncoder_Check(self));
-    s = (PyEncoderObject *)self;
+    PyEncoderObject *s = (PyEncoderObject *)self;
     Py_CLEAR(s->markers);
     Py_CLEAR(s->defaultfn);
     Py_CLEAR(s->encoder);
