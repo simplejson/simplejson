@@ -3187,8 +3187,7 @@ encoder_listencode_dict(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
         goto bail;
 
     idx = 0;
-    /* CPython exposes no public helper for PySequence_Fast iteration.
-       Lock the concrete list we are iterating to avoid races on free-threaded builds. */
+    /* Lock the concrete item list so free-threaded builds cannot mutate it underneath us. */
     Py_BEGIN_CRITICAL_SECTION(items);
     for (Py_ssize_t i = 0; i < PyList_GET_SIZE(items); i++) {
         PyObject *item = PyList_GET_ITEM(items, i);
@@ -3301,7 +3300,7 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
 {
     /* Encode Python list seq to a JSON term */
     PyObject *ident = NULL;
-    PyObject *s_fast = NULL;
+    PyObject *iter = NULL;
     int is_true;
     int error = 0;
 
@@ -3332,10 +3331,6 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
         }
     }
 
-    s_fast = PySequence_Fast(seq, "encoder_listencode_list needs a sequence");
-    if (s_fast == NULL)
-        goto bail;
-
     if (JSON_Accu_Accumulate(st, rval, st->JSON_OpenArray))
         goto bail;
     if (s->indent != Py_None) {
@@ -3347,16 +3342,25 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
             buf += newline_indent
         */
     }
-    /* Keep iteration stable for free-threaded builds by locking the
-       list materialized by PySequence_Fast(). */
-    Py_BEGIN_CRITICAL_SECTION(s_fast);
-    for (Py_ssize_t i = 0; i < PySequence_Fast_GET_SIZE(s_fast); i++) {
-        PyObject *obj = PySequence_Fast_GET_ITEM(s_fast, i);
+    if (PyList_Check(seq)) {
+        Py_ssize_t len = PyList_GET_SIZE(seq);
+        Py_BEGIN_CRITICAL_SECTION(seq);
+        for (Py_ssize_t i = 0; i < len; i++) {
+            PyObject *obj = PyList_GET_ITEM(seq, i);
 #ifdef Py_GIL_DISABLED
-        Py_INCREF(obj);
+            Py_INCREF(obj);
 #endif
-        if (i) {
-            if (JSON_Accu_Accumulate(st, rval, s->item_separator))
+            if (i) {
+                if (JSON_Accu_Accumulate(st, rval, s->item_separator))
+                {
+#ifdef Py_GIL_DISABLED
+                    Py_DECREF(obj);
+#endif
+                    error = 1;
+                    break;
+                }
+            }
+            if (encoder_listencode_obj(st, s, rval, obj, indent_level))
             {
 #ifdef Py_GIL_DISABLED
                 Py_DECREF(obj);
@@ -3364,23 +3368,85 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
                 error = 1;
                 break;
             }
-        }
-        if (encoder_listencode_obj(st, s, rval, obj, indent_level))
-        {
 #ifdef Py_GIL_DISABLED
             Py_DECREF(obj);
 #endif
-            error = 1;
-            break;
         }
-#ifdef Py_GIL_DISABLED
-        Py_DECREF(obj);
-#endif
+        Py_END_CRITICAL_SECTION();
+        if (error)
+            goto bail;
     }
-    Py_END_CRITICAL_SECTION();
-    if (PyErr_Occurred() || error)
-        goto bail;
-    Py_CLEAR(s_fast);
+    else if (PyTuple_Check(seq)) {
+        Py_ssize_t len = PyTuple_GET_SIZE(seq);
+        Py_BEGIN_CRITICAL_SECTION(seq);
+        for (Py_ssize_t i = 0; i < len; i++) {
+            PyObject *obj = PyTuple_GET_ITEM(seq, i);
+#ifdef Py_GIL_DISABLED
+            Py_INCREF(obj);
+#endif
+            if (i) {
+                if (JSON_Accu_Accumulate(st, rval, s->item_separator))
+                {
+#ifdef Py_GIL_DISABLED
+                    Py_DECREF(obj);
+#endif
+                    error = 1;
+                    break;
+                }
+            }
+            if (encoder_listencode_obj(st, s, rval, obj, indent_level))
+            {
+#ifdef Py_GIL_DISABLED
+                Py_DECREF(obj);
+#endif
+                error = 1;
+                break;
+            }
+#ifdef Py_GIL_DISABLED
+            Py_DECREF(obj);
+#endif
+        }
+        Py_END_CRITICAL_SECTION();
+        if (error)
+            goto bail;
+    }
+    else {
+        Py_ssize_t index = 0;
+        PyObject *item = NULL;
+
+        iter = PyObject_GetIter(seq);
+        if (iter == NULL)
+            goto bail;
+
+        Py_BEGIN_CRITICAL_SECTION(iter);
+        while ((item = PyIter_Next(iter)) != NULL) {
+            if (index) {
+                if (JSON_Accu_Accumulate(st, rval, s->item_separator)) {
+                    Py_DECREF(item);
+                    error = 1;
+                    break;
+                }
+            }
+            if (encoder_listencode_obj(st, s, rval, item, indent_level)) {
+                Py_DECREF(item);
+                error = 1;
+                break;
+            }
+            Py_DECREF(item);
+            index++;
+        }
+        Py_END_CRITICAL_SECTION();
+
+        if (item == NULL && PyErr_Occurred())
+            error = 1;
+
+        Py_DECREF(iter);
+        iter = NULL;
+
+        if (error)
+            goto bail;
+    }
+
     if (ident != NULL) {
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
@@ -3398,7 +3464,7 @@ encoder_listencode_list(speedups_modulestate *st, PyEncoderObject *s, JSON_Accu 
     return 0;
 
 bail:
-    Py_XDECREF(s_fast);
+    Py_XDECREF(iter);
     Py_XDECREF(ident);
     return -1;
 }
