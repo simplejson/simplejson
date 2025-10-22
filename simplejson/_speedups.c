@@ -146,10 +146,6 @@ static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObjec
 #define PyDict_GetItemRef _compat_PyDict_GetItemRef
 #endif
 
-#if PY_VERSION_HEX >= 0x030D0000
-#include "critical_section.h"
-#endif
-
 #ifndef Py_BEGIN_CRITICAL_SECTION
 #define Py_BEGIN_CRITICAL_SECTION(op) ((void)(op))
 #define Py_END_CRITICAL_SECTION() ((void)0)
@@ -168,20 +164,10 @@ static inline int _compat_PyDict_GetItemRef(PyObject *mp, PyObject *key, PyObjec
 
 #define DEFAULT_ENCODING "utf-8"
 
-static inline speedups_modulestate *
-module_state_from_type(PyTypeObject *type)
-{
-    return (speedups_modulestate *)PyType_GetModuleState(type);
-}
-
 static inline PyTypeObject *
 scanner_type_from_object(PyObject *op)
 {
-    speedups_modulestate *st = module_state_from_type(Py_TYPE(op));
-#if PY_VERSION_HEX < 0x03090000
-    if (st == NULL)
-        st = global_module_state;
-#endif
+    speedups_modulestate *st = (speedups_modulestate *)PyType_GetModuleState(Py_TYPE(op));
     if (st == NULL)
         return NULL;
     return st->ScannerType;
@@ -190,11 +176,7 @@ scanner_type_from_object(PyObject *op)
 static inline PyTypeObject *
 encoder_type_from_object(PyObject *op)
 {
-    speedups_modulestate *st = module_state_from_type(Py_TYPE(op));
-#if PY_VERSION_HEX < 0x03090000
-    if (st == NULL)
-        st = global_module_state;
-#endif
+    speedups_modulestate *st = (speedups_modulestate *)PyType_GetModuleState(Py_TYPE(op));
     if (st == NULL)
         return NULL;
     return st->EncoderType;
@@ -825,7 +807,7 @@ encoder_stringify_key(speedups_modulestate *st, PyEncoderObject *s, PyObject *ke
 static PyObject *
 encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 {
-    speedups_modulestate *st = module_state_from_type(Py_TYPE(s));
+    speedups_modulestate *st = (speedups_modulestate *)PyType_GetModuleState(Py_TYPE(s));
     PyObject *items = NULL;
     PyObject *lst = NULL;
     PyObject *kstr = NULL;
