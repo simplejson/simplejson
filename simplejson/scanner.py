@@ -2,7 +2,11 @@
 """
 import re
 from .errors import JSONDecodeError
+from .compat import is_gil_enabled
+
 def _import_c_make_scanner():
+    if not is_gil_enabled():
+        return None
     try:
         from ._speedups import make_scanner
         return make_scanner

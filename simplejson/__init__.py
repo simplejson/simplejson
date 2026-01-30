@@ -133,6 +133,8 @@ from .errors import JSONDecodeError
 from .raw_json import RawJSON
 from .decoder import JSONDecoder
 from .encoder import JSONEncoder, JSONEncoderForHTML
+from .compat import is_gil_enabled
+
 def _import_OrderedDict():
     import collections
     try:
@@ -143,6 +145,8 @@ def _import_OrderedDict():
 OrderedDict = _import_OrderedDict()
 
 def _import_c_make_encoder():
+    if not is_gil_enabled():
+        return None
     try:
         from ._speedups import make_encoder
         return make_encoder

@@ -4,10 +4,13 @@ from __future__ import absolute_import
 import re
 import sys
 import struct
-from .compat import PY3, unichr
+from .compat import PY3, unichr, is_gil_enabled
 from .scanner import make_scanner, JSONDecodeError
 
+
 def _import_c_scanstring():
+    if not is_gil_enabled():
+        return None
     try:
         from ._speedups import scanstring
         return scanstring

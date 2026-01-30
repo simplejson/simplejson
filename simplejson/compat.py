@@ -1,6 +1,18 @@
 """Python 3 compatibility shims
 """
 import sys
+
+def is_gil_enabled():
+    """Return True if the CPython runtime currently has the GIL enabled."""
+    getter = getattr(sys, "_is_gil_enabled", None)
+    if getter is None:
+        return True
+    try:
+        return bool(getter())
+    except RuntimeError:
+        # Some runtimes may raise if called before fully initialized.
+        return True
+
 if sys.version_info[0] < 3:
     PY3 = False
     def b(s):
