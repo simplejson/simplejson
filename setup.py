@@ -24,8 +24,6 @@ PYTHON_REQUIRES = '>=2.5, !=3.0.*, !=3.1.*, !=3.2.*'
 CLASSIFIERS = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
-    'License :: OSI Approved :: MIT License',
-    'License :: OSI Approved :: Academic Free License (AFL)',
     'Programming Language :: Python',
     'Programming Language :: Python :: 2',
     'Programming Language :: Python :: 2.5',
@@ -119,7 +117,7 @@ def run_setup(with_binary):
         author="Bob Ippolito",
         author_email="bob@redivi.com",
         url="https://github.com/simplejson/simplejson",
-        license="MIT License",
+        license="MIT OR AFL-2.1",
         packages=['simplejson', 'simplejson.tests'],
         platforms=['any'],
         **kw)
