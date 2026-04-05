@@ -2700,6 +2700,8 @@ _encoded_const(PyObject *obj)
         static PyObject *s_null = NULL;
         if (s_null == NULL) {
             s_null = JSON_InternFromString("null");
+            if (s_null == NULL)
+                return NULL;
         }
         Py_INCREF(s_null);
         return s_null;
@@ -2708,6 +2710,8 @@ _encoded_const(PyObject *obj)
         static PyObject *s_true = NULL;
         if (s_true == NULL) {
             s_true = JSON_InternFromString("true");
+            if (s_true == NULL)
+                return NULL;
         }
         Py_INCREF(s_true);
         return s_true;
@@ -2716,6 +2720,8 @@ _encoded_const(PyObject *obj)
         static PyObject *s_false = NULL;
         if (s_false == NULL) {
             s_false = JSON_InternFromString("false");
+            if (s_false == NULL)
+                return NULL;
         }
         Py_INCREF(s_false);
         return s_false;
@@ -2979,11 +2985,19 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *encoded = NULL;
     Py_ssize_t idx;
 
-    if (open_dict == NULL || close_dict == NULL || empty_dict == NULL) {
+    if (open_dict == NULL) {
         open_dict = JSON_InternFromString("{");
+        if (open_dict == NULL)
+            return -1;
+    }
+    if (close_dict == NULL) {
         close_dict = JSON_InternFromString("}");
+        if (close_dict == NULL)
+            return -1;
+    }
+    if (empty_dict == NULL) {
         empty_dict = JSON_InternFromString("{}");
-        if (open_dict == NULL || close_dict == NULL || empty_dict == NULL)
+        if (empty_dict == NULL)
             return -1;
     }
     if (PyDict_Size(dct) == 0)
@@ -3120,11 +3134,19 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     int is_true;
     int i = 0;
 
-    if (open_array == NULL || close_array == NULL || empty_array == NULL) {
+    if (open_array == NULL) {
         open_array = JSON_InternFromString("[");
+        if (open_array == NULL)
+            return -1;
+    }
+    if (close_array == NULL) {
         close_array = JSON_InternFromString("]");
+        if (close_array == NULL)
+            return -1;
+    }
+    if (empty_array == NULL) {
         empty_array = JSON_InternFromString("[]");
-        if (open_array == NULL || close_array == NULL || empty_array == NULL)
+        if (empty_array == NULL)
             return -1;
     }
     ident = NULL;
@@ -3386,6 +3408,8 @@ moduleinit(void)
 #else
     m = Py_InitModule3("_speedups", speedups_methods, module_doc);
 #endif
+    if (m == NULL)
+        return NULL;
     Py_INCREF((PyObject*)&PyScannerType);
     PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType);
     Py_INCREF((PyObject*)&PyEncoderType);
