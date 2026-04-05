@@ -2912,9 +2912,12 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             PyObject *newobj;
             if (s->iterable_as_array) {
                 newobj = PyObject_GetIter(obj);
-                if (newobj == NULL)
-                    PyErr_Clear();
-                else {
+                if (newobj == NULL) {
+                    if (PyErr_ExceptionMatches(PyExc_TypeError))
+                        PyErr_Clear();
+                    else
+                        break;
+                } else {
                     rv = encoder_listencode_list(s, rval, newobj, indent_level);
                     Py_DECREF(newobj);
                     break;
