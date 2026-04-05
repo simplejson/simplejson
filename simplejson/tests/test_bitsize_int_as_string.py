@@ -61,6 +61,18 @@ class TestBitSizeIntAsString(TestCase):
                 expect,
                 json.loads(json.dumps(val, int_as_string_bitcount=31)))
 
+    def test_comparison_error_propagated(self):
+        # Regression test: PyObject_RichCompareBool returning -1 must
+        # propagate the error, not silently quote the integer.
+        class BadInt(int):
+            def __ge__(self, other):
+                raise RuntimeError("comparison bomb")
+            def __le__(self, other):
+                raise RuntimeError("comparison bomb")
+        self.assertRaises(
+            (RuntimeError, SystemError),
+            json.dumps, BadInt(2**60), int_as_string_bitcount=53)
+
     def test_dict_keys(self):
         for val, _ in self.values:
             expect = {str(val): 'value'}
