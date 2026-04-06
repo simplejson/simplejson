@@ -729,6 +729,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
             else if (kstr == Py_None) {
                 /* skipkeys */
                 Py_DECREF(kstr);
+                Py_DECREF(item);
                 continue;
             }
             value = PyTuple_GET_ITEM(item, 1);
@@ -3039,7 +3040,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 
     idx = 0;
     while ((item = PyIter_Next(iter))) {
-        PyObject *encoded, *key, *value;
+        PyObject *key, *value;
         if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
             PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
             goto bail;
