@@ -74,9 +74,12 @@ class TestBitSizeIntAsString(TestCase):
                 raise RuntimeError("comparison bomb")
             def __le__(self, other):
                 raise RuntimeError("comparison bomb")
+        # Use bitcount=15 and value 2**16 so the value fits in a
+        # Python 2 int on 32-bit platforms while still exceeding the
+        # bitcount threshold.
         self.assertRaises(
             RuntimeError,
-            json.dumps, BadInt(2**60), int_as_string_bitcount=53)
+            json.dumps, BadInt(2**16), int_as_string_bitcount=15)
 
     def test_dict_keys(self):
         for val, _ in self.values:
