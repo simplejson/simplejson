@@ -62,15 +62,20 @@ class TestBitSizeIntAsString(TestCase):
                 json.loads(json.dumps(val, int_as_string_bitcount=31)))
 
     def test_comparison_error_propagated(self):
-        # Regression test: PyObject_RichCompareBool returning -1 must
-        # propagate the error, not silently quote the integer.
+        # Regression test for C extension bug: PyObject_RichCompareBool
+        # returning -1 is truthy in C, causing the error to be silently
+        # swallowed. The pure Python encoder uses < (not >=/<= via
+        # RichCompareBool), so this only tests the C extension path.
+        from simplejson import encoder
+        if encoder.c_make_encoder is None:
+            return
         class BadInt(int):
             def __ge__(self, other):
                 raise RuntimeError("comparison bomb")
             def __le__(self, other):
                 raise RuntimeError("comparison bomb")
         self.assertRaises(
-            (RuntimeError, SystemError),
+            RuntimeError,
             json.dumps, BadInt(2**60), int_as_string_bitcount=53)
 
     def test_dict_keys(self):
