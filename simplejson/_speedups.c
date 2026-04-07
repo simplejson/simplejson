@@ -179,7 +179,7 @@ static PyMemberDef encoder_members[] = {
     {"markers", T_OBJECT, offsetof(PyEncoderObject, markers), READONLY, "markers"},
     {"default", T_OBJECT, offsetof(PyEncoderObject, defaultfn), READONLY, "default"},
     {"encoder", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoder"},
-    {"encoding", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoding"},
+    {"encoding", T_OBJECT, offsetof(PyEncoderObject, encoding), READONLY, "encoding"},
     {"indent", T_OBJECT, offsetof(PyEncoderObject, indent), READONLY, "indent"},
     {"key_separator", T_OBJECT, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
     {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
@@ -2594,6 +2594,8 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
         static const unsigned long long_long_bitsize = SIZEOF_LONG_LONG * 8;
         long int_as_string_bitcount_val = PyLong_AsLong(int_as_string_bitcount);
+        if (int_as_string_bitcount_val == -1 && PyErr_Occurred())
+            goto bail;
         if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < (long)long_long_bitsize) {
             s->max_long_size = PyLong_FromUnsignedLongLong(1ULL << (int)int_as_string_bitcount_val);
             s->min_long_size = PyLong_FromLongLong(-1LL << (int)int_as_string_bitcount_val);
@@ -3251,6 +3253,7 @@ encoder_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(s->key_separator);
     Py_VISIT(s->item_separator);
     Py_VISIT(s->key_memo);
+    Py_VISIT(s->skipkeys_bool);
     Py_VISIT(s->sort_keys);
     Py_VISIT(s->item_sort_kw);
     Py_VISIT(s->item_sort_key);
