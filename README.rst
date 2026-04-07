@@ -32,3 +32,28 @@ Python 2.2. This is based on a very old version of simplejson,
 is not maintained, and should only be used as a last resort.
 
 .. _python2.2: https://github.com/simplejson/simplejson/tree/python2.2
+
+RawJSON
+~~~~~~~
+
+``RawJSON`` allows embedding pre-encoded JSON strings into output without
+re-encoding them.
+
+This can be useful in advanced cases where JSON content is already
+serialized and re-encoding would be unnecessary.
+
+Example usage::
+
+    from simplejson import dumps, RawJSON
+
+    payload = {
+        "status": "ok",
+        "data": RawJSON('{"a": 1, "b": 2}')
+    }
+
+    print(dumps(payload))
+    # Output: {"status": "ok", "data": {"a": 1, "b": 2}}
+
+**Caveat:** ``RawJSON`` should be used with care. It bypasses normal
+serialization and validation, and is not recommended for general use
+unless the embedded JSON content is fully trusted.
