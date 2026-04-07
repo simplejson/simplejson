@@ -273,7 +273,10 @@ static PyObject* RawJSONType = NULL;
 static int
 is_raw_json(PyObject *obj)
 {
-    return PyObject_IsInstance(obj, RawJSONType) ? 1 : 0;
+    int r = PyObject_IsInstance(obj, RawJSONType);
+    if (r < 0)
+        return -1;
+    return r;
 }
 
 static int
@@ -378,8 +381,17 @@ static PyObject *
 maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 {
     if (s->max_long_size != Py_None && s->min_long_size != Py_None) {
-        if (PyObject_RichCompareBool(obj, s->max_long_size, Py_GE) ||
-            PyObject_RichCompareBool(obj, s->min_long_size, Py_LE)) {
+        int ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
+        if (ge < 0) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        int le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
+        if (le < 0) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        if (ge || le) {
 #if PY_MAJOR_VERSION >= 3
             PyObject* quoted = PyUnicode_FromFormat("\"%U\"", encoded);
 #else
@@ -2910,13 +2922,16 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
         }
-        else if (is_raw_json(obj))
-        {
-            PyObject *encoded = PyObject_GetAttrString(obj, "encoded_json");
-            if (encoded != NULL)
-                rv = _steal_accumulate(rval, encoded);
-        }
         else {
+            int raw = is_raw_json(obj);
+            if (raw < 0)
+                break;
+            if (raw) {
+                PyObject *encoded = PyObject_GetAttrString(obj, "encoded_json");
+                if (encoded != NULL)
+                    rv = _steal_accumulate(rval, encoded);
+            }
+            else {
             PyObject *ident = NULL;
             PyObject *newobj;
             if (s->iterable_as_array) {
@@ -2971,6 +2986,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
                     rv = -1;
                 }
                 Py_DECREF(ident);
+            }
             }
         }
     } while (0);

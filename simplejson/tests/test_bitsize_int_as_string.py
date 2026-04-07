@@ -61,6 +61,26 @@ class TestBitSizeIntAsString(TestCase):
                 expect,
                 json.loads(json.dumps(val, int_as_string_bitcount=31)))
 
+    def test_comparison_error_propagated(self):
+        # Regression test for C extension bug: PyObject_RichCompareBool
+        # returning -1 is truthy in C, causing the error to be silently
+        # swallowed. The pure Python encoder uses < (not >=/<= via
+        # RichCompareBool), so this only tests the C extension path.
+        from simplejson import encoder
+        if encoder.c_make_encoder is None:
+            return
+        class BadInt(int):
+            def __ge__(self, other):
+                raise RuntimeError("comparison bomb")
+            def __le__(self, other):
+                raise RuntimeError("comparison bomb")
+        # Use bitcount=15 and value 2**16 so the value fits in a
+        # Python 2 int on 32-bit platforms while still exceeding the
+        # bitcount threshold.
+        self.assertRaises(
+            RuntimeError,
+            json.dumps, BadInt(2**16), int_as_string_bitcount=15)
+
     def test_dict_keys(self):
         for val, _ in self.values:
             expect = {str(val): 'value'}
