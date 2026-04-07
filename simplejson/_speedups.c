@@ -1430,11 +1430,14 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             key = scanstring_str(pystr, idx + 1, encoding, s->strict, &next_idx);
             if (key == NULL)
                 goto bail;
-            memokey = PyDict_GetItem(s->memo, key);
+            memokey = PyDict_GetItemWithError(s->memo, key);
             if (memokey != NULL) {
                 Py_INCREF(memokey);
                 Py_DECREF(key);
                 key = memokey;
+            }
+            else if (PyErr_Occurred()) {
+                goto bail;
             }
             else {
                 if (PyDict_SetItem(s->memo, key, key) < 0)
@@ -1591,11 +1594,14 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
             key = scanstring_unicode(pystr, idx + 1, s->strict, &next_idx);
             if (key == NULL)
                 goto bail;
-            memokey = PyDict_GetItem(s->memo, key);
+            memokey = PyDict_GetItemWithError(s->memo, key);
             if (memokey != NULL) {
                 Py_INCREF(memokey);
                 Py_DECREF(key);
                 key = memokey;
+            }
+            else if (PyErr_Occurred()) {
+                goto bail;
             }
             else {
                 if (PyDict_SetItem(s->memo, key, key) < 0)
@@ -3054,10 +3060,12 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
          * indistinguishable from 0 and 1 in a dictionary lookup and there
          * may be other quirks with user defined subclasses.
          */
-        encoded = PyDict_GetItem(s->key_memo, kstr);
+        encoded = PyDict_GetItemWithError(s->key_memo, kstr);
         if (encoded != NULL) {
             Py_INCREF(encoded);
             Py_CLEAR(kstr);
+        } else if (PyErr_Occurred()) {
+            goto bail;
         } else {
             encoded = encoder_encode_string(s, kstr);
             Py_CLEAR(kstr);
