@@ -91,6 +91,21 @@ static PyObject *JSON_EmptyUnicode = NULL;
 static PyObject *JSON_EmptyStr = NULL;
 #endif
 
+/* Interned string constants, initialized in init_constants().
+   Previously lazily initialized in individual functions, which
+   is a data race under free-threaded Python (PEP 703). */
+static PyObject *JSON_s_null = NULL;
+static PyObject *JSON_s_true = NULL;
+static PyObject *JSON_s_false = NULL;
+static PyObject *JSON_open_dict = NULL;
+static PyObject *JSON_close_dict = NULL;
+static PyObject *JSON_empty_dict = NULL;
+static PyObject *JSON_open_array = NULL;
+static PyObject *JSON_close_array = NULL;
+static PyObject *JSON_empty_array = NULL;
+static PyObject *JSON_sortargs = NULL;
+static PyObject *JSON_itemgetter0 = NULL;
+
 static PyTypeObject PyScannerType;
 static PyTypeObject PyEncoderType;
 
@@ -693,14 +708,6 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     PyObject *kstr = NULL;
     PyObject *sortfun = NULL;
     PyObject *sortres;
-    static PyObject *sortargs = NULL;
-
-    if (sortargs == NULL) {
-        sortargs = PyTuple_New(0);
-        if (sortargs == NULL)
-            return NULL;
-    }
-
     if (PyDict_CheckExact(dct))
         items = PyDict_Items(dct);
     else
@@ -764,7 +771,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     sortfun = PyObject_GetAttrString(lst, "sort");
     if (sortfun == NULL)
         goto bail;
-    sortres = PyObject_Call(sortfun, sortargs, s->item_sort_kw);
+    sortres = PyObject_Call(sortfun, JSON_sortargs, s->item_sort_kw);
     if (!sortres)
         goto bail;
     Py_DECREF(sortres);
@@ -2643,15 +2650,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         if (is_true < 0)
             goto bail;
         if (is_true) {
-            static PyObject *itemgetter0 = NULL;
-            if (!itemgetter0) {
-                PyObject *operator = PyImport_ImportModule("operator");
-                if (!operator)
-                    goto bail;
-                itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
-                Py_DECREF(operator);
-            }
-            item_sort_key = itemgetter0;
+            item_sort_key = JSON_itemgetter0;
             if (!item_sort_key)
                 goto bail;
         }
@@ -2712,34 +2711,16 @@ _encoded_const(PyObject *obj)
 {
     /* Return the JSON string representation of None, True, False */
     if (obj == Py_None) {
-        static PyObject *s_null = NULL;
-        if (s_null == NULL) {
-            s_null = JSON_InternFromString("null");
-            if (s_null == NULL)
-                return NULL;
-        }
-        Py_INCREF(s_null);
-        return s_null;
+        Py_INCREF(JSON_s_null);
+        return JSON_s_null;
     }
     else if (obj == Py_True) {
-        static PyObject *s_true = NULL;
-        if (s_true == NULL) {
-            s_true = JSON_InternFromString("true");
-            if (s_true == NULL)
-                return NULL;
-        }
-        Py_INCREF(s_true);
-        return s_true;
+        Py_INCREF(JSON_s_true);
+        return JSON_s_true;
     }
     else if (obj == Py_False) {
-        static PyObject *s_false = NULL;
-        if (s_false == NULL) {
-            s_false = JSON_InternFromString("false");
-            if (s_false == NULL)
-                return NULL;
-        }
-        Py_INCREF(s_false);
-        return s_false;
+        Py_INCREF(JSON_s_false);
+        return JSON_s_false;
     }
     else {
         PyErr_SetString(PyExc_ValueError, "not a const");
@@ -2997,9 +2978,6 @@ static int
 encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_ssize_t indent_level)
 {
     /* Encode Python dict dct a JSON term */
-    static PyObject *open_dict = NULL;
-    static PyObject *close_dict = NULL;
-    static PyObject *empty_dict = NULL;
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
@@ -3008,23 +2986,8 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *encoded = NULL;
     Py_ssize_t idx;
 
-    if (open_dict == NULL) {
-        open_dict = JSON_InternFromString("{");
-        if (open_dict == NULL)
-            return -1;
-    }
-    if (close_dict == NULL) {
-        close_dict = JSON_InternFromString("}");
-        if (close_dict == NULL)
-            return -1;
-    }
-    if (empty_dict == NULL) {
-        empty_dict = JSON_InternFromString("{}");
-        if (empty_dict == NULL)
-            return -1;
-    }
     if (PyDict_Size(dct) == 0)
-        return JSON_Accu_Accumulate(rval, empty_dict);
+        return JSON_Accu_Accumulate(rval, JSON_empty_dict);
 
     if (s->markers != Py_None) {
         int has_key;
@@ -3042,7 +3005,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
         }
     }
 
-    if (JSON_Accu_Accumulate(rval, open_dict))
+    if (JSON_Accu_Accumulate(rval, JSON_open_dict))
         goto bail;
 
     if (s->indent != Py_None) {
@@ -3129,7 +3092,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             yield '\n' + (_indent * _current_indent_level)
         */
     }
-    if (JSON_Accu_Accumulate(rval, close_dict))
+    if (JSON_Accu_Accumulate(rval, JSON_close_dict))
         goto bail;
     return 0;
 
@@ -3148,36 +3111,18 @@ static int
 encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_ssize_t indent_level)
 {
     /* Encode Python list seq to a JSON term */
-    static PyObject *open_array = NULL;
-    static PyObject *close_array = NULL;
-    static PyObject *empty_array = NULL;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *obj = NULL;
     int is_true;
     int i = 0;
 
-    if (open_array == NULL) {
-        open_array = JSON_InternFromString("[");
-        if (open_array == NULL)
-            return -1;
-    }
-    if (close_array == NULL) {
-        close_array = JSON_InternFromString("]");
-        if (close_array == NULL)
-            return -1;
-    }
-    if (empty_array == NULL) {
-        empty_array = JSON_InternFromString("[]");
-        if (empty_array == NULL)
-            return -1;
-    }
     ident = NULL;
     is_true = PyObject_IsTrue(seq);
     if (is_true == -1)
         return -1;
     else if (is_true == 0)
-        return JSON_Accu_Accumulate(rval, empty_array);
+        return JSON_Accu_Accumulate(rval, JSON_empty_array);
 
     if (s->markers != Py_None) {
         int has_key;
@@ -3199,7 +3144,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     if (iter == NULL)
         goto bail;
 
-    if (JSON_Accu_Accumulate(rval, open_array))
+    if (JSON_Accu_Accumulate(rval, JSON_open_array))
         goto bail;
     if (s->indent != Py_None) {
         /* TODO: DOES NOT RUN */
@@ -3235,7 +3180,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
             yield '\n' + (_indent * _current_indent_level)
         */
     }
-    if (JSON_Accu_Accumulate(rval, close_array))
+    if (JSON_Accu_Accumulate(rval, JSON_close_array))
         goto bail;
     return 0;
 
@@ -3418,6 +3363,37 @@ init_constants(void)
     if (JSON_EmptyUnicode == NULL)
         return 0;
 
+    JSON_s_null = JSON_InternFromString("null");
+    if (JSON_s_null == NULL)
+        return 0;
+    JSON_s_true = JSON_InternFromString("true");
+    if (JSON_s_true == NULL)
+        return 0;
+    JSON_s_false = JSON_InternFromString("false");
+    if (JSON_s_false == NULL)
+        return 0;
+    JSON_open_dict = JSON_InternFromString("{");
+    if (JSON_open_dict == NULL)
+        return 0;
+    JSON_close_dict = JSON_InternFromString("}");
+    if (JSON_close_dict == NULL)
+        return 0;
+    JSON_empty_dict = JSON_InternFromString("{}");
+    if (JSON_empty_dict == NULL)
+        return 0;
+    JSON_open_array = JSON_InternFromString("[");
+    if (JSON_open_array == NULL)
+        return 0;
+    JSON_close_array = JSON_InternFromString("]");
+    if (JSON_close_array == NULL)
+        return 0;
+    JSON_empty_array = JSON_InternFromString("[]");
+    if (JSON_empty_array == NULL)
+        return 0;
+    JSON_sortargs = PyTuple_New(0);
+    if (JSON_sortargs == NULL)
+        return 0;
+
     return 1;
 }
 
@@ -3457,6 +3433,15 @@ moduleinit(void)
     JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
     if (JSONDecodeError == NULL)
         return NULL;
+    {
+        PyObject *operator = PyImport_ImportModule("operator");
+        if (!operator)
+            return NULL;
+        JSON_itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
+        Py_DECREF(operator);
+        if (!JSON_itemgetter0)
+            return NULL;
+    }
     return m;
 }
 
