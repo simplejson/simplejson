@@ -179,7 +179,7 @@ static PyMemberDef encoder_members[] = {
     {"markers", T_OBJECT, offsetof(PyEncoderObject, markers), READONLY, "markers"},
     {"default", T_OBJECT, offsetof(PyEncoderObject, defaultfn), READONLY, "default"},
     {"encoder", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoder"},
-    {"encoding", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoding"},
+    {"encoding", T_OBJECT, offsetof(PyEncoderObject, encoding), READONLY, "encoding"},
     {"indent", T_OBJECT, offsetof(PyEncoderObject, indent), READONLY, "indent"},
     {"key_separator", T_OBJECT, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
     {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
@@ -273,7 +273,10 @@ static PyObject* RawJSONType = NULL;
 static int
 is_raw_json(PyObject *obj)
 {
-    return PyObject_IsInstance(obj, RawJSONType) ? 1 : 0;
+    int r = PyObject_IsInstance(obj, RawJSONType);
+    if (r < 0)
+        return -1;
+    return r;
 }
 
 static int
@@ -378,8 +381,17 @@ static PyObject *
 maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 {
     if (s->max_long_size != Py_None && s->min_long_size != Py_None) {
-        if (PyObject_RichCompareBool(obj, s->max_long_size, Py_GE) ||
-            PyObject_RichCompareBool(obj, s->min_long_size, Py_LE)) {
+        int ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
+        if (ge < 0) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        int le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
+        if (le < 0) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        if (ge || le) {
 #if PY_MAJOR_VERSION >= 3
             PyObject* quoted = PyUnicode_FromFormat("\"%U\"", encoded);
 #else
@@ -2594,6 +2606,8 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
         static const unsigned long long_long_bitsize = SIZEOF_LONG_LONG * 8;
         long int_as_string_bitcount_val = PyLong_AsLong(int_as_string_bitcount);
+        if (int_as_string_bitcount_val == -1 && PyErr_Occurred())
+            goto bail;
         if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < (long)long_long_bitsize) {
             s->max_long_size = PyLong_FromUnsignedLongLong(1ULL << (int)int_as_string_bitcount_val);
             s->min_long_size = PyLong_FromLongLong(-1LL << (int)int_as_string_bitcount_val);
@@ -2908,13 +2922,16 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (encoded != NULL)
                 rv = _steal_accumulate(rval, encoded);
         }
-        else if (is_raw_json(obj))
-        {
-            PyObject *encoded = PyObject_GetAttrString(obj, "encoded_json");
-            if (encoded != NULL)
-                rv = _steal_accumulate(rval, encoded);
-        }
         else {
+            int raw = is_raw_json(obj);
+            if (raw < 0)
+                break;
+            if (raw) {
+                PyObject *encoded = PyObject_GetAttrString(obj, "encoded_json");
+                if (encoded != NULL)
+                    rv = _steal_accumulate(rval, encoded);
+            }
+            else {
             PyObject *ident = NULL;
             PyObject *newobj;
             if (s->iterable_as_array) {
@@ -2969,6 +2986,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
                     rv = -1;
                 }
                 Py_DECREF(ident);
+            }
             }
         }
     } while (0);
@@ -3251,6 +3269,7 @@ encoder_traverse(PyObject *self, visitproc visit, void *arg)
     Py_VISIT(s->key_separator);
     Py_VISIT(s->item_separator);
     Py_VISIT(s->key_memo);
+    Py_VISIT(s->skipkeys_bool);
     Py_VISIT(s->sort_keys);
     Py_VISIT(s->item_sort_kw);
     Py_VISIT(s->item_sort_key);
