@@ -73,6 +73,14 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
 #define UNUSED
 #endif
 
+/* Py_BEGIN_CRITICAL_SECTION was added in Python 3.13.
+   On older versions, define as no-ops. */
+#if PY_VERSION_HEX < 0x030d0000
+#define Py_BEGIN_CRITICAL_SECTION(op)
+#define Py_END_CRITICAL_SECTION()
+#endif
+
+
 #define DEFAULT_ENCODING "utf-8"
 
 #define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
@@ -2359,7 +2367,7 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
 {
     /* Python callable interface to scan_once_{str,unicode} */
     PyObject *pystr;
-    PyObject *rval;
+    PyObject *rval = NULL;
     Py_ssize_t idx;
     Py_ssize_t next_idx = -1;
     static char *kwlist[] = {"string", "idx", NULL};
@@ -2372,20 +2380,31 @@ scanner_call(PyObject *self, PyObject *args, PyObject *kwds)
     if (PyUnicode_Check(pystr)) {
         if (PyUnicode_READY(pystr))
             return NULL;
-        rval = scan_once_unicode(s, pystr, idx, &next_idx);
     }
 #if PY_MAJOR_VERSION < 3
-    else if (PyString_Check(pystr)) {
-        rval = scan_once_str(s, pystr, idx, &next_idx);
-    }
-#endif /* PY_MAJOR_VERSION < 3 */
+    else if (!PyString_Check(pystr)) {
+#else
     else {
+#endif
         PyErr_Format(PyExc_TypeError,
                  "first argument must be a string, not %.80s",
                  Py_TYPE(pystr)->tp_name);
         return NULL;
     }
+
+    Py_BEGIN_CRITICAL_SECTION(self);
+
+    if (PyUnicode_Check(pystr)) {
+        rval = scan_once_unicode(s, pystr, idx, &next_idx);
+    }
+#if PY_MAJOR_VERSION < 3
+    else {
+        rval = scan_once_str(s, pystr, idx, &next_idx);
+    }
+#endif /* PY_MAJOR_VERSION < 3 */
     PyDict_Clear(s->memo);
+
+    Py_END_CRITICAL_SECTION();
     return _build_rval_index_tuple(rval, next_idx);
 }
 
@@ -2698,6 +2717,7 @@ encoder_call(PyObject *self, PyObject *args, PyObject *kwds)
     Py_ssize_t indent_level;
     PyEncoderObject *s;
     JSON_Accu rval;
+    int encode_rv;
     assert(PyEncoder_Check(self));
     s = (PyEncoderObject *)self;
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:_iterencode", kwlist,
@@ -2705,7 +2725,10 @@ encoder_call(PyObject *self, PyObject *args, PyObject *kwds)
         return NULL;
     if (JSON_Accu_Init(&rval))
         return NULL;
-    if (encoder_listencode_obj(s, &rval, obj, indent_level)) {
+    Py_BEGIN_CRITICAL_SECTION(self);
+    encode_rv = encoder_listencode_obj(s, &rval, obj, indent_level);
+    Py_END_CRITICAL_SECTION();
+    if (encode_rv) {
         JSON_Accu_Destroy(&rval);
         return NULL;
     }
