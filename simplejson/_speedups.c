@@ -73,6 +73,13 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
 #define UNUSED
 #endif
 
+/* Py_BEGIN_CRITICAL_SECTION was added in Python 3.13.
+   On older versions, define as no-ops. */
+#if PY_VERSION_HEX < 0x030d0000
+#define Py_BEGIN_CRITICAL_SECTION(op)
+#define Py_END_CRITICAL_SECTION()
+#endif
+
 
 #define DEFAULT_ENCODING "utf-8"
 
