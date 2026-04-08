@@ -3340,75 +3340,6 @@ static PyMethodDef speedups_methods[] = {
 PyDoc_STRVAR(module_doc,
 "simplejson speedups\n");
 
-#if PY_VERSION_HEX >= 0x030D0000
-/* Multi-phase initialization for Python 3.13+ (PEP 489).
-   Required to declare Py_mod_gil for free-threaded Python (PEP 703). */
-static int
-module_exec(PyObject *m)
-{
-    if (PyType_Ready(&PyScannerType) < 0)
-        return -1;
-    if (PyType_Ready(&PyEncoderType) < 0)
-        return -1;
-    if (!init_constants())
-        return -1;
-
-    if (PyModule_AddObjectRef(m, "make_scanner", (PyObject*)&PyScannerType) < 0)
-        return -1;
-    if (PyModule_AddObjectRef(m, "make_encoder", (PyObject*)&PyEncoderType) < 0)
-        return -1;
-
-    if (RawJSONType == NULL) {
-        RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
-        if (RawJSONType == NULL)
-            return -1;
-    }
-    if (JSONDecodeError == NULL) {
-        JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
-        if (JSONDecodeError == NULL)
-            return -1;
-    }
-    if (JSON_itemgetter0 == NULL) {
-        PyObject *operator = PyImport_ImportModule("operator");
-        if (!operator)
-            return -1;
-        JSON_itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
-        Py_DECREF(operator);
-        if (!JSON_itemgetter0)
-            return -1;
-    }
-
-    return 0;
-}
-
-static PyModuleDef_Slot module_slots[] = {
-    {Py_mod_exec, module_exec},
-#ifdef Py_GIL_DISABLED
-    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
-#endif
-    {0, NULL}
-};
-#endif /* PY_VERSION_HEX >= 0x030D0000 */
-
-#if PY_MAJOR_VERSION >= 3
-static struct PyModuleDef moduledef = {
-    PyModuleDef_HEAD_INIT,
-    "_speedups",        /* m_name */
-    module_doc,         /* m_doc */
-#if PY_VERSION_HEX >= 0x030D0000
-    0,                  /* m_size */
-    speedups_methods,   /* m_methods */
-    module_slots,       /* m_slots */
-#else
-    -1,                 /* m_size */
-    speedups_methods,   /* m_methods */
-    NULL,               /* m_slots */
-#endif
-    NULL,               /* m_traverse */
-    NULL,               /* m_clear */
-};
-#endif
-
 PyObject *
 import_dependency(char *module_name, char *attr_name)
 {
@@ -3481,6 +3412,77 @@ init_constants(void)
     return 1;
 }
 
+#if PY_VERSION_HEX >= 0x030D0000
+/* Multi-phase initialization for Python 3.13+ (PEP 489).
+   Required to declare Py_mod_gil for free-threaded Python (PEP 703). */
+static int
+module_exec(PyObject *m)
+{
+    if (PyType_Ready(&PyScannerType) < 0)
+        return -1;
+    if (PyType_Ready(&PyEncoderType) < 0)
+        return -1;
+    if (!init_constants())
+        return -1;
+
+    if (PyModule_AddObjectRef(m, "make_scanner", (PyObject*)&PyScannerType) < 0)
+        return -1;
+    if (PyModule_AddObjectRef(m, "make_encoder", (PyObject*)&PyEncoderType) < 0)
+        return -1;
+
+    if (RawJSONType == NULL) {
+        RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
+        if (RawJSONType == NULL)
+            return -1;
+    }
+    if (JSONDecodeError == NULL) {
+        JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
+        if (JSONDecodeError == NULL)
+            return -1;
+    }
+    if (JSON_itemgetter0 == NULL) {
+        PyObject *operator = PyImport_ImportModule("operator");
+        if (!operator)
+            return -1;
+        JSON_itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
+        Py_DECREF(operator);
+        if (!JSON_itemgetter0)
+            return -1;
+    }
+
+    return 0;
+}
+
+static PyModuleDef_Slot module_slots[] = {
+    {Py_mod_exec, module_exec},
+#ifdef Py_GIL_DISABLED
+    {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+#endif
+    {0, NULL}
+};
+#endif /* PY_VERSION_HEX >= 0x030D0000 */
+
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "_speedups",        /* m_name */
+    module_doc,         /* m_doc */
+#if PY_VERSION_HEX >= 0x030D0000
+    0,                  /* m_size */
+    speedups_methods,   /* m_methods */
+    module_slots,       /* m_slots */
+#else
+    -1,                 /* m_size */
+    speedups_methods,   /* m_methods */
+    NULL,               /* m_slots */
+#endif
+    NULL,               /* m_traverse */
+    NULL,               /* m_clear */
+};
+#endif
+
+#if PY_VERSION_HEX < 0x030D0000
+/* Single-phase initialization for Python < 3.13 */
 static PyObject *
 moduleinit(void)
 {
@@ -3528,6 +3530,7 @@ moduleinit(void)
     }
     return m;
 }
+#endif /* PY_VERSION_HEX < 0x030D0000 */
 
 #if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC
