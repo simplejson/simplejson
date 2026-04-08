@@ -166,7 +166,7 @@ class TestFreeThreadingEncode(TestCase):
         def work():
             for _ in range(NUM_ITERATIONS):
                 for s in json_strings:
-                    _speedups.scanstring(s, 1, True)
+                    _speedups.scanstring(s, 1, None, True)
 
         self._run_concurrent(work)
 

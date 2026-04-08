@@ -284,8 +284,10 @@ static int
 _call_json_method(PyObject *obj, const char *method_name, PyObject **result);
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
+#if PY_VERSION_HEX < 0x030D0000
 static PyObject *
 moduleinit(void);
+#endif
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
