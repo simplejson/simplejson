@@ -112,3 +112,47 @@ class TestEncode(TestCase):
         def test_bad_encoding(self):
             with self.assertRaises(UnicodeEncodeError):
                 encoder.JSONEncoder(encoding='\udcff').encode({b('key'): 123})
+
+
+@unittest.skipIf(sys.version_info < (3, 13),
+                 "heap types require Python 3.13+")
+class TestHeapTypes(TestCase):
+    """Verify that Scanner and Encoder are heap types on Python 3.13+."""
+
+    @skip_if_speedups_missing
+    def test_scanner_is_heap_type(self):
+        from simplejson._speedups import make_scanner
+        # Py_TPFLAGS_HEAPTYPE = 1 << 9
+        self.assertTrue(make_scanner.__flags__ & (1 << 9),
+                        "Scanner should be a heap type on 3.13+")
+
+    @skip_if_speedups_missing
+    def test_encoder_is_heap_type(self):
+        from simplejson._speedups import make_encoder
+        self.assertTrue(make_encoder.__flags__ & (1 << 9),
+                        "Encoder should be a heap type on 3.13+")
+
+    @skip_if_speedups_missing
+    def test_scanner_type_is_gc_tracked(self):
+        """Heap types must be GC-tracked so they can be collected."""
+        import gc
+        from simplejson._speedups import make_scanner
+        self.assertTrue(gc.is_tracked(make_scanner))
+
+    @skip_if_speedups_missing
+    def test_encoder_type_is_gc_tracked(self):
+        import gc
+        from simplejson._speedups import make_encoder
+        self.assertTrue(gc.is_tracked(make_encoder))
+
+    @skip_if_speedups_missing
+    def test_scanner_instances_work(self):
+        """Verify Scanner heap type instances decode correctly."""
+        result = simplejson.loads('{"a": 1}')
+        self.assertEqual(result, {"a": 1})
+
+    @skip_if_speedups_missing
+    def test_encoder_instances_work(self):
+        """Verify Encoder heap type instances encode correctly."""
+        result = simplejson.dumps({"a": 1}, sort_keys=True)
+        self.assertEqual(result, '{"a": 1}')
