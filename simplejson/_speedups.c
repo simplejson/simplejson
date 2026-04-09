@@ -3457,9 +3457,7 @@ module_exec(PyObject *m)
 
 static PyModuleDef_Slot module_slots[] = {
     {Py_mod_exec, module_exec},
-#ifdef Py_GIL_DISABLED
     {Py_mod_gil, Py_MOD_GIL_NOT_USED},
-#endif
     {0, NULL}
 };
 #endif /* PY_VERSION_HEX >= 0x030D0000 */
