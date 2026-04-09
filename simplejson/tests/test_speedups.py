@@ -166,14 +166,13 @@ class TestSubinterpreters(TestCase):
     @skip_if_speedups_missing
     def test_import_in_subinterpreter(self):
         """Verify _speedups can be imported in a subinterpreter."""
-        import _interpreters
+        try:
+            import _interpreters
+        except ImportError:
+            raise unittest.SkipTest("_interpreters not available")
         interp = _interpreters.create()
         try:
-            # This will fail if the module doesn't support
-            # multiple interpreters (Py_mod_multiple_interpreters)
             _interpreters.run_string(interp,
                 "import simplejson; simplejson.dumps({'a': 1})")
-        except ModuleNotFoundError:
-            raise unittest.SkipTest("_interpreters not available")
         finally:
             _interpreters.destroy(interp)
