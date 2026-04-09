@@ -6,6 +6,7 @@ but most meaningful on free-threaded builds (3.13t+) where the GIL does
 not serialize access.
 """
 from __future__ import absolute_import
+import decimal
 import sys
 import threading
 import unittest
@@ -13,6 +14,9 @@ from unittest import TestCase
 
 import simplejson as json
 
+# threading.Barrier requires Python 3.2+
+_SKIP_REASON = "free-threading tests require Python 3.2+ (threading.Barrier)"
+_SKIP = sys.version_info < (3, 2)
 
 # Number of threads and iterations to use for concurrency tests.
 # Keep these moderate to avoid making the test suite too slow while
@@ -36,6 +40,7 @@ def skip_if_no_speedups(func):
     return wrapper
 
 
+@unittest.skipIf(_SKIP, _SKIP_REASON)
 class TestFreeThreadingEncode(TestCase):
     """Test concurrent encoding operations for thread safety."""
 
@@ -108,7 +113,7 @@ class TestFreeThreadingEncode(TestCase):
 
     def test_concurrent_dumps_varied_types(self):
         """Concurrent encoding of different types should not race."""
-        import decimal
+
 
         datasets = [
             {"type": "dict", "data": {"key": "value"}},
@@ -171,6 +176,7 @@ class TestFreeThreadingEncode(TestCase):
         self._run_concurrent(work)
 
 
+@unittest.skipIf(_SKIP, _SKIP_REASON)
 class TestFreeThreadingDecode(TestCase):
     """Test concurrent decoding operations for thread safety."""
 
@@ -231,7 +237,7 @@ class TestFreeThreadingDecode(TestCase):
 
     def test_concurrent_loads_with_parse_float(self):
         """Concurrent loads with custom parse_float should not race."""
-        import decimal
+
 
         json_str = '{"price": 19.99, "tax": 1.50}'
 
@@ -261,6 +267,7 @@ class TestFreeThreadingDecode(TestCase):
         self._run_concurrent(work)
 
 
+@unittest.skipIf(_SKIP, _SKIP_REASON)
 class TestFreeThreadingMixed(TestCase):
     """Test concurrent mixed encode/decode operations."""
 
