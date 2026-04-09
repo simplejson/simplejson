@@ -85,7 +85,7 @@ jobs:
           CIBW_ARCHS: ${{ matrix.arch }}
 
       - name: Build Python 2.7 wheels
-        if: runner.os == 'Linux' && matrix.arch != 'ppc64le'
+        if: runner.os == 'Linux' && matrix.arch == 'x86_64'
         uses: pypa/cibuildwheel@v1.12.0
         env:
           CIBW_TEST_COMMAND: >-
