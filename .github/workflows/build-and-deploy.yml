@@ -81,13 +81,9 @@ jobs:
         env:
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"
-          CIBW_ENABLE: "cpython-freethreading"
           CIBW_ARCHS: ${{ matrix.arch }}
-          # Skip PyPy wheels (covered by the pure-Python test job).
-          # Skip Python 3.8 on Windows: cibuildwheel 3.4.1 ships a
-          # virtualenv that cannot bootstrap Python 3.8 on Windows,
-          # and 3.8 has been EOL since October 2024.
-          CIBW_SKIP: "pp* cp38-win*"
+          # PyPy wheels are covered by the test_pure_python job.
+          CIBW_SKIP: "pp*"
 
       - name: Build Python 2.7 wheels
         if: runner.os == 'Linux' && matrix.arch == 'x86_64'
