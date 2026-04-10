@@ -136,6 +136,28 @@ jobs:
             dist/*.tar.gz
             dist/*-none-any.whl
 
+  # Aggregate gate jobs to match branch protection rule names
+  gate_ubuntu:
+    name: Build wheels on ubuntu-latest
+    needs: [build_wheels, test_pure_python, test_free_threading]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All ubuntu-latest checks passed"
+
+  gate_windows:
+    name: Build wheels on windows-latest
+    needs: [build_wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All windows-latest checks passed"
+
+  gate_macos:
+    name: Build wheels on macos-latest
+    needs: [build_wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All macos-latest checks passed"
+
   upload_pypi:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
