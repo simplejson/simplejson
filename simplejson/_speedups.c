@@ -312,7 +312,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 static PyObject *
 _encoded_const(PyObject *obj, PyObject *JSON_s_null, PyObject *JSON_s_true, PyObject *JSON_s_false);
 static void
-raise_errmsg(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError);
+raise_errmsg_impl(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError);
 static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj);
 static int
@@ -334,12 +334,20 @@ import_dependency(char *module_name, char *attr_name);
 
 /* Short aliases for helpers that take state-derived arguments. Defined
    once for all Python versions now that the state layout is unified. */
-#define RAISE_ERRMSG(msg, s, end, jde) raise_errmsg(msg, s, end, jde)
+#define RAISE_ERRMSG(msg, s, end, jde) raise_errmsg_impl(msg, s, end, jde)
 #define ENCODED_CONST(obj, sn, st, sf) _encoded_const(obj, sn, st, sf)
 #define IS_RAW_JSON(obj, rjt) is_raw_json(obj, rjt)
 #define JOIN_LIST_UNICODE(lst, eu) join_list_unicode(lst, eu)
 #define SCANSTRING_UNICODE(pystr, end, strict, next_end_ptr, eu, jde) \
     scanstring_unicode(pystr, end, strict, next_end_ptr, eu, jde)
+
+#if PY_MAJOR_VERSION < 3
+/* Python 2 call sites use a 3-arg form without threading state
+   through the scanner functions; resolve JSONDecodeError from the
+   static state at the call site. */
+#define raise_errmsg(msg, s, end) \
+    raise_errmsg_impl(msg, s, end, _speedups_static_state.JSONDecodeError)
+#endif
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
@@ -862,7 +870,7 @@ bail:
 
 /* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
 static void
-raise_errmsg(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError)
+raise_errmsg_impl(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError)
 {
     PyObject *exc = PyObject_CallFunction(JSONDecodeError, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
     if (exc) {
@@ -2221,6 +2229,10 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
 
     Returns a new PyObject representation of the term.
     */
+    _speedups_state *_st = get_speedups_state(s->module_ref);
+    PyObject *JSON_NaN = _st->JSON_NaN;
+    PyObject *JSON_Infinity = _st->JSON_Infinity;
+    PyObject *JSON_NegInfinity = _st->JSON_NegInfinity;
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t length = PyString_GET_SIZE(pystr);
     PyObject *rval = NULL;
