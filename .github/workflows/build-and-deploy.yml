@@ -38,6 +38,17 @@ jobs:
       - uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.14t'
+      - name: Verify Python is a free-threaded build
+        run: |
+          python -c "
+          import sys, sysconfig
+          gil_disabled = sysconfig.get_config_var('Py_GIL_DISABLED')
+          assert gil_disabled == 1, (
+              'Python is not a free-threaded build '
+              '(Py_GIL_DISABLED={!r}); setup-python did not install 3.14t.'
+              .format(gil_disabled))
+          print('OK: Py_GIL_DISABLED=1, sys.version=' + sys.version)
+          "
       - name: Build extension with free-threading support
         run: |
           python -m pip install --upgrade pip setuptools wheel
