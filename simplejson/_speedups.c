@@ -90,10 +90,8 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
    accesses it via get_speedups_state(module_ref) so that call sites
    look identical on all versions. */
 typedef struct {
-#if PY_VERSION_HEX >= 0x030D0000
     PyObject *PyScannerType;
     PyObject *PyEncoderType;
-#endif
     PyObject *JSON_Infinity;
     PyObject *JSON_NegInfinity;
     PyObject *JSON_NaN;
@@ -3746,10 +3744,18 @@ static PyObject *
 moduleinit(void)
 {
     PyObject *m;
+    _speedups_state *state = &_speedups_static_state;
+
     if (PyType_Ready(&PyScannerType) < 0)
         return NULL;
     if (PyType_Ready(&PyEncoderType) < 0)
         return NULL;
+
+    /* Static types are eternal, so these are borrowed pointers kept
+       in the state struct for layout uniformity with the 3.13+ path.
+       There's no refcount to manage and no GC tracking here. */
+    state->PyScannerType = (PyObject *)&PyScannerType;
+    state->PyEncoderType = (PyObject *)&PyEncoderType;
 
 #if PY_MAJOR_VERSION >= 3
     m = PyModule_Create(&moduledef);
@@ -3762,20 +3768,20 @@ moduleinit(void)
     /* Borrowed reference - sys.modules keeps the module alive. */
     _speedups_module = m;
 
-    Py_INCREF((PyObject*)&PyScannerType);
-    if (PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType) < 0) {
-        Py_DECREF((PyObject*)&PyScannerType);
+    Py_INCREF(state->PyScannerType);
+    if (PyModule_AddObject(m, "make_scanner", state->PyScannerType) < 0) {
+        Py_DECREF(state->PyScannerType);
         Py_DECREF(m);
         return NULL;
     }
-    Py_INCREF((PyObject*)&PyEncoderType);
-    if (PyModule_AddObject(m, "make_encoder", (PyObject*)&PyEncoderType) < 0) {
-        Py_DECREF((PyObject*)&PyEncoderType);
+    Py_INCREF(state->PyEncoderType);
+    if (PyModule_AddObject(m, "make_encoder", state->PyEncoderType) < 0) {
+        Py_DECREF(state->PyEncoderType);
         Py_DECREF(m);
         return NULL;
     }
 
-    if (init_speedups_state(&_speedups_static_state, m) < 0) {
+    if (init_speedups_state(state, m) < 0) {
         Py_DECREF(m);
         return NULL;
     }
