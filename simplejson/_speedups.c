@@ -83,19 +83,24 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
 
 #define DEFAULT_ENCODING "utf-8"
 
-#if PY_VERSION_HEX >= 0x030D0000
-/* Module state for Python 3.13+ (heap types).
-   Type objects live here for proper GC and lifecycle management.
-   String constants remain as file-scope globals because they are
-   interned / immutable and safe to share across threads. */
+/* Unified module state.
+   On Python 3.13+ this is stored per-module (PEP 489) so that each
+   subinterpreter gets its own copy. On older Python versions a single
+   static instance is shared by the whole process. Either way, code
+   accesses it via get_speedups_state(module_ref) so that call sites
+   look identical on all versions. */
 typedef struct {
+#if PY_VERSION_HEX >= 0x030D0000
     PyObject *PyScannerType;
     PyObject *PyEncoderType;
-    /* Constants – per-module state instead of file-scope globals */
+#endif
     PyObject *JSON_Infinity;
     PyObject *JSON_NegInfinity;
     PyObject *JSON_NaN;
     PyObject *JSON_EmptyUnicode;
+#if PY_MAJOR_VERSION < 3
+    PyObject *JSON_EmptyStr;
+#endif
     PyObject *JSON_s_null;
     PyObject *JSON_s_true;
     PyObject *JSON_s_false;
@@ -111,19 +116,16 @@ typedef struct {
     PyObject *JSONDecodeError;
 } _speedups_state;
 
-static inline _speedups_state *
-get_speedups_state(PyObject *module)
-{
-    void *state = PyModule_GetState(module);
-    assert(state != NULL);
-    return (_speedups_state *)state;
-}
-
+#if PY_VERSION_HEX >= 0x030D0000
 /* Forward declaration - defined later with multi-phase init */
 static struct PyModuleDef moduledef;
-#endif /* PY_VERSION_HEX >= 0x030D0000 */
-
-#if PY_VERSION_HEX < 0x030D0000
+#else
+/* Pre-3.13: a single static state instance serves the whole process,
+   and a borrowed reference to the module object so that Scanner and
+   Encoder instances can store module_ref uniformly. The module object
+   is kept alive by sys.modules for the entire interpreter lifetime. */
+static _speedups_state _speedups_static_state;
+static PyObject *_speedups_module = NULL;  /* borrowed */
 static PyTypeObject PyScannerType;
 static PyTypeObject PyEncoderType;
 #define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
@@ -132,44 +134,32 @@ static PyTypeObject PyEncoderType;
 #define PyEncoder_CheckExact(op) (Py_TYPE(op) == &PyEncoderType)
 #endif
 
+static inline _speedups_state *
+get_speedups_state(PyObject *module)
+{
+#if PY_VERSION_HEX >= 0x030D0000
+    void *state = PyModule_GetState(module);
+    assert(state != NULL);
+    return (_speedups_state *)state;
+#else
+    (void)module;
+    return &_speedups_static_state;
+#endif
+}
+
 #define JSON_ALLOW_NAN 1
 #define JSON_IGNORE_NAN 2
-
-#if PY_VERSION_HEX < 0x030D0000
-static PyObject *JSON_Infinity = NULL;
-static PyObject *JSON_NegInfinity = NULL;
-static PyObject *JSON_NaN = NULL;
-static PyObject *JSON_EmptyUnicode = NULL;
-#if PY_MAJOR_VERSION < 3
-static PyObject *JSON_EmptyStr = NULL;
-#endif
-
-/* Interned string constants, initialized in init_constants().
-   Previously lazily initialized in individual functions, which
-   is a data race under free-threaded Python (PEP 703). */
-static PyObject *JSON_s_null = NULL;
-static PyObject *JSON_s_true = NULL;
-static PyObject *JSON_s_false = NULL;
-static PyObject *JSON_open_dict = NULL;
-static PyObject *JSON_close_dict = NULL;
-static PyObject *JSON_empty_dict = NULL;
-static PyObject *JSON_open_array = NULL;
-static PyObject *JSON_close_array = NULL;
-static PyObject *JSON_empty_array = NULL;
-static PyObject *JSON_sortargs = NULL;
-static PyObject *JSON_itemgetter0 = NULL;
-#endif /* PY_VERSION_HEX < 0x030D0000 */
 
 typedef struct {
     PyObject *large_strings;  /* A list of previously accumulated large strings */
     PyObject *small_strings;  /* Pending small strings */
-#if PY_VERSION_HEX >= 0x030D0000
+#if PY_MAJOR_VERSION >= 3
     PyObject *empty_unicode;  /* Borrowed ref to state->JSON_EmptyUnicode */
 #endif
 } JSON_Accu;
 
 static int
-JSON_Accu_Init(JSON_Accu *acc);
+JSON_Accu_Init(JSON_Accu *acc, _speedups_state *state);
 static int
 JSON_Accu_Accumulate(JSON_Accu *acc, PyObject *unicode);
 static PyObject *
@@ -194,9 +184,7 @@ JSON_Accu_Destroy(JSON_Accu *acc);
 
 typedef struct _PyScannerObject {
     PyObject_HEAD
-#if PY_VERSION_HEX >= 0x030D0000
     PyObject *module_ref;
-#endif
     PyObject *encoding;
     PyObject *strict_bool;
     int strict;
@@ -221,9 +209,7 @@ static PyMemberDef scanner_members[] = {
 
 typedef struct _PyEncoderObject {
     PyObject_HEAD
-#if PY_VERSION_HEX >= 0x030D0000
     PyObject *module_ref;
-#endif
     PyObject *markers;
     PyObject *defaultfn;
     PyObject *encoder;
@@ -268,13 +254,8 @@ static PyMemberDef encoder_members[] = {
     {NULL}
 };
 
-#if PY_VERSION_HEX >= 0x030D0000
 static PyObject *
 join_list_unicode(PyObject *lst, PyObject *empty_unicode);
-#else
-static PyObject *
-join_list_unicode(PyObject *lst);
-#endif
 static PyObject *
 JSON_ParseEncoding(PyObject *encoding);
 static PyObject *
@@ -299,14 +280,9 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
 static PyObject *
 _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 #endif
-#if PY_VERSION_HEX >= 0x030D0000
 static PyObject *
 scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr,
                    PyObject *JSON_EmptyUnicode, PyObject *JSONDecodeError);
-#else
-static PyObject *
-scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr);
-#endif
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
@@ -323,13 +299,8 @@ static void
 encoder_dealloc(PyObject *self);
 static int
 encoder_clear(PyObject *self);
-#if PY_VERSION_HEX >= 0x030D0000
 static int
 is_raw_json(PyObject *obj, PyObject *RawJSONType);
-#else
-static int
-is_raw_json(PyObject *obj);
-#endif
 static PyObject *
 encoder_stringify_key(PyEncoderObject *s, PyObject *key);
 static int
@@ -338,17 +309,10 @@ static int
 encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ssize_t indent_level);
 static int
 encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_ssize_t indent_level);
-#if PY_VERSION_HEX >= 0x030D0000
 static PyObject *
 _encoded_const(PyObject *obj, PyObject *JSON_s_null, PyObject *JSON_s_true, PyObject *JSON_s_false);
 static void
 raise_errmsg(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError);
-#else
-static PyObject *
-_encoded_const(PyObject *obj);
-static void
-raise_errmsg(char *msg, PyObject *s, Py_ssize_t end);
-#endif
 static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj);
 static int
@@ -362,47 +326,26 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 #if PY_VERSION_HEX < 0x030D0000
 static PyObject *
 moduleinit(void);
-static int
-init_constants(void);
 #endif
+static int
+init_speedups_state(_speedups_state *state, PyObject *module);
 static PyObject *
 import_dependency(char *module_name, char *attr_name);
 
-/* Convenience macros for dual-signature utility functions.
-   On 3.13+ these pass per-module-state objects; on older versions
-   the functions use file-scope globals and the extra args are ignored. */
-#if PY_VERSION_HEX >= 0x030D0000
+/* Short aliases for helpers that take state-derived arguments. Defined
+   once for all Python versions now that the state layout is unified. */
 #define RAISE_ERRMSG(msg, s, end, jde) raise_errmsg(msg, s, end, jde)
 #define ENCODED_CONST(obj, sn, st, sf) _encoded_const(obj, sn, st, sf)
 #define IS_RAW_JSON(obj, rjt) is_raw_json(obj, rjt)
 #define JOIN_LIST_UNICODE(lst, eu) join_list_unicode(lst, eu)
 #define SCANSTRING_UNICODE(pystr, end, strict, next_end_ptr, eu, jde) \
     scanstring_unicode(pystr, end, strict, next_end_ptr, eu, jde)
-#else
-#define RAISE_ERRMSG(msg, s, end, jde) raise_errmsg(msg, s, end)
-#define ENCODED_CONST(obj, sn, st, sf) _encoded_const(obj)
-#define IS_RAW_JSON(obj, rjt) is_raw_json(obj)
-#define JOIN_LIST_UNICODE(lst, eu) join_list_unicode(lst)
-#define SCANSTRING_UNICODE(pystr, end, strict, next_end_ptr, eu, jde) \
-    scanstring_unicode(pystr, end, strict, next_end_ptr)
-#endif
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
 
 #define MIN_EXPANSION 6
 
-#if PY_VERSION_HEX < 0x030D0000
-static PyObject* RawJSONType = NULL;
-static int
-is_raw_json(PyObject *obj)
-{
-    int r = PyObject_IsInstance(obj, RawJSONType);
-    if (r < 0)
-        return -1;
-    return r;
-}
-#else
 static int
 is_raw_json(PyObject *obj, PyObject *RawJSONType)
 {
@@ -411,16 +354,20 @@ is_raw_json(PyObject *obj, PyObject *RawJSONType)
         return -1;
     return r;
 }
-#endif
 
 static int
-JSON_Accu_Init(JSON_Accu *acc)
+JSON_Accu_Init(JSON_Accu *acc, _speedups_state *state)
 {
     /* Lazily allocated */
     acc->large_strings = NULL;
     acc->small_strings = PyList_New(0);
     if (acc->small_strings == NULL)
         return -1;
+#if PY_MAJOR_VERSION >= 3
+    acc->empty_unicode = state->JSON_EmptyUnicode;  /* borrowed */
+#else
+    (void)state;
+#endif
     return 0;
 }
 
@@ -436,13 +383,11 @@ flush_accumulator(JSON_Accu *acc)
             if (acc->large_strings == NULL)
                 return -1;
         }
-#if PY_VERSION_HEX >= 0x030D0000
+#if PY_MAJOR_VERSION >= 3
         joined = join_list_unicode(acc->small_strings, acc->empty_unicode);
-#elif PY_MAJOR_VERSION >= 3
-        joined = join_list_unicode(acc->small_strings);
-#else /* PY_MAJOR_VERSION >= 3 */
+#else
         joined = join_list_string(acc->small_strings);
-#endif /* PY_MAJOR_VERSION < 3 */
+#endif
         if (joined == NULL)
             return -1;
         if (PyList_SetSlice(acc->small_strings, 0, nsmall, NULL)) {
@@ -761,12 +706,10 @@ ascii_escape_str(PyObject *pystr)
 static PyObject *
 encoder_stringify_key(PyEncoderObject *s, PyObject *key)
 {
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_s_null = _st->JSON_s_null;
     PyObject *JSON_s_true = _st->JSON_s_true;
     PyObject *JSON_s_false = _st->JSON_s_false;
-#endif
     if (PyUnicode_Check(key)) {
         Py_INCREF(key);
         return key;
@@ -828,10 +771,8 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
 static PyObject *
 encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 {
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_sortargs = _st->JSON_sortargs;
-#endif
     PyObject *items;
     PyObject *iter = NULL;
     PyObject *lst = NULL;
@@ -920,18 +861,6 @@ bail:
 }
 
 /* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
-#if PY_VERSION_HEX < 0x030D0000
-static PyObject *JSONDecodeError = NULL;
-static void
-raise_errmsg(char *msg, PyObject *s, Py_ssize_t end)
-{
-    PyObject *exc = PyObject_CallFunction(JSONDecodeError, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
-    if (exc) {
-        PyErr_SetObject(JSONDecodeError, exc);
-        Py_DECREF(exc);
-    }
-}
-#else
 static void
 raise_errmsg(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError)
 {
@@ -941,34 +870,22 @@ raise_errmsg(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError)
         Py_DECREF(exc);
     }
 }
-#endif
 
-#if PY_VERSION_HEX >= 0x030D0000
 static PyObject *
 join_list_unicode(PyObject *lst, PyObject *empty_unicode)
 {
     /* return u''.join(lst) */
     return PyUnicode_Join(empty_unicode, lst);
 }
-#else
-static PyObject *
-join_list_unicode(PyObject *lst)
-{
-    /* return u''.join(lst) */
-    return PyUnicode_Join(JSON_EmptyUnicode, lst);
-}
-#endif
 
-#if PY_MAJOR_VERSION >= 3
-#define join_list_string join_list_unicode
-#else /* PY_MAJOR_VERSION >= 3 */
+#if PY_MAJOR_VERSION < 3
 static PyObject *
 join_list_string(PyObject *lst)
 {
     /* return ''.join(lst) */
     static PyObject *joinfn = NULL;
     if (joinfn == NULL) {
-        joinfn = PyObject_GetAttrString(JSON_EmptyStr, "join");
+        joinfn = PyObject_GetAttrString(_speedups_static_state.JSON_EmptyStr, "join");
         if (joinfn == NULL)
             return NULL;
     }
@@ -1204,7 +1121,7 @@ scanstring_str(PyObject *pystr, Py_ssize_t end, char *encoding, int strict, Py_s
         if (chunk != NULL)
             rval = chunk;
         else {
-            rval = JSON_EmptyStr;
+            rval = _speedups_static_state.JSON_EmptyStr;
             Py_INCREF(rval);
         }
     }
@@ -1227,14 +1144,9 @@ bail:
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
-#if PY_VERSION_HEX >= 0x030D0000
 static PyObject *
 scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr,
                    PyObject *JSON_EmptyUnicode, PyObject *JSONDecodeError)
-#else
-static PyObject *
-scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr)
-#endif
 {
     /* Read the JSON string from PyUnicode pystr.
     end is the index of the first character after the quote.
@@ -1448,15 +1360,11 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
     if (PyUnicode_Check(pystr)) {
         if (PyUnicode_READY(pystr))
             return NULL;
-#if PY_VERSION_HEX >= 0x030D0000
         {
             _speedups_state *_st = get_speedups_state(self);
             rval = scanstring_unicode(pystr, end, strict, &next_end,
                                       _st->JSON_EmptyUnicode, _st->JSONDecodeError);
         }
-#else
-        rval = scanstring_unicode(pystr, end, strict, &next_end);
-#endif
     }
 #if PY_MAJOR_VERSION < 3
     /* Using a bytes input is unsupported for scanning in Python 3.
@@ -1519,15 +1427,14 @@ scanner_dealloc(PyObject *self)
 static int
 scanner_traverse(PyObject *self, visitproc visit, void *arg)
 {
-    PyScannerObject *s;
-#if PY_VERSION_HEX < 0x030D0000
+    PyScannerObject *s = (PyScannerObject *)self;
+#if PY_VERSION_HEX >= 0x030D0000
+    /* Heap types must visit their type for GC. */
+    Py_VISIT(Py_TYPE(self));
+#else
     assert(PyScanner_Check(self));
 #endif
-    s = (PyScannerObject *)self;
-#if PY_VERSION_HEX >= 0x030D0000
-    Py_VISIT(Py_TYPE(self));
     Py_VISIT(s->module_ref);
-#endif
     Py_VISIT(s->encoding);
     Py_VISIT(s->strict_bool);
     Py_VISIT(s->object_hook);
@@ -1542,14 +1449,11 @@ scanner_traverse(PyObject *self, visitproc visit, void *arg)
 static int
 scanner_clear(PyObject *self)
 {
-    PyScannerObject *s;
+    PyScannerObject *s = (PyScannerObject *)self;
 #if PY_VERSION_HEX < 0x030D0000
     assert(PyScanner_Check(self));
 #endif
-    s = (PyScannerObject *)self;
-#if PY_VERSION_HEX >= 0x030D0000
     Py_CLEAR(s->module_ref);
-#endif
     Py_CLEAR(s->encoding);
     Py_CLEAR(s->strict_bool);
     Py_CLEAR(s->object_hook);
@@ -1736,11 +1640,9 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
 
     Returns a new PyObject (usually a dict, but object_hook can change that)
     */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_EmptyUnicode = _st->JSON_EmptyUnicode;
     PyObject *JSONDecodeError = _st->JSONDecodeError;
-#endif
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
@@ -1988,10 +1890,8 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
 
     Returns a new PyList
     */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSONDecodeError = _st->JSONDecodeError;
-#endif
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
@@ -2074,10 +1974,8 @@ _parse_constant(PyScannerObject *s, PyObject *pystr, PyObject *constant, Py_ssiz
 
     Returns the result of parse_constant
     */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSONDecodeError = _st->JSONDecodeError;
-#endif
     PyObject *rval;
     if (s->parse_constant == Py_None) {
         RAISE_ERRMSG(ERR_EXPECTING_VALUE, pystr, idx, JSONDecodeError);
@@ -2211,10 +2109,8 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
         PyInt, PyLong, or PyFloat.
         May return other types if parse_int or parse_float are set
     */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSONDecodeError = _st->JSONDecodeError;
-#endif
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
@@ -2432,14 +2328,12 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
 
     Returns a new PyObject representation of the term.
     */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_NaN = _st->JSON_NaN;
     PyObject *JSON_Infinity = _st->JSON_Infinity;
     PyObject *JSON_NegInfinity = _st->JSON_NegInfinity;
     PyObject *JSON_EmptyUnicode = _st->JSON_EmptyUnicode;
     PyObject *JSONDecodeError = _st->JSONDecodeError;
-#endif
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t length = PyUnicode_GET_LENGTH(pystr);
@@ -2655,8 +2549,10 @@ scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     s->module_ref = PyType_GetModuleByDef(type, &moduledef);
     if (s->module_ref == NULL)
         goto bail;
-    Py_INCREF(s->module_ref);
+#else
+    s->module_ref = _speedups_module;  /* borrowed */
 #endif
+    Py_INCREF(s->module_ref);
 
     if (s->memo == NULL) {
         s->memo = PyDict_New();
@@ -2818,8 +2714,10 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     s->module_ref = PyType_GetModuleByDef(type, &moduledef);
     if (s->module_ref == NULL)
         goto bail;
-    Py_INCREF(s->module_ref);
+#else
+    s->module_ref = _speedups_module;  /* borrowed */
 #endif
+    Py_INCREF(s->module_ref);
 
     Py_INCREF(markers);
     s->markers = markers;
@@ -2912,12 +2810,8 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         if (is_true < 0)
             goto bail;
         if (is_true) {
-#if PY_VERSION_HEX >= 0x030D0000
             _speedups_state *_st = get_speedups_state(s->module_ref);
             item_sort_key = _st->JSON_itemgetter0;
-#else
-            item_sort_key = JSON_itemgetter0;
-#endif
             if (!item_sort_key)
                 goto bail;
         }
@@ -2967,14 +2861,8 @@ encoder_call(PyObject *self, PyObject *args, PyObject *kwds)
     if (!PyArg_ParseTupleAndKeywords(args, kwds, "OO&:_iterencode", kwlist,
         &obj, _convertPyInt_AsSsize_t, &indent_level))
         return NULL;
-    if (JSON_Accu_Init(&rval))
+    if (JSON_Accu_Init(&rval, get_speedups_state(s->module_ref)))
         return NULL;
-#if PY_VERSION_HEX >= 0x030D0000
-    {
-        _speedups_state *_st = get_speedups_state(s->module_ref);
-        rval.empty_unicode = _st->JSON_EmptyUnicode;
-    }
-#endif
     Py_BEGIN_CRITICAL_SECTION(self);
     encode_rv = encoder_listencode_obj(s, &rval, obj, indent_level);
     Py_END_CRITICAL_SECTION();
@@ -2985,7 +2873,6 @@ encoder_call(PyObject *self, PyObject *args, PyObject *kwds)
     return JSON_Accu_FinishAsList(&rval);
 }
 
-#if PY_VERSION_HEX >= 0x030D0000
 static PyObject *
 _encoded_const(PyObject *obj, PyObject *JSON_s_null, PyObject *JSON_s_true, PyObject *JSON_s_false)
 {
@@ -3007,35 +2894,11 @@ _encoded_const(PyObject *obj, PyObject *JSON_s_null, PyObject *JSON_s_true, PyOb
         return NULL;
     }
 }
-#else
-static PyObject *
-_encoded_const(PyObject *obj)
-{
-    /* Return the JSON string representation of None, True, False */
-    if (obj == Py_None) {
-        Py_INCREF(JSON_s_null);
-        return JSON_s_null;
-    }
-    else if (obj == Py_True) {
-        Py_INCREF(JSON_s_true);
-        return JSON_s_true;
-    }
-    else if (obj == Py_False) {
-        Py_INCREF(JSON_s_false);
-        return JSON_s_false;
-    }
-    else {
-        PyErr_SetString(PyExc_ValueError, "not a const");
-        return NULL;
-    }
-}
-#endif
 
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj)
 {
     /* Return the JSON representation of a PyFloat */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_Infinity = _st->JSON_Infinity;
     PyObject *JSON_NegInfinity = _st->JSON_NegInfinity;
@@ -3043,7 +2906,6 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
     PyObject *JSON_s_null = _st->JSON_s_null;
     PyObject *JSON_s_true = _st->JSON_s_true;
     PyObject *JSON_s_false = _st->JSON_s_false;
-#endif
     double i = PyFloat_AS_DOUBLE(obj);
     if (!Py_IS_FINITE(i)) {
         if (!s->allow_or_ignore_nan) {
@@ -3122,13 +2984,11 @@ static int
 encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ssize_t indent_level)
 {
     /* Encode Python object obj to a JSON term, rval is a PyList */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_s_null = _st->JSON_s_null;
     PyObject *JSON_s_true = _st->JSON_s_true;
     PyObject *JSON_s_false = _st->JSON_s_false;
     PyObject *RawJSONType = _st->RawJSONType;
-#endif
     int rv = -1;
     do {
         PyObject *newobj;
@@ -3297,12 +3157,10 @@ static int
 encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_ssize_t indent_level)
 {
     /* Encode Python dict dct a JSON term */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_empty_dict = _st->JSON_empty_dict;
     PyObject *JSON_open_dict = _st->JSON_open_dict;
     PyObject *JSON_close_dict = _st->JSON_close_dict;
-#endif
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
@@ -3438,12 +3296,10 @@ static int
 encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_ssize_t indent_level)
 {
     /* Encode Python list seq to a JSON term */
-#if PY_VERSION_HEX >= 0x030D0000
     _speedups_state *_st = get_speedups_state(s->module_ref);
     PyObject *JSON_empty_array = _st->JSON_empty_array;
     PyObject *JSON_open_array = _st->JSON_open_array;
     PyObject *JSON_close_array = _st->JSON_close_array;
-#endif
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *obj = NULL;
@@ -3542,15 +3398,14 @@ encoder_dealloc(PyObject *self)
 static int
 encoder_traverse(PyObject *self, visitproc visit, void *arg)
 {
-    PyEncoderObject *s;
-#if PY_VERSION_HEX < 0x030D0000
+    PyEncoderObject *s = (PyEncoderObject *)self;
+#if PY_VERSION_HEX >= 0x030D0000
+    /* Heap types must visit their type for GC. */
+    Py_VISIT(Py_TYPE(self));
+#else
     assert(PyEncoder_Check(self));
 #endif
-    s = (PyEncoderObject *)self;
-#if PY_VERSION_HEX >= 0x030D0000
-    Py_VISIT(Py_TYPE(self));
     Py_VISIT(s->module_ref);
-#endif
     Py_VISIT(s->markers);
     Py_VISIT(s->defaultfn);
     Py_VISIT(s->encoder);
@@ -3573,14 +3428,11 @@ static int
 encoder_clear(PyObject *self)
 {
     /* Deallocate Encoder */
-    PyEncoderObject *s;
+    PyEncoderObject *s = (PyEncoderObject *)self;
 #if PY_VERSION_HEX < 0x030D0000
     assert(PyEncoder_Check(self));
 #endif
-    s = (PyEncoderObject *)self;
-#if PY_VERSION_HEX >= 0x030D0000
     Py_CLEAR(s->module_ref);
-#endif
     Py_CLEAR(s->markers);
     Py_CLEAR(s->defaultfn);
     Py_CLEAR(s->encoder);
@@ -3680,6 +3532,82 @@ static PyMethodDef speedups_methods[] = {
 PyDoc_STRVAR(module_doc,
 "simplejson speedups\n");
 
+/* Shared initializer for per-module state. Used by both module_exec on
+   3.13+ and moduleinit on older versions. Assumes the type fields (on
+   3.13+) have already been populated. */
+static int
+init_speedups_state(_speedups_state *state, PyObject *module)
+{
+    state->JSON_NaN = JSON_InternFromString("NaN");
+    if (state->JSON_NaN == NULL)
+        return -1;
+    state->JSON_Infinity = JSON_InternFromString("Infinity");
+    if (state->JSON_Infinity == NULL)
+        return -1;
+    state->JSON_NegInfinity = JSON_InternFromString("-Infinity");
+    if (state->JSON_NegInfinity == NULL)
+        return -1;
+#if PY_MAJOR_VERSION >= 3
+    state->JSON_EmptyUnicode = PyUnicode_New(0, 127);
+#else
+    state->JSON_EmptyStr = PyString_FromString("");
+    if (state->JSON_EmptyStr == NULL)
+        return -1;
+    state->JSON_EmptyUnicode = PyUnicode_FromUnicode(NULL, 0);
+#endif
+    if (state->JSON_EmptyUnicode == NULL)
+        return -1;
+    state->JSON_s_null = JSON_InternFromString("null");
+    if (state->JSON_s_null == NULL)
+        return -1;
+    state->JSON_s_true = JSON_InternFromString("true");
+    if (state->JSON_s_true == NULL)
+        return -1;
+    state->JSON_s_false = JSON_InternFromString("false");
+    if (state->JSON_s_false == NULL)
+        return -1;
+    state->JSON_open_dict = JSON_InternFromString("{");
+    if (state->JSON_open_dict == NULL)
+        return -1;
+    state->JSON_close_dict = JSON_InternFromString("}");
+    if (state->JSON_close_dict == NULL)
+        return -1;
+    state->JSON_empty_dict = JSON_InternFromString("{}");
+    if (state->JSON_empty_dict == NULL)
+        return -1;
+    state->JSON_open_array = JSON_InternFromString("[");
+    if (state->JSON_open_array == NULL)
+        return -1;
+    state->JSON_close_array = JSON_InternFromString("]");
+    if (state->JSON_close_array == NULL)
+        return -1;
+    state->JSON_empty_array = JSON_InternFromString("[]");
+    if (state->JSON_empty_array == NULL)
+        return -1;
+    state->JSON_sortargs = PyTuple_New(0);
+    if (state->JSON_sortargs == NULL)
+        return -1;
+
+    state->RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
+    if (state->RawJSONType == NULL)
+        return -1;
+    state->JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
+    if (state->JSONDecodeError == NULL)
+        return -1;
+
+    {
+        PyObject *operator_mod = PyImport_ImportModule("operator");
+        if (!operator_mod)
+            return -1;
+        state->JSON_itemgetter0 = PyObject_CallMethod(operator_mod, "itemgetter", "i", 0);
+        Py_DECREF(operator_mod);
+        if (!state->JSON_itemgetter0)
+            return -1;
+    }
+    (void)module;
+    return 0;
+}
+
 #if PY_VERSION_HEX >= 0x030D0000
 /* Multi-phase initialization for Python 3.13+ (PEP 489).
    Required to declare Py_mod_gil for free-threaded Python (PEP 703). */
@@ -3697,72 +3625,12 @@ module_exec(PyObject *m)
     if (state->PyEncoderType == NULL)
         return -1;
 
-    /* Initialize all string constants into per-module state */
-    state->JSON_NaN = PyUnicode_InternFromString("NaN");
-    if (state->JSON_NaN == NULL)
-        return -1;
-    state->JSON_Infinity = PyUnicode_InternFromString("Infinity");
-    if (state->JSON_Infinity == NULL)
-        return -1;
-    state->JSON_NegInfinity = PyUnicode_InternFromString("-Infinity");
-    if (state->JSON_NegInfinity == NULL)
-        return -1;
-    state->JSON_EmptyUnicode = PyUnicode_New(0, 127);
-    if (state->JSON_EmptyUnicode == NULL)
-        return -1;
-    state->JSON_s_null = PyUnicode_InternFromString("null");
-    if (state->JSON_s_null == NULL)
-        return -1;
-    state->JSON_s_true = PyUnicode_InternFromString("true");
-    if (state->JSON_s_true == NULL)
-        return -1;
-    state->JSON_s_false = PyUnicode_InternFromString("false");
-    if (state->JSON_s_false == NULL)
-        return -1;
-    state->JSON_open_dict = PyUnicode_InternFromString("{");
-    if (state->JSON_open_dict == NULL)
-        return -1;
-    state->JSON_close_dict = PyUnicode_InternFromString("}");
-    if (state->JSON_close_dict == NULL)
-        return -1;
-    state->JSON_empty_dict = PyUnicode_InternFromString("{}");
-    if (state->JSON_empty_dict == NULL)
-        return -1;
-    state->JSON_open_array = PyUnicode_InternFromString("[");
-    if (state->JSON_open_array == NULL)
-        return -1;
-    state->JSON_close_array = PyUnicode_InternFromString("]");
-    if (state->JSON_close_array == NULL)
-        return -1;
-    state->JSON_empty_array = PyUnicode_InternFromString("[]");
-    if (state->JSON_empty_array == NULL)
-        return -1;
-    state->JSON_sortargs = PyTuple_New(0);
-    if (state->JSON_sortargs == NULL)
-        return -1;
-
     if (PyModule_AddObjectRef(m, "make_scanner", state->PyScannerType) < 0)
         return -1;
     if (PyModule_AddObjectRef(m, "make_encoder", state->PyEncoderType) < 0)
         return -1;
 
-    state->RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
-    if (state->RawJSONType == NULL)
-        return -1;
-    state->JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
-    if (state->JSONDecodeError == NULL)
-        return -1;
-
-    {
-        PyObject *operator = PyImport_ImportModule("operator");
-        if (!operator)
-            return -1;
-        state->JSON_itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
-        Py_DECREF(operator);
-        if (!state->JSON_itemgetter0)
-            return -1;
-    }
-    return 0;
+    return init_speedups_state(state, m);
 }
 
 static int
@@ -3858,66 +3726,10 @@ import_dependency(char *module_name, char *attr_name)
 }
 
 #if PY_VERSION_HEX < 0x030D0000
-static int
-init_constants(void)
-{
-    JSON_NaN = JSON_InternFromString("NaN");
-    if (JSON_NaN == NULL)
-        return 0;
-    JSON_Infinity = JSON_InternFromString("Infinity");
-    if (JSON_Infinity == NULL)
-        return 0;
-    JSON_NegInfinity = JSON_InternFromString("-Infinity");
-    if (JSON_NegInfinity == NULL)
-        return 0;
-#if PY_MAJOR_VERSION >= 3
-    JSON_EmptyUnicode = PyUnicode_New(0, 127);
-#else /* PY_MAJOR_VERSION >= 3 */
-    JSON_EmptyStr = PyString_FromString("");
-    if (JSON_EmptyStr == NULL)
-        return 0;
-    JSON_EmptyUnicode = PyUnicode_FromUnicode(NULL, 0);
-#endif /* PY_MAJOR_VERSION >= 3 */
-    if (JSON_EmptyUnicode == NULL)
-        return 0;
-
-    JSON_s_null = JSON_InternFromString("null");
-    if (JSON_s_null == NULL)
-        return 0;
-    JSON_s_true = JSON_InternFromString("true");
-    if (JSON_s_true == NULL)
-        return 0;
-    JSON_s_false = JSON_InternFromString("false");
-    if (JSON_s_false == NULL)
-        return 0;
-    JSON_open_dict = JSON_InternFromString("{");
-    if (JSON_open_dict == NULL)
-        return 0;
-    JSON_close_dict = JSON_InternFromString("}");
-    if (JSON_close_dict == NULL)
-        return 0;
-    JSON_empty_dict = JSON_InternFromString("{}");
-    if (JSON_empty_dict == NULL)
-        return 0;
-    JSON_open_array = JSON_InternFromString("[");
-    if (JSON_open_array == NULL)
-        return 0;
-    JSON_close_array = JSON_InternFromString("]");
-    if (JSON_close_array == NULL)
-        return 0;
-    JSON_empty_array = JSON_InternFromString("[]");
-    if (JSON_empty_array == NULL)
-        return 0;
-    JSON_sortargs = PyTuple_New(0);
-    if (JSON_sortargs == NULL)
-        return 0;
-
-    return 1;
-}
-#endif /* PY_VERSION_HEX < 0x030D0000 */
-
-#if PY_VERSION_HEX < 0x030D0000
-/* Single-phase initialization for Python < 3.13 */
+/* Single-phase initialization for Python < 3.13 (including Python 2.7).
+   Populates the single static state instance and captures a borrowed
+   module reference so Scanner/Encoder instances can uniformly store a
+   module_ref pointer. */
 static PyObject *
 moduleinit(void)
 {
@@ -3925,8 +3737,6 @@ moduleinit(void)
     if (PyType_Ready(&PyScannerType) < 0)
         return NULL;
     if (PyType_Ready(&PyEncoderType) < 0)
-        return NULL;
-    if (!init_constants())
         return NULL;
 
 #if PY_MAJOR_VERSION >= 3
@@ -3936,6 +3746,10 @@ moduleinit(void)
 #endif
     if (m == NULL)
         return NULL;
+
+    /* Borrowed reference - sys.modules keeps the module alive. */
+    _speedups_module = m;
+
     Py_INCREF((PyObject*)&PyScannerType);
     if (PyModule_AddObject(m, "make_scanner", (PyObject*)&PyScannerType) < 0) {
         Py_DECREF((PyObject*)&PyScannerType);
@@ -3948,20 +3762,10 @@ moduleinit(void)
         Py_DECREF(m);
         return NULL;
     }
-    RawJSONType = import_dependency("simplejson.raw_json", "RawJSON");
-    if (RawJSONType == NULL)
+
+    if (init_speedups_state(&_speedups_static_state, m) < 0) {
+        Py_DECREF(m);
         return NULL;
-    JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
-    if (JSONDecodeError == NULL)
-        return NULL;
-    {
-        PyObject *operator = PyImport_ImportModule("operator");
-        if (!operator)
-            return NULL;
-        JSON_itemgetter0 = PyObject_CallMethod(operator, "itemgetter", "i", 0);
-        Py_DECREF(operator);
-        if (!JSON_itemgetter0)
-            return NULL;
     }
     return m;
 }
