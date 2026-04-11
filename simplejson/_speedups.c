@@ -1447,514 +1447,13 @@ scanner_clear(PyObject *self)
     return 0;
 }
 
-#if PY_MAJOR_VERSION < 3
 static PyObject *
-_parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+_parse_constant(PyScannerObject *s, PyObject *pystr, PyObject *constant,
+                Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
 {
-    /* Read a JSON object from PyString pystr.
-    idx is the index of the first character after the opening curly brace.
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the closing curly brace.
-
-    Returns a new PyObject (usually a dict, but object_hook or
-    object_pairs_hook can change that)
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
-    PyObject *rval = NULL;
-    PyObject *pairs = NULL;
-    PyObject *item;
-    PyObject *key = NULL;
-    PyObject *val = NULL;
-    char *encoding = PyString_AS_STRING(s->encoding);
-    int has_pairs_hook = (s->pairs_hook != Py_None);
-    int did_parse = 0;
-    Py_ssize_t next_idx;
-    if (has_pairs_hook) {
-        pairs = PyList_New(0);
-        if (pairs == NULL)
-            return NULL;
-    }
-    else {
-        rval = PyDict_New();
-        if (rval == NULL)
-            return NULL;
-    }
-
-    /* skip whitespace after { */
-    while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-
-    /* only loop if the object is non-empty */
-    if (idx <= end_idx && str[idx] != '}') {
-        int trailing_delimiter = 0;
-        while (idx <= end_idx) {
-            PyObject *memokey;
-            trailing_delimiter = 0;
-
-            /* read key */
-            if (str[idx] != '"') {
-                raise_errmsg(state, ERR_OBJECT_PROPERTY, pystr, idx);
-                goto bail;
-            }
-            key = scanstring_str(state, pystr, idx + 1, encoding, s->strict, &next_idx);
-            if (key == NULL)
-                goto bail;
-            memokey = PyDict_GetItemWithError(s->memo, key);
-            if (memokey != NULL) {
-                Py_INCREF(memokey);
-                Py_DECREF(key);
-                key = memokey;
-            }
-            else if (PyErr_Occurred()) {
-                goto bail;
-            }
-            else {
-                if (PyDict_SetItem(s->memo, key, key) < 0)
-                    goto bail;
-            }
-            idx = next_idx;
-
-            /* skip whitespace between key and : delimiter, read :, skip whitespace */
-            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-            if (idx > end_idx || str[idx] != ':') {
-                raise_errmsg(state, ERR_OBJECT_PROPERTY_DELIMITER, pystr, idx);
-                goto bail;
-            }
-            idx++;
-            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-
-            /* read any JSON data type */
-            val = scan_once_str(s, pystr, idx, &next_idx);
-            if (val == NULL)
-                goto bail;
-
-            if (has_pairs_hook) {
-                item = PyTuple_Pack(2, key, val);
-                if (item == NULL)
-                    goto bail;
-                Py_CLEAR(key);
-                Py_CLEAR(val);
-                if (PyList_Append(pairs, item) == -1) {
-                    Py_DECREF(item);
-                    goto bail;
-                }
-                Py_DECREF(item);
-            }
-            else {
-                if (PyDict_SetItem(rval, key, val) < 0)
-                    goto bail;
-                Py_CLEAR(key);
-                Py_CLEAR(val);
-            }
-            idx = next_idx;
-
-            /* skip whitespace before } or , */
-            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-
-            /* bail if the object is closed or we didn't get the , delimiter */
-            did_parse = 1;
-            if (idx > end_idx) break;
-            if (str[idx] == '}') {
-                break;
-            }
-            else if (str[idx] != ',') {
-                raise_errmsg(state, ERR_OBJECT_DELIMITER, pystr, idx);
-                goto bail;
-            }
-            idx++;
-
-            /* skip whitespace after , delimiter */
-            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-            trailing_delimiter = 1;
-        }
-        if (trailing_delimiter) {
-            raise_errmsg(state, ERR_OBJECT_PROPERTY, pystr, idx);
-            goto bail;
-        }
-    }
-    /* verify that idx < end_idx, str[idx] should be '}' */
-    if (idx > end_idx || str[idx] != '}') {
-        if (did_parse) {
-            raise_errmsg(state, ERR_OBJECT_DELIMITER, pystr, idx);
-        } else {
-            raise_errmsg(state, ERR_OBJECT_PROPERTY_FIRST, pystr, idx);
-        }
-        goto bail;
-    }
-
-    /* if pairs_hook is not None: rval = object_pairs_hook(pairs) */
-    if (s->pairs_hook != Py_None) {
-        val = PyObject_CallOneArg(s->pairs_hook, pairs);
-        if (val == NULL)
-            goto bail;
-        Py_DECREF(pairs);
-        *next_idx_ptr = idx + 1;
-        return val;
-    }
-
-    /* if object_hook is not None: rval = object_hook(rval) */
-    if (s->object_hook != Py_None) {
-        val = PyObject_CallOneArg(s->object_hook, rval);
-        if (val == NULL)
-            goto bail;
-        Py_DECREF(rval);
-        rval = val;
-        val = NULL;
-    }
-    *next_idx_ptr = idx + 1;
-    return rval;
-bail:
-    Py_XDECREF(rval);
-    Py_XDECREF(key);
-    Py_XDECREF(val);
-    Py_XDECREF(pairs);
-    return NULL;
-}
-#endif /* PY_MAJOR_VERSION < 3 */
-
-static PyObject *
-_parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
-{
-    /* Read a JSON object from PyUnicode pystr.
-    idx is the index of the first character after the opening curly brace.
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the closing curly brace.
-
-    Returns a new PyObject (usually a dict, but object_hook can change that)
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    void *str = PyUnicode_DATA(pystr);
-    Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
-    PY2_UNUSED int kind = PyUnicode_KIND(pystr);
-    PyObject *rval = NULL;
-    PyObject *pairs = NULL;
-    PyObject *item;
-    PyObject *key = NULL;
-    PyObject *val = NULL;
-    int has_pairs_hook = (s->pairs_hook != Py_None);
-    int did_parse = 0;
-    Py_ssize_t next_idx;
-
-    if (has_pairs_hook) {
-        pairs = PyList_New(0);
-        if (pairs == NULL)
-            return NULL;
-    }
-    else {
-        rval = PyDict_New();
-        if (rval == NULL)
-            return NULL;
-    }
-
-    /* skip whitespace after { */
-    while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-
-    /* only loop if the object is non-empty */
-    if (idx <= end_idx && PyUnicode_READ(kind, str, idx) != '}') {
-        int trailing_delimiter = 0;
-        while (idx <= end_idx) {
-            PyObject *memokey;
-            trailing_delimiter = 0;
-
-            /* read key */
-            if (PyUnicode_READ(kind, str, idx) != '"') {
-                raise_errmsg(state, ERR_OBJECT_PROPERTY, pystr, idx);
-                goto bail;
-            }
-            key = scanstring_unicode(state, pystr, idx + 1, s->strict, &next_idx);
-            if (key == NULL)
-                goto bail;
-            memokey = PyDict_GetItemWithError(s->memo, key);
-            if (memokey != NULL) {
-                Py_INCREF(memokey);
-                Py_DECREF(key);
-                key = memokey;
-            }
-            else if (PyErr_Occurred()) {
-                goto bail;
-            }
-            else {
-                if (PyDict_SetItem(s->memo, key, key) < 0)
-                    goto bail;
-            }
-            idx = next_idx;
-
-            /* skip whitespace between key and : delimiter, read :, skip
-               whitespace */
-            while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-            if (idx > end_idx || PyUnicode_READ(kind, str, idx) != ':') {
-                raise_errmsg(state, ERR_OBJECT_PROPERTY_DELIMITER, pystr, idx);
-                goto bail;
-            }
-            idx++;
-            while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-
-            /* read any JSON term */
-            val = scan_once_unicode(s, pystr, idx, &next_idx);
-            if (val == NULL)
-                goto bail;
-
-            if (has_pairs_hook) {
-                item = PyTuple_Pack(2, key, val);
-                if (item == NULL)
-                    goto bail;
-                Py_CLEAR(key);
-                Py_CLEAR(val);
-                if (PyList_Append(pairs, item) == -1) {
-                    Py_DECREF(item);
-                    goto bail;
-                }
-                Py_DECREF(item);
-            }
-            else {
-                if (PyDict_SetItem(rval, key, val) < 0)
-                    goto bail;
-                Py_CLEAR(key);
-                Py_CLEAR(val);
-            }
-            idx = next_idx;
-
-            /* skip whitespace before } or , */
-            while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-
-            /* bail if the object is closed or we didn't get the ,
-               delimiter */
-            did_parse = 1;
-            if (idx > end_idx) break;
-            if (PyUnicode_READ(kind, str, idx) == '}') {
-                break;
-            }
-            else if (PyUnicode_READ(kind, str, idx) != ',') {
-                raise_errmsg(state, ERR_OBJECT_DELIMITER, pystr, idx);
-                goto bail;
-            }
-            idx++;
-
-            /* skip whitespace after , delimiter */
-            while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-            trailing_delimiter = 1;
-        }
-        if (trailing_delimiter) {
-            raise_errmsg(state, ERR_OBJECT_PROPERTY, pystr, idx);
-            goto bail;
-        }
-    }
-
-    /* verify that idx < end_idx, str[idx] should be '}' */
-    if (idx > end_idx || PyUnicode_READ(kind, str, idx) != '}') {
-        if (did_parse) {
-            raise_errmsg(state, ERR_OBJECT_DELIMITER, pystr, idx);
-        } else {
-            raise_errmsg(state, ERR_OBJECT_PROPERTY_FIRST, pystr, idx);
-        }
-        goto bail;
-    }
-
-    /* if pairs_hook is not None: rval = object_pairs_hook(pairs) */
-    if (s->pairs_hook != Py_None) {
-        val = PyObject_CallOneArg(s->pairs_hook, pairs);
-        if (val == NULL)
-            goto bail;
-        Py_DECREF(pairs);
-        *next_idx_ptr = idx + 1;
-        return val;
-    }
-
-    /* if object_hook is not None: rval = object_hook(rval) */
-    if (s->object_hook != Py_None) {
-        val = PyObject_CallOneArg(s->object_hook, rval);
-        if (val == NULL)
-            goto bail;
-        Py_DECREF(rval);
-        rval = val;
-        val = NULL;
-    }
-    *next_idx_ptr = idx + 1;
-    return rval;
-bail:
-    Py_XDECREF(rval);
-    Py_XDECREF(key);
-    Py_XDECREF(val);
-    Py_XDECREF(pairs);
-    return NULL;
-}
-
-#if PY_MAJOR_VERSION < 3
-static PyObject *
-_parse_array_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
-{
-    /* Read a JSON array from PyString pystr.
-    idx is the index of the first character after the opening brace.
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the closing brace.
-
-    Returns a new PyList
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
-    PyObject *val = NULL;
-    PyObject *rval = PyList_New(0);
-    Py_ssize_t next_idx;
-    if (rval == NULL)
-        return NULL;
-
-    /* skip whitespace after [ */
-    while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-
-    /* only loop if the array is non-empty */
-    if (idx <= end_idx && str[idx] != ']') {
-        int trailing_delimiter = 0;
-        while (idx <= end_idx) {
-            trailing_delimiter = 0;
-            /* read any JSON term and de-tuplefy the (rval, idx) */
-            val = scan_once_str(s, pystr, idx, &next_idx);
-            if (val == NULL) {
-                goto bail;
-            }
-
-            if (PyList_Append(rval, val) == -1)
-                goto bail;
-
-            Py_CLEAR(val);
-            idx = next_idx;
-
-            /* skip whitespace between term and , */
-            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-
-            /* bail if the array is closed or we didn't get the , delimiter */
-            if (idx > end_idx) break;
-            if (str[idx] == ']') {
-                break;
-            }
-            else if (str[idx] != ',') {
-                raise_errmsg(state, ERR_ARRAY_DELIMITER, pystr, idx);
-                goto bail;
-            }
-            idx++;
-
-            /* skip whitespace after , */
-            while (idx <= end_idx && IS_WHITESPACE(str[idx])) idx++;
-            trailing_delimiter = 1;
-        }
-        if (trailing_delimiter) {
-            raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, idx);
-            goto bail;
-        }
-    }
-
-    /* verify that idx < end_idx, str[idx] should be ']' */
-    if (idx > end_idx || str[idx] != ']') {
-        if (PyList_GET_SIZE(rval)) {
-            raise_errmsg(state, ERR_ARRAY_DELIMITER, pystr, idx);
-        } else {
-            raise_errmsg(state, ERR_ARRAY_VALUE_FIRST, pystr, idx);
-        }
-        goto bail;
-    }
-    *next_idx_ptr = idx + 1;
-    return rval;
-bail:
-    Py_XDECREF(val);
-    Py_DECREF(rval);
-    return NULL;
-}
-#endif /* PY_MAJOR_VERSION < 3 */
-
-static PyObject *
-_parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
-{
-    /* Read a JSON array from PyString pystr.
-    idx is the index of the first character after the opening brace.
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the closing brace.
-
-    Returns a new PyList
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    PY2_UNUSED int kind = PyUnicode_KIND(pystr);
-    void *str = PyUnicode_DATA(pystr);
-    Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
-    PyObject *val = NULL;
-    PyObject *rval = PyList_New(0);
-    Py_ssize_t next_idx;
-    if (rval == NULL)
-        return NULL;
-
-    /* skip whitespace after [ */
-    while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-
-    /* only loop if the array is non-empty */
-    if (idx <= end_idx && PyUnicode_READ(kind, str, idx) != ']') {
-        int trailing_delimiter = 0;
-        while (idx <= end_idx) {
-            trailing_delimiter = 0;
-            /* read any JSON term  */
-            val = scan_once_unicode(s, pystr, idx, &next_idx);
-            if (val == NULL) {
-                goto bail;
-            }
-
-            if (PyList_Append(rval, val) == -1)
-                goto bail;
-
-            Py_CLEAR(val);
-            idx = next_idx;
-
-            /* skip whitespace between term and , */
-            while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-
-            /* bail if the array is closed or we didn't get the , delimiter */
-            if (idx > end_idx) break;
-            if (PyUnicode_READ(kind, str, idx) == ']') {
-                break;
-            }
-            else if (PyUnicode_READ(kind, str, idx) != ',') {
-                raise_errmsg(state, ERR_ARRAY_DELIMITER, pystr, idx);
-                goto bail;
-            }
-            idx++;
-
-            /* skip whitespace after , */
-            while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
-            trailing_delimiter = 1;
-        }
-        if (trailing_delimiter) {
-            raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, idx);
-            goto bail;
-        }
-    }
-
-    /* verify that idx < end_idx, str[idx] should be ']' */
-    if (idx > end_idx || PyUnicode_READ(kind, str, idx) != ']') {
-        if (PyList_GET_SIZE(rval)) {
-            raise_errmsg(state, ERR_ARRAY_DELIMITER, pystr, idx);
-        } else {
-            raise_errmsg(state, ERR_ARRAY_VALUE_FIRST, pystr, idx);
-        }
-        goto bail;
-    }
-    *next_idx_ptr = idx + 1;
-    return rval;
-bail:
-    Py_XDECREF(val);
-    Py_DECREF(rval);
-    return NULL;
-}
-
-static PyObject *
-_parse_constant(PyScannerObject *s, PyObject *pystr, PyObject *constant, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
-{
-    /* Read a JSON constant from PyString pystr.
-    constant is the Python string that was found
-        ("NaN", "Infinity", "-Infinity").
-    idx is the index of the first character of the constant
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the constant.
-
-    Returns the result of parse_constant
-    */
+    /* Read a JSON constant from pystr. `constant` is the Python string
+       that was found ("NaN", "Infinity", "-Infinity"). Returns the
+       result of s->parse_constant(constant). */
     PyObject *rval;
     if (s->parse_constant == Py_None) {
         raise_errmsg(get_speedups_state(s->module_ref),
@@ -1962,473 +1461,92 @@ _parse_constant(PyScannerObject *s, PyObject *pystr, PyObject *constant, Py_ssiz
         return NULL;
     }
 
-    /* rval = parse_constant(constant) */
     rval = PyObject_CallOneArg(s->parse_constant, constant);
     idx += PyString_GET_SIZE(constant);
     *next_idx_ptr = idx;
     return rval;
 }
 
-#if PY_MAJOR_VERSION < 3
-static PyObject *
-_match_number_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr)
+/* -- Helper functions for _match_number fast paths (used by the
+   _speedups_scan.h template). Factored out so the template can stay
+   agnostic about PyFloat / PyInt vs PyObject_CallOneArg details. */
+
+static inline PyObject *
+_match_number_float_fast_unicode(PyObject *numstr)
 {
-    /* Read a JSON number from PyString pystr.
-    idx is the index of the first character of the number
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the number.
-
-    Returns a new PyObject representation of that number:
-        PyInt, PyLong, or PyFloat.
-        May return other types if parse_int or parse_float are set
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t end_idx = PyString_GET_SIZE(pystr) - 1;
-    Py_ssize_t idx = start;
-    int is_float = 0;
-    PyObject *rval;
-    PyObject *numstr;
-
-    /* read a sign if it's there, make sure it's not the end of the string */
-    if (str[idx] == '-') {
-        if (idx >= end_idx) {
-            raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, start);
-            return NULL;
-        }
-        idx++;
-    }
-
-    /* read as many integer digits as we find as long as it doesn't start with 0 */
-    if (str[idx] >= '1' && str[idx] <= '9') {
-        idx++;
-        while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
-    }
-    /* if it starts with 0 we only expect one integer digit */
-    else if (str[idx] == '0') {
-        idx++;
-    }
-    /* no integer digits, error */
-    else {
-        raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, start);
-        return NULL;
-    }
-
-    /* if the next char is '.' followed by a digit then read all float digits */
-    if (idx < end_idx && str[idx] == '.' && str[idx + 1] >= '0' && str[idx + 1] <= '9') {
-        is_float = 1;
-        idx += 2;
-        while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
-    }
-
-    /* if the next char is 'e' or 'E' then maybe read the exponent (or backtrack) */
-    if (idx < end_idx && (str[idx] == 'e' || str[idx] == 'E')) {
-
-        /* save the index of the 'e' or 'E' just in case we need to backtrack */
-        Py_ssize_t e_start = idx;
-        idx++;
-
-        /* read an exponent sign if present */
-        if (idx < end_idx && (str[idx] == '-' || str[idx] == '+')) idx++;
-
-        /* read all digits */
-        while (idx <= end_idx && str[idx] >= '0' && str[idx] <= '9') idx++;
-
-        /* if we got a digit, then parse as float. if not, backtrack */
-        if (str[idx - 1] >= '0' && str[idx - 1] <= '9') {
-            is_float = 1;
-        }
-        else {
-            idx = e_start;
-        }
-    }
-
-    /* copy the section we determined to be a number */
-    numstr = PyString_FromStringAndSize(&str[start], idx - start);
-    if (numstr == NULL)
-        return NULL;
-    if (is_float) {
-        /* parse as a float using a fast path if available, otherwise call user defined method */
-        if (s->parse_float != (PyObject *)&PyFloat_Type) {
-            rval = PyObject_CallOneArg(s->parse_float, numstr);
-        }
-        else {
-            /* rval = PyFloat_FromDouble(PyOS_ascii_atof(PyString_AS_STRING(numstr))); */
-            double d = PyOS_string_to_double(PyString_AS_STRING(numstr),
-                                             NULL, NULL);
-            if (d == -1.0 && PyErr_Occurred()) {
-                Py_DECREF(numstr);
-                return NULL;
-            }
-            rval = PyFloat_FromDouble(d);
-        }
-    }
-    else {
-        /* parse as an int using a fast path if available, otherwise call user defined method */
-        if (s->parse_int != (PyObject *)&PyInt_Type) {
-            rval = PyObject_CallOneArg(s->parse_int, numstr);
-        }
-        else {
-            rval = PyInt_FromString(PyString_AS_STRING(numstr), NULL, 10);
-        }
-    }
-    Py_DECREF(numstr);
-    *next_idx_ptr = idx;
-    return rval;
+#if PY_MAJOR_VERSION >= 3
+    return PyFloat_FromString(numstr);
+#else
+    return PyFloat_FromString(numstr, NULL);
+#endif
 }
-#endif /* PY_MAJOR_VERSION < 3 */
 
-static PyObject *
-_match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_ssize_t *next_idx_ptr)
+static inline PyObject *
+_match_number_int_fast_unicode(PyScannerObject *s, PyObject *numstr)
 {
-    /* Read a JSON number from PyUnicode pystr.
-    idx is the index of the first character of the number
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the number.
-
-    Returns a new PyObject representation of that number:
-        PyInt, PyLong, or PyFloat.
-        May return other types if parse_int or parse_float are set
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    PY2_UNUSED int kind = PyUnicode_KIND(pystr);
-    void *str = PyUnicode_DATA(pystr);
-    Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
-    Py_ssize_t idx = start;
-    int is_float = 0;
-    JSON_UNICHR c;
-    PyObject *rval;
-    PyObject *numstr;
-
-    /* read a sign if it's there, make sure it's not the end of the string */
-    if (PyUnicode_READ(kind, str, idx) == '-') {
-        if (idx >= end_idx) {
-            raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, start);
-            return NULL;
-        }
-        idx++;
-    }
-
-    /* read as many integer digits as we find as long as it doesn't start with 0 */
-    c = PyUnicode_READ(kind, str, idx);
-    if (c == '0') {
-        /* if it starts with 0 we only expect one integer digit */
-        idx++;
-    }
-    else if (IS_DIGIT(c)) {
-        idx++;
-        while (idx <= end_idx && IS_DIGIT(PyUnicode_READ(kind, str, idx))) {
-            idx++;
-        }
-    }
-    else {
-        /* no integer digits, error */
-        raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, start);
-        return NULL;
-    }
-
-    /* if the next char is '.' followed by a digit then read all float digits */
-    if (idx < end_idx &&
-        PyUnicode_READ(kind, str, idx) == '.' &&
-        IS_DIGIT(PyUnicode_READ(kind, str, idx + 1))) {
-        is_float = 1;
-        idx += 2;
-        while (idx <= end_idx && IS_DIGIT(PyUnicode_READ(kind, str, idx))) idx++;
-    }
-
-    /* if the next char is 'e' or 'E' then maybe read the exponent (or backtrack) */
-    if (idx < end_idx &&
-        (PyUnicode_READ(kind, str, idx) == 'e' ||
-            PyUnicode_READ(kind, str, idx) == 'E')) {
-        Py_ssize_t e_start = idx;
-        idx++;
-
-        /* read an exponent sign if present */
-        if (idx < end_idx &&
-            (PyUnicode_READ(kind, str, idx) == '-' ||
-                PyUnicode_READ(kind, str, idx) == '+')) idx++;
-
-        /* read all digits */
-        while (idx <= end_idx && IS_DIGIT(PyUnicode_READ(kind, str, idx))) idx++;
-
-        /* if we got a digit, then parse as float. if not, backtrack */
-        if (IS_DIGIT(PyUnicode_READ(kind, str, idx - 1))) {
-            is_float = 1;
-        }
-        else {
-            idx = e_start;
-        }
-    }
-
-    /* copy the section we determined to be a number */
-#if PY_MAJOR_VERSION >= 3
-    numstr = PyUnicode_Substring(pystr, start, idx);
-#else
-    numstr = PyUnicode_FromUnicode(&((Py_UNICODE *)str)[start], idx - start);
-#endif
-    if (numstr == NULL)
-        return NULL;
-    if (is_float) {
-        /* parse as a float using a fast path if available, otherwise call user defined method */
-        if (s->parse_float != (PyObject *)&PyFloat_Type) {
-            rval = PyObject_CallOneArg(s->parse_float, numstr);
-        }
-        else {
-#if PY_MAJOR_VERSION >= 3
-            rval = PyFloat_FromString(numstr);
-#else
-            rval = PyFloat_FromString(numstr, NULL);
-#endif
-        }
-    }
-    else {
-        /* no fast path for unicode -> int, just call */
-        rval = PyObject_CallOneArg(s->parse_int, numstr);
-    }
-    Py_DECREF(numstr);
-    *next_idx_ptr = idx;
-    return rval;
+    /* No fast path for unicode -> int; always call parse_int. */
+    return PyObject_CallOneArg(s->parse_int, numstr);
 }
 
 #if PY_MAJOR_VERSION < 3
-static PyObject *
-scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
+static inline PyObject *
+_match_number_float_fast_str(PyObject *numstr)
 {
-    /* Read one JSON term (of any kind) from PyString pystr.
-    idx is the index of the first character of the term
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the number.
-
-    Returns a new PyObject representation of the term.
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    char *str = PyString_AS_STRING(pystr);
-    Py_ssize_t length = PyString_GET_SIZE(pystr);
-    PyObject *rval = NULL;
-    int fallthrough = 0;
-    if (idx < 0 || idx >= length) {
-        raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, idx);
+    double d = PyOS_string_to_double(PyString_AS_STRING(numstr), NULL, NULL);
+    if (d == -1.0 && PyErr_Occurred())
         return NULL;
-    }
-    switch (str[idx]) {
-        case '"':
-            /* string */
-            rval = scanstring_str(state, pystr, idx + 1,
-                                  PyString_AS_STRING(s->encoding),
-                                  s->strict, next_idx_ptr);
-            break;
-        case '{':
-            /* object */
-            if (Py_EnterRecursiveCall(" while decoding a JSON object "
-                                      "from a string"))
-                return NULL;
-            rval = _parse_object_str(s, pystr, idx + 1, next_idx_ptr);
-            Py_LeaveRecursiveCall();
-            break;
-        case '[':
-            /* array */
-            if (Py_EnterRecursiveCall(" while decoding a JSON array "
-                                      "from a string"))
-                return NULL;
-            rval = _parse_array_str(s, pystr, idx + 1, next_idx_ptr);
-            Py_LeaveRecursiveCall();
-            break;
-        case 'n':
-            /* null */
-            if ((idx + 3 < length) && str[idx + 1] == 'u' && str[idx + 2] == 'l' && str[idx + 3] == 'l') {
-                Py_INCREF(Py_None);
-                *next_idx_ptr = idx + 4;
-                rval = Py_None;
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 't':
-            /* true */
-            if ((idx + 3 < length) && str[idx + 1] == 'r' && str[idx + 2] == 'u' && str[idx + 3] == 'e') {
-                Py_INCREF(Py_True);
-                *next_idx_ptr = idx + 4;
-                rval = Py_True;
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 'f':
-            /* false */
-            if ((idx + 4 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'l' && str[idx + 3] == 's' && str[idx + 4] == 'e') {
-                Py_INCREF(Py_False);
-                *next_idx_ptr = idx + 5;
-                rval = Py_False;
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 'N':
-            /* NaN */
-            if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
-                rval = _parse_constant(s, pystr, state->JSON_NaN, idx, next_idx_ptr);
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 'I':
-            /* Infinity */
-            if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
-                rval = _parse_constant(s, pystr, state->JSON_Infinity, idx, next_idx_ptr);
-            }
-            else
-                fallthrough = 1;
-            break;
-        case '-':
-            /* -Infinity */
-            if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
-                rval = _parse_constant(s, pystr, state->JSON_NegInfinity, idx, next_idx_ptr);
-            }
-            else
-                fallthrough = 1;
-            break;
-        default:
-            fallthrough = 1;
-    }
-    /* Didn't find a string, object, array, or named constant. Look for a number. */
-    if (fallthrough)
-        rval = _match_number_str(s, pystr, idx, next_idx_ptr);
-    return rval;
+    return PyFloat_FromDouble(d);
 }
+
+static inline PyObject *
+_match_number_int_fast_str(PyScannerObject *s, PyObject *numstr)
+{
+    if (s->parse_int != (PyObject *)&PyInt_Type) {
+        return PyObject_CallOneArg(s->parse_int, numstr);
+    }
+    return PyInt_FromString(PyString_AS_STRING(numstr), NULL, 10);
+}
+#endif
+
+/* -- Generate scan_once_unicode, _parse_object_unicode, _parse_array_unicode,
+   _match_number_unicode from the shared template. -- */
+#define JSON_SCAN_SUFFIX _unicode
+#define JSON_SCAN_DATA_INIT(p) \
+    PY2_UNUSED int kind = PyUnicode_KIND(p); \
+    void *str = PyUnicode_DATA(p); \
+    Py_ssize_t end_idx = PyUnicode_GET_LENGTH(p) - 1
+#define JSON_SCAN_READ(i) PyUnicode_READ(kind, str, (i))
+#define JSON_SCAN_SCANSTRING_CALL(pos, nextp) \
+    scanstring_unicode(state, pystr, (pos), s->strict, (nextp))
+#if PY_MAJOR_VERSION >= 3
+#define JSON_SCAN_NUMSTR_CREATE(sidx, eidx) \
+    PyUnicode_Substring(pystr, (sidx), (eidx))
+#else
+#define JSON_SCAN_NUMSTR_CREATE(sidx, eidx) \
+    PyUnicode_FromUnicode(&((Py_UNICODE *)str)[(sidx)], (eidx) - (sidx))
+#endif
+#define JSON_SCAN_PARSE_FLOAT_FAST(ns) _match_number_float_fast_unicode(ns)
+#define JSON_SCAN_PARSE_INT_FAST(ns)   _match_number_int_fast_unicode(s, ns)
+#define JSON_SCAN_MAYBE_ENCODING_DECL  ((void)0)
+#include "_speedups_scan.h"
+
+/* -- Generate the corresponding _str variants on Python 2. -- */
+#if PY_MAJOR_VERSION < 3
+#define JSON_SCAN_SUFFIX _str
+#define JSON_SCAN_DATA_INIT(p) \
+    char *str = PyString_AS_STRING(p); \
+    Py_ssize_t end_idx = PyString_GET_SIZE(p) - 1
+#define JSON_SCAN_READ(i) ((unsigned char)str[(i)])
+#define JSON_SCAN_SCANSTRING_CALL(pos, nextp) \
+    scanstring_str(state, pystr, (pos), encoding, s->strict, (nextp))
+#define JSON_SCAN_NUMSTR_CREATE(sidx, eidx) \
+    PyString_FromStringAndSize(&str[(sidx)], (eidx) - (sidx))
+#define JSON_SCAN_PARSE_FLOAT_FAST(ns) _match_number_float_fast_str(ns)
+#define JSON_SCAN_PARSE_INT_FAST(ns)   _match_number_int_fast_str(s, ns)
+#define JSON_SCAN_MAYBE_ENCODING_DECL  char *encoding = PyString_AS_STRING(s->encoding)
+#include "_speedups_scan.h"
 #endif /* PY_MAJOR_VERSION < 3 */
 
-
-static PyObject *
-scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr)
-{
-    /* Read one JSON term (of any kind) from PyUnicode pystr.
-    idx is the index of the first character of the term
-    *next_idx_ptr is a return-by-reference index to the first character after
-        the number.
-
-    Returns a new PyObject representation of the term.
-    */
-    _speedups_state *state = get_speedups_state(s->module_ref);
-    PY2_UNUSED int kind = PyUnicode_KIND(pystr);
-    void *str = PyUnicode_DATA(pystr);
-    Py_ssize_t length = PyUnicode_GET_LENGTH(pystr);
-    PyObject *rval = NULL;
-    int fallthrough = 0;
-    if (idx < 0 || idx >= length) {
-        raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, idx);
-        return NULL;
-    }
-    switch (PyUnicode_READ(kind, str, idx)) {
-        case '"':
-            /* string */
-            rval = scanstring_unicode(state, pystr, idx + 1, s->strict,
-                                      next_idx_ptr);
-            break;
-        case '{':
-            /* object */
-            if (Py_EnterRecursiveCall(" while decoding a JSON object "
-                                      "from a unicode string"))
-                return NULL;
-            rval = _parse_object_unicode(s, pystr, idx + 1, next_idx_ptr);
-            Py_LeaveRecursiveCall();
-            break;
-        case '[':
-            /* array */
-            if (Py_EnterRecursiveCall(" while decoding a JSON array "
-                                      "from a unicode string"))
-                return NULL;
-            rval = _parse_array_unicode(s, pystr, idx + 1, next_idx_ptr);
-            Py_LeaveRecursiveCall();
-            break;
-        case 'n':
-            /* null */
-            if ((idx + 3 < length) &&
-                PyUnicode_READ(kind, str, idx + 1) == 'u' &&
-                PyUnicode_READ(kind, str, idx + 2) == 'l' &&
-                PyUnicode_READ(kind, str, idx + 3) == 'l') {
-                Py_INCREF(Py_None);
-                *next_idx_ptr = idx + 4;
-                rval = Py_None;
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 't':
-            /* true */
-            if ((idx + 3 < length) &&
-                PyUnicode_READ(kind, str, idx + 1) == 'r' &&
-                PyUnicode_READ(kind, str, idx + 2) == 'u' &&
-                PyUnicode_READ(kind, str, idx + 3) == 'e') {
-                Py_INCREF(Py_True);
-                *next_idx_ptr = idx + 4;
-                rval = Py_True;
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 'f':
-            /* false */
-            if ((idx + 4 < length) &&
-                PyUnicode_READ(kind, str, idx + 1) == 'a' &&
-                PyUnicode_READ(kind, str, idx + 2) == 'l' &&
-                PyUnicode_READ(kind, str, idx + 3) == 's' &&
-                PyUnicode_READ(kind, str, idx + 4) == 'e') {
-                Py_INCREF(Py_False);
-                *next_idx_ptr = idx + 5;
-                rval = Py_False;
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 'N':
-            /* NaN */
-            if ((idx + 2 < length) &&
-                PyUnicode_READ(kind, str, idx + 1) == 'a' &&
-                PyUnicode_READ(kind, str, idx + 2) == 'N') {
-                rval = _parse_constant(s, pystr, state->JSON_NaN, idx, next_idx_ptr);
-            }
-            else
-                fallthrough = 1;
-            break;
-        case 'I':
-            /* Infinity */
-            if ((idx + 7 < length) &&
-                PyUnicode_READ(kind, str, idx + 1) == 'n' &&
-                PyUnicode_READ(kind, str, idx + 2) == 'f' &&
-                PyUnicode_READ(kind, str, idx + 3) == 'i' &&
-                PyUnicode_READ(kind, str, idx + 4) == 'n' &&
-                PyUnicode_READ(kind, str, idx + 5) == 'i' &&
-                PyUnicode_READ(kind, str, idx + 6) == 't' &&
-                PyUnicode_READ(kind, str, idx + 7) == 'y') {
-                rval = _parse_constant(s, pystr, state->JSON_Infinity, idx, next_idx_ptr);
-            }
-            else
-                fallthrough = 1;
-            break;
-        case '-':
-            /* -Infinity */
-            if ((idx + 8 < length) &&
-                PyUnicode_READ(kind, str, idx + 1) == 'I' &&
-                PyUnicode_READ(kind, str, idx + 2) == 'n' &&
-                PyUnicode_READ(kind, str, idx + 3) == 'f' &&
-                PyUnicode_READ(kind, str, idx + 4) == 'i' &&
-                PyUnicode_READ(kind, str, idx + 5) == 'n' &&
-                PyUnicode_READ(kind, str, idx + 6) == 'i' &&
-                PyUnicode_READ(kind, str, idx + 7) == 't' &&
-                PyUnicode_READ(kind, str, idx + 8) == 'y') {
-                rval = _parse_constant(s, pystr, state->JSON_NegInfinity, idx, next_idx_ptr);
-            }
-            else
-                fallthrough = 1;
-            break;
-        default:
-            fallthrough = 1;
-    }
-    /* Didn't find a string, object, array, or named constant. Look for a number. */
-    if (fallthrough)
-        rval = _match_number_unicode(s, pystr, idx, next_idx_ptr);
-    return rval;
-}
 
 static PyObject *
 scanner_call(PyObject *self, PyObject *args, PyObject *kwds)

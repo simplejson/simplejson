@@ -101,7 +101,11 @@ def run_setup(with_binary):
     if with_binary:
         kw = dict(
             ext_modules=[
-                Extension("simplejson._speedups", ["simplejson/_speedups.c"]),
+                Extension(
+                    "simplejson._speedups",
+                    sources=["simplejson/_speedups.c"],
+                    depends=["simplejson/_speedups_scan.h"],
+                ),
             ],
             cmdclass=dict(cmdclass, build_ext=ve_build_ext),
         )
