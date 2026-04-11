@@ -66,7 +66,7 @@ jobs:
     env:
       # Pin the Python version so the cache key is stable. Bump when
       # we want to pick up a new 3.14.x release.
-      PYTHON_VERSION: '3.14.0'
+      PYTHON_VERSION: '3.14.4'
       PYTHON_PREFIX: /opt/python-debug
     steps:
       - uses: actions/checkout@v4
