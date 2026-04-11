@@ -302,7 +302,7 @@ static PyObject *
 scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
 scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
-               char *encoding, int strict, Py_ssize_t *next_end_ptr);
+               const char *encoding, int strict, Py_ssize_t *next_end_ptr);
 static PyObject *
 _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 #endif
@@ -338,7 +338,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 static PyObject *
 _encoded_const(_speedups_state *state, PyObject *obj);
 static void
-raise_errmsg(_speedups_state *state, char *msg, PyObject *s, Py_ssize_t end);
+raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t end);
 static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj);
 static int
@@ -348,11 +348,13 @@ _convertPyInt_FromSsize_t(Py_ssize_t *size_ptr);
 static int
 _call_json_method(PyObject *obj, PyObject *method_name, PyObject **result);
 static PyObject *
+encoder_long_to_str(PyObject *obj);
+static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 static int
 init_speedups_state(_speedups_state *state, PyObject *module);
 static PyObject *
-import_dependency(char *module_name, char *attr_name);
+import_dependency(const char *module_name, const char *attr_name);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
@@ -500,6 +502,24 @@ maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 #endif
     Py_DECREF(encoded);
     return quoted;
+}
+
+/* Stringify an int/long to its JSON decimal form. For int/long subclasses
+ * we first normalize through PyLong_Type so custom __str__ / __repr__
+ * overrides don't inject garbage into the JSON output (see #118). */
+static PyObject *
+encoder_long_to_str(PyObject *obj)
+{
+    PyObject *encoded;
+    PyObject *tmp;
+    if (PyInt_CheckExact(obj) || PyLong_CheckExact(obj))
+        return PyObject_Str(obj);
+    tmp = PyObject_CallOneArg((PyObject *)&PyLong_Type, obj);
+    if (tmp == NULL)
+        return NULL;
+    encoded = PyObject_Str(tmp);
+    Py_DECREF(tmp);
+    return encoded;
 }
 
 static int
@@ -755,20 +775,7 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
         return _encoded_const(state, key);
     }
     else if (PyInt_Check(key) || PyLong_Check(key)) {
-        if (!(PyInt_CheckExact(key) || PyLong_CheckExact(key))) {
-            /* See #118, do not trust custom str/repr */
-            PyObject *res;
-            PyObject *tmp = PyObject_CallOneArg((PyObject *)&PyLong_Type, key);
-            if (tmp == NULL) {
-                return NULL;
-            }
-            res = PyObject_Str(tmp);
-            Py_DECREF(tmp);
-            return res;
-        }
-        else {
-            return PyObject_Str(key);
-        }
+        return encoder_long_to_str(key);
     }
     else if (s->use_decimal && PyObject_TypeCheck(key, (PyTypeObject *)s->Decimal)) {
         return PyObject_Str(key);
@@ -876,7 +883,7 @@ bail:
 
 /* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
 static void
-raise_errmsg(_speedups_state *state, char *msg, PyObject *s, Py_ssize_t end)
+raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t end)
 {
     PyObject *JSONDecodeError = state->JSONDecodeError;
     PyObject *exc = PyObject_CallFunction(JSONDecodeError, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
@@ -948,7 +955,7 @@ _build_rval_index_tuple(PyObject *rval, Py_ssize_t idx)
 #if PY_MAJOR_VERSION < 3
 static PyObject *
 scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
-               char *encoding, int strict, Py_ssize_t *next_end_ptr)
+               const char *encoding, int strict, Py_ssize_t *next_end_ptr)
 {
     /* Read the JSON string from PyString pystr.
     end is the index of the first character after the quote.
@@ -2193,21 +2200,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
                 rv = _steal_accumulate(state, rval, encoded);
         }
         else if (PyInt_Check(obj) || PyLong_Check(obj)) {
-            PyObject *encoded;
-            if (PyInt_CheckExact(obj) || PyLong_CheckExact(obj)) {
-                encoded = PyObject_Str(obj);
-            }
-            else {
-                /* See #118, do not trust custom str/repr */
-                PyObject *tmp = PyObject_CallOneArg((PyObject *)&PyLong_Type, obj);
-                if (tmp == NULL) {
-                    encoded = NULL;
-                }
-                else {
-                    encoded = PyObject_Str(tmp);
-                    Py_DECREF(tmp);
-                }
-            }
+            PyObject *encoded = encoder_long_to_str(obj);
             if (encoded != NULL) {
                 encoded = maybe_quote_bigint(s, encoded, obj);
                 if (encoded == NULL)
@@ -2322,7 +2315,6 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *item = NULL;
-    PyObject *items = NULL;
     PyObject *encoded = NULL;
     Py_ssize_t idx;
 
@@ -2347,16 +2339,6 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 
     if (JSON_Accu_Accumulate(state, rval, state->JSON_open_dict))
         goto bail;
-
-    if (s->indent != Py_None) {
-        /* TODO: DOES NOT RUN */
-        indent_level += 1;
-        /*
-            newline_indent = '\n' + (_indent * _current_indent_level)
-            separator = _item_separator + newline_indent
-            buf += newline_indent
-        */
-    }
 
     iter = encoder_dict_iteritems(s, dct);
     if (iter == NULL)
@@ -2427,20 +2409,12 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             goto bail;
         Py_CLEAR(ident);
     }
-    if (s->indent != Py_None) {
-        /* TODO: DOES NOT RUN */
-        indent_level -= 1;
-        /*
-            yield '\n' + (_indent * _current_indent_level)
-        */
-    }
     if (JSON_Accu_Accumulate(state, rval, state->JSON_close_dict))
         goto bail;
     return 0;
 
 bail:
     Py_XDECREF(encoded);
-    Py_XDECREF(items);
     Py_XDECREF(item);
     Py_XDECREF(iter);
     Py_XDECREF(kstr);
@@ -2460,7 +2434,6 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     int is_true;
     int i = 0;
 
-    ident = NULL;
     is_true = PyObject_IsTrue(seq);
     if (is_true == -1)
         return -1;
@@ -2489,15 +2462,6 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
 
     if (JSON_Accu_Accumulate(state, rval, state->JSON_open_array))
         goto bail;
-    if (s->indent != Py_None) {
-        /* TODO: DOES NOT RUN */
-        indent_level += 1;
-        /*
-            newline_indent = '\n' + (_indent * _current_indent_level)
-            separator = _item_separator + newline_indent
-            buf += newline_indent
-        */
-    }
     while ((obj = PyIter_Next(iter))) {
         if (i) {
             if (JSON_Accu_Accumulate(state, rval, s->item_separator))
@@ -2515,13 +2479,6 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
         if (PyDict_DelItem(s->markers, ident))
             goto bail;
         Py_CLEAR(ident);
-    }
-    if (s->indent != Py_None) {
-        /* TODO: DOES NOT RUN */
-        indent_level -= 1;
-        /*
-            yield '\n' + (_indent * _current_indent_level)
-        */
     }
     if (JSON_Accu_Accumulate(state, rval, state->JSON_close_array))
         goto bail;
@@ -2959,7 +2916,7 @@ static struct PyModuleDef moduledef = {
 #endif
 
 static PyObject *
-import_dependency(char *module_name, char *attr_name)
+import_dependency(const char *module_name, const char *attr_name)
 {
     PyObject *rval;
     PyObject *module = PyImport_ImportModule(module_name);
