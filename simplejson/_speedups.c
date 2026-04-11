@@ -1,6 +1,7 @@
 /* -*- mode: C; c-file-style: "python"; c-basic-offset: 4 -*- */
 #include "Python.h"
 #include "structmember.h"
+#include <limits.h>  /* CHAR_BIT */
 
 #if PY_MAJOR_VERSION >= 3
 #define PyInt_FromSsize_t PyLong_FromSsize_t
@@ -13,6 +14,13 @@
 #define JSON_StringCheck PyUnicode_Check
 #define PY2_UNUSED
 #define PY3_UNUSED UNUSED
+#if PY_VERSION_HEX >= 0x030C0000
+/* PyUnicode_READY was deprecated in 3.10 and is a no-op since 3.12
+ * (PEP 623). Skip calling it on modern Python to avoid the deprecation
+ * warning and the eventual removal. */
+#undef PyUnicode_READY
+#define PyUnicode_READY(obj) 0
+#endif
 #else /* PY_MAJOR_VERSION >= 3 */
 #define PY2_UNUSED UNUSED
 #define PY3_UNUSED
@@ -135,6 +143,11 @@ static PyTypeObject PyEncoderType;
 static inline _speedups_state *
 get_speedups_state(PyObject *module)
 {
+    /* Every call site passes either the module object (from module-level
+     * methods) or Scanner/Encoder->module_ref (set during instance
+     * construction). Both must be non-NULL; catch any regression where an
+     * uninitialized instance leaks into the hot path. */
+    assert(module != NULL);
 #if PY_VERSION_HEX >= 0x030D0000
     void *state = PyModule_GetState(module);
     assert(state != NULL);
@@ -319,10 +332,6 @@ static int
 _call_json_method(PyObject *obj, const char *method_name, PyObject **result);
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
-#if PY_VERSION_HEX < 0x030D0000
-static PyObject *
-moduleinit(void);
-#endif
 static int
 init_speedups_state(_speedups_state *state, PyObject *module);
 static PyObject *
@@ -2741,7 +2750,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (s->iterable_as_array < 0)
         goto bail;
     if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
-        static const unsigned long long_long_bitsize = SIZEOF_LONG_LONG * 8;
+        static const unsigned long long_long_bitsize = sizeof(long long) * CHAR_BIT;
         long int_as_string_bitcount_val = PyLong_AsLong(int_as_string_bitcount);
         if (int_as_string_bitcount_val == -1 && PyErr_Occurred())
             goto bail;
@@ -3496,12 +3505,51 @@ static PyMethodDef speedups_methods[] = {
 PyDoc_STRVAR(module_doc,
 "simplejson speedups\n");
 
-/* Shared initializer for per-module state. Used by both module_exec on
-   3.13+ and moduleinit on older versions. Assumes the type fields (on
-   3.13+) have already been populated. */
+/* Clear every state field that init_speedups_state may populate.
+ * Called at the start of init_speedups_state so that re-initialization
+ * (e.g. importlib.reload on pre-3.13 where the static state lives for
+ * the lifetime of the interpreter) releases the previous references
+ * instead of leaking them. Type fields are NOT touched here: on 3.13+
+ * module_exec creates the heap types before calling this function, and
+ * on older versions the type fields hold borrowed pointers to static
+ * PyTypeObjects that must not be cleared. */
+static void
+reset_speedups_state_constants(_speedups_state *state)
+{
+    Py_CLEAR(state->JSON_Infinity);
+    Py_CLEAR(state->JSON_NegInfinity);
+    Py_CLEAR(state->JSON_NaN);
+    Py_CLEAR(state->JSON_EmptyUnicode);
+#if PY_MAJOR_VERSION < 3
+    Py_CLEAR(state->JSON_EmptyStr);
+#endif
+    Py_CLEAR(state->JSON_s_null);
+    Py_CLEAR(state->JSON_s_true);
+    Py_CLEAR(state->JSON_s_false);
+    Py_CLEAR(state->JSON_open_dict);
+    Py_CLEAR(state->JSON_close_dict);
+    Py_CLEAR(state->JSON_empty_dict);
+    Py_CLEAR(state->JSON_open_array);
+    Py_CLEAR(state->JSON_close_array);
+    Py_CLEAR(state->JSON_empty_array);
+    Py_CLEAR(state->JSON_sortargs);
+    Py_CLEAR(state->JSON_itemgetter0);
+    Py_CLEAR(state->RawJSONType);
+    Py_CLEAR(state->JSONDecodeError);
+}
+
+/* Shared initializer for per-module state. Called from module_exec
+   on Python 3 and from init_speedups on Python 2. Assumes the type
+   fields in state have already been populated. */
 static int
 init_speedups_state(_speedups_state *state, PyObject *module)
 {
+    /* Release any prior values. A no-op on the first call (fields are
+     * already NULL from per-module zeroed storage on 3.13+ or from the
+     * static BSS on older versions); on reload this releases the
+     * previous references to avoid a refcount leak. */
+    reset_speedups_state_constants(state);
+
     state->JSON_NaN = JSON_InternFromString("NaN");
     if (state->JSON_NaN == NULL)
         return -1;
@@ -3572,31 +3620,64 @@ init_speedups_state(_speedups_state *state, PyObject *module)
     return 0;
 }
 
-#if PY_VERSION_HEX >= 0x030D0000
-/* Multi-phase initialization for Python 3.13+ (PEP 489).
-   Required to declare Py_mod_gil for free-threaded Python (PEP 703). */
+#if PY_VERSION_HEX >= 0x03050000
+/* Multi-phase initialization (PEP 489) for Python 3.5+. On 3.13+ this
+ * path creates heap types and allocates per-module state so that each
+ * interpreter gets its own copy; on 3.5-3.12 the type fields just point
+ * at the statically-allocated PyTypeObjects and state lives in the
+ * single _speedups_static_state instance. Either way, module_exec does
+ * the work and get_speedups_state() gives uniform access. */
 static int
 module_exec(PyObject *m)
 {
     _speedups_state *state = get_speedups_state(m);
 
-    /* Create heap types from specs, binding them to this module */
+#if PY_VERSION_HEX >= 0x030D0000
+    /* Create heap types from specs, bound to this module */
     state->PyScannerType = PyType_FromModuleAndSpec(m, &PyScannerType_spec, NULL);
     if (state->PyScannerType == NULL)
         return -1;
-
     state->PyEncoderType = PyType_FromModuleAndSpec(m, &PyEncoderType_spec, NULL);
     if (state->PyEncoderType == NULL)
         return -1;
+#else
+    if (PyType_Ready(&PyScannerType) < 0)
+        return -1;
+    if (PyType_Ready(&PyEncoderType) < 0)
+        return -1;
+    /* Static types are eternal, so these are borrowed pointers kept
+     * in the state struct for layout uniformity with the 3.13+ path.
+     * There is nothing to refcount and no GC tracking here. */
+    state->PyScannerType = (PyObject *)&PyScannerType;
+    state->PyEncoderType = (PyObject *)&PyEncoderType;
+    /* Scanner/Encoder instance construction needs a borrowed reference
+     * to the module to store in module_ref; capture it here, before
+     * anything else that might trigger instance creation. */
+    _speedups_module = m;
+#endif
 
+#if PY_VERSION_HEX >= 0x030A0000
     if (PyModule_AddObjectRef(m, "make_scanner", state->PyScannerType) < 0)
         return -1;
     if (PyModule_AddObjectRef(m, "make_encoder", state->PyEncoderType) < 0)
         return -1;
+#else
+    Py_INCREF(state->PyScannerType);
+    if (PyModule_AddObject(m, "make_scanner", state->PyScannerType) < 0) {
+        Py_DECREF(state->PyScannerType);
+        return -1;
+    }
+    Py_INCREF(state->PyEncoderType);
+    if (PyModule_AddObject(m, "make_encoder", state->PyEncoderType) < 0) {
+        Py_DECREF(state->PyEncoderType);
+        return -1;
+    }
+#endif
 
     return init_speedups_state(state, m);
 }
 
+#if PY_VERSION_HEX >= 0x030D0000
 static int
 speedups_traverse(PyObject *m, visitproc visit, void *arg)
 {
@@ -3629,32 +3710,19 @@ speedups_clear(PyObject *m)
     _speedups_state *state = get_speedups_state(m);
     Py_CLEAR(state->PyScannerType);
     Py_CLEAR(state->PyEncoderType);
-    Py_CLEAR(state->JSON_Infinity);
-    Py_CLEAR(state->JSON_NegInfinity);
-    Py_CLEAR(state->JSON_NaN);
-    Py_CLEAR(state->JSON_EmptyUnicode);
-    Py_CLEAR(state->JSON_s_null);
-    Py_CLEAR(state->JSON_s_true);
-    Py_CLEAR(state->JSON_s_false);
-    Py_CLEAR(state->JSON_open_dict);
-    Py_CLEAR(state->JSON_close_dict);
-    Py_CLEAR(state->JSON_empty_dict);
-    Py_CLEAR(state->JSON_open_array);
-    Py_CLEAR(state->JSON_close_array);
-    Py_CLEAR(state->JSON_empty_array);
-    Py_CLEAR(state->JSON_sortargs);
-    Py_CLEAR(state->JSON_itemgetter0);
-    Py_CLEAR(state->RawJSONType);
-    Py_CLEAR(state->JSONDecodeError);
+    reset_speedups_state_constants(state);
     return 0;
 }
+#endif /* PY_VERSION_HEX >= 0x030D0000 */
 
 static PyModuleDef_Slot module_slots[] = {
     {Py_mod_exec, module_exec},
+#if PY_VERSION_HEX >= 0x030D0000
     {Py_mod_gil, Py_MOD_GIL_NOT_USED},
+#endif
     {0, NULL}
 };
-#endif /* PY_VERSION_HEX >= 0x030D0000 */
+#endif /* PY_VERSION_HEX >= 0x03050000 */
 
 #if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
@@ -3663,17 +3731,23 @@ static struct PyModuleDef moduledef = {
     module_doc,         /* m_doc */
 #if PY_VERSION_HEX >= 0x030D0000
     sizeof(_speedups_state), /* m_size */
+#else
+    0,                  /* m_size: no per-module state on <3.13 */
+#endif
     speedups_methods,   /* m_methods */
-    module_slots,       /* m_slots */
+#if PY_VERSION_HEX >= 0x03050000
+    module_slots,       /* m_slots (multi-phase init) */
+#else
+    NULL,               /* m_slots (3.3/3.4: single-phase) */
+#endif
+#if PY_VERSION_HEX >= 0x030D0000
     speedups_traverse,  /* m_traverse */
     speedups_clear,     /* m_clear */
 #else
-    -1,                 /* m_size */
-    speedups_methods,   /* m_methods */
-    NULL,               /* m_slots */
     NULL,               /* m_traverse */
     NULL,               /* m_clear */
 #endif
+    NULL,               /* m_free */
 };
 #endif
 
@@ -3689,74 +3763,55 @@ import_dependency(char *module_name, char *attr_name)
     return rval;
 }
 
-#if PY_VERSION_HEX < 0x030D0000
-/* Single-phase initialization for Python < 3.13 (including Python 2.7).
-   Populates the single static state instance and captures a borrowed
-   module reference so Scanner/Encoder instances can uniformly store a
-   module_ref pointer. */
-static PyObject *
-moduleinit(void)
-{
-    PyObject *m;
-    _speedups_state *state = &_speedups_static_state;
-
-    if (PyType_Ready(&PyScannerType) < 0)
-        return NULL;
-    if (PyType_Ready(&PyEncoderType) < 0)
-        return NULL;
-
-    /* Static types are eternal, so these are borrowed pointers kept
-       in the state struct for layout uniformity with the 3.13+ path.
-       There's no refcount to manage and no GC tracking here. */
-    state->PyScannerType = (PyObject *)&PyScannerType;
-    state->PyEncoderType = (PyObject *)&PyEncoderType;
-
-#if PY_MAJOR_VERSION >= 3
-    m = PyModule_Create(&moduledef);
-#else
-    m = Py_InitModule3("_speedups", speedups_methods, module_doc);
-#endif
-    if (m == NULL)
-        return NULL;
-
-    /* Borrowed reference - sys.modules keeps the module alive. */
-    _speedups_module = m;
-
-    Py_INCREF(state->PyScannerType);
-    if (PyModule_AddObject(m, "make_scanner", state->PyScannerType) < 0) {
-        Py_DECREF(state->PyScannerType);
-        Py_DECREF(m);
-        return NULL;
-    }
-    Py_INCREF(state->PyEncoderType);
-    if (PyModule_AddObject(m, "make_encoder", state->PyEncoderType) < 0) {
-        Py_DECREF(state->PyEncoderType);
-        Py_DECREF(m);
-        return NULL;
-    }
-
-    if (init_speedups_state(state, m) < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    return m;
-}
-#endif /* PY_VERSION_HEX < 0x030D0000 */
-
 #if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC
 PyInit__speedups(void)
 {
-#if PY_VERSION_HEX >= 0x030D0000
+#if PY_VERSION_HEX >= 0x03050000
+    /* Multi-phase init: Python runs module_exec via the Py_mod_exec slot */
     return PyModuleDef_Init(&moduledef);
 #else
-    return moduleinit();
+    /* Python 3.3/3.4: fall back to single-phase init */
+    PyObject *m = PyModule_Create(&moduledef);
+    if (m == NULL)
+        return NULL;
+    if (module_exec(m) < 0) {
+        Py_DECREF(m);
+        return NULL;
+    }
+    return m;
 #endif
 }
 #else
+/* Python 2.7: single-phase init via Py_InitModule3 */
 void
 init_speedups(void)
 {
-    moduleinit();
+    _speedups_state *state = &_speedups_static_state;
+    PyObject *m;
+
+    if (PyType_Ready(&PyScannerType) < 0)
+        return;
+    if (PyType_Ready(&PyEncoderType) < 0)
+        return;
+    state->PyScannerType = (PyObject *)&PyScannerType;
+    state->PyEncoderType = (PyObject *)&PyEncoderType;
+
+    m = Py_InitModule3("_speedups", speedups_methods, module_doc);
+    if (m == NULL)
+        return;
+    _speedups_module = m;  /* borrowed; sys.modules keeps it alive */
+
+    Py_INCREF(state->PyScannerType);
+    if (PyModule_AddObject(m, "make_scanner", state->PyScannerType) < 0) {
+        Py_DECREF(state->PyScannerType);
+        return;
+    }
+    Py_INCREF(state->PyEncoderType);
+    if (PyModule_AddObject(m, "make_encoder", state->PyEncoderType) < 0) {
+        Py_DECREF(state->PyEncoderType);
+        return;
+    }
+    (void)init_speedups_state(state, m);
 }
 #endif
