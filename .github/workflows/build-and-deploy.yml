@@ -60,6 +60,63 @@ jobs:
       - name: Run tests with GIL disabled
         run: PYTHON_GIL=0 python -m simplejson.tests._cibw_runner .
 
+  test_debug_build:
+    name: Tests on Python 3.14 debug build
+    runs-on: ubuntu-latest
+    env:
+      # Pin the Python version so the cache key is stable. Bump when
+      # we want to pick up a new 3.14.x release.
+      PYTHON_VERSION: '3.14.0'
+      PYTHON_PREFIX: /opt/python-debug
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Python debug build
+        id: cache-python
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PYTHON_PREFIX }}
+          key: python-${{ env.PYTHON_VERSION }}-debug-${{ runner.os }}-v1
+
+      - name: Build Python ${{ env.PYTHON_VERSION }} with --with-pydebug
+        if: steps.cache-python.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libssl-dev zlib1g-dev libbz2-dev \
+            libreadline-dev libsqlite3-dev libffi-dev liblzma-dev
+          curl -fsSL -o Python.tar.xz \
+            "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz"
+          tar xf Python.tar.xz
+          cd Python-${PYTHON_VERSION}
+          ./configure --with-pydebug --disable-test-modules \
+            --prefix="${PYTHON_PREFIX}" --with-ensurepip=install
+          make -j "$(nproc)"
+          sudo make install
+          sudo chown -R "$(id -u):$(id -g)" "${PYTHON_PREFIX}"
+
+      - name: Add debug Python to PATH
+        run: echo "${PYTHON_PREFIX}/bin" >> "$GITHUB_PATH"
+
+      - name: Verify debug build
+        run: |
+          python3 -c "
+          import sys
+          assert hasattr(sys, 'gettotalrefcount'), (
+              'not a debug build (sys.gettotalrefcount missing)')
+          print('OK:', sys.version)
+          "
+
+      - name: Build extension with strict warnings (-Werror)
+        env:
+          CFLAGS: "-Wall -Wextra -Wshadow -Wstrict-prototypes -Werror -Wno-unused-parameter -Wno-missing-field-initializers -Wno-cast-function-type"
+        run: |
+          python3 -m pip install --upgrade setuptools wheel
+          REQUIRE_SPEEDUPS=1 python3 setup.py build_ext -i
+
+      - name: Run tests (TestRefcountLeaks auto-enabled on debug build)
+        run: python3 -m simplejson.tests._cibw_runner .
+
   build_wheels:
     name: Build wheels (${{ matrix.os }}, ${{ matrix.arch }})
     runs-on: ${{ matrix.os }}
@@ -151,7 +208,7 @@ jobs:
   # Aggregate gate jobs to match branch protection rule names
   gate_ubuntu:
     name: Build wheels on ubuntu-latest
-    needs: [build_wheels, test_pure_python, test_free_threading]
+    needs: [build_wheels, test_pure_python, test_free_threading, test_debug_build]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All ubuntu-latest checks passed"

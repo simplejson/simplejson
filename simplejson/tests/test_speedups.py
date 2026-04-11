@@ -156,3 +156,74 @@ class TestHeapTypes(TestCase):
         """Verify Encoder heap type instances encode correctly."""
         result = simplejson.dumps({"a": 1}, sort_keys=True)
         self.assertEqual(result, '{"a": 1}')
+
+
+@unittest.skipUnless(hasattr(sys, "gettotalrefcount"),
+                     "debug build required (sys.gettotalrefcount)")
+class TestRefcountLeaks(TestCase):
+    """Catch refcount leaks in the C extension.
+
+    These tests only run on debug builds of CPython, which expose
+    sys.gettotalrefcount(). On release builds they skip silently.
+    """
+
+    ITER = 2000
+
+    def _assert_no_leak(self, func):
+        import gc
+        # Warm up to stabilize caches (interned strings, module state, etc.)
+        for _ in range(50):
+            func()
+        gc.collect()
+        before = sys.gettotalrefcount()
+        for _ in range(self.ITER):
+            func()
+        gc.collect()
+        after = sys.gettotalrefcount()
+        delta = after - before
+        # Allow a small slack for debug build internals, but any real
+        # leak would grow linearly with ITER.
+        self.assertLess(abs(delta), 50,
+                        "refcount delta=%d over %d iterations"
+                        % (delta, self.ITER))
+
+    @skip_if_speedups_missing
+    def test_dumps_no_leak(self):
+        data = {"a": [1, 2, 3], "b": "hello", "c": None, "d": True}
+        self._assert_no_leak(lambda: simplejson.dumps(data))
+
+    @skip_if_speedups_missing
+    def test_loads_no_leak(self):
+        raw = '{"a": [1, 2, 3], "b": "hello", "c": null, "d": true}'
+        self._assert_no_leak(lambda: simplejson.loads(raw))
+
+    @skip_if_speedups_missing
+    def test_scanner_construction_no_leak(self):
+        self._assert_no_leak(lambda: simplejson.JSONDecoder())
+
+    @skip_if_speedups_missing
+    def test_encoder_construction_no_leak(self):
+        self._assert_no_leak(lambda: simplejson.JSONEncoder())
+
+    @skip_if_speedups_missing
+    def test_failed_construction_no_leak(self):
+        """Error path in scanner_new/encoder_new must release module_ref."""
+        class BadBool:
+            def __bool__(self):
+                raise ZeroDivisionError()
+            __nonzero__ = __bool__
+
+        def try_bad_scanner():
+            try:
+                decoder.JSONDecoder(strict=BadBool()).decode('{}')
+            except ZeroDivisionError:
+                pass
+
+        def try_bad_encoder():
+            try:
+                encoder.JSONEncoder(skipkeys=BadBool()).encode({})
+            except ZeroDivisionError:
+                pass
+
+        self._assert_no_leak(try_bad_scanner)
+        self._assert_no_leak(try_bad_encoder)
