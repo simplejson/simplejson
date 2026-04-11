@@ -1024,18 +1024,18 @@ scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
             }
             /* Decode 4 hex digits */
             for (; next < end; next++) {
-                JSON_UNICHR digit = (JSON_UNICHR)buf[next];
+                JSON_UNICHR hex_digit = (JSON_UNICHR)buf[next];
                 c <<= 4;
-                switch (digit) {
+                switch (hex_digit) {
                     case '0': case '1': case '2': case '3': case '4':
                     case '5': case '6': case '7': case '8': case '9':
-                        c |= (digit - '0'); break;
+                        c |= (hex_digit - '0'); break;
                     case 'a': case 'b': case 'c': case 'd': case 'e':
                     case 'f':
-                        c |= (digit - 'a' + 10); break;
+                        c |= (hex_digit - 'a' + 10); break;
                     case 'A': case 'B': case 'C': case 'D': case 'E':
                     case 'F':
-                        c |= (digit - 'A' + 10); break;
+                        c |= (hex_digit - 'A' + 10); break;
                     default:
                         raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
                         goto bail;
@@ -1050,17 +1050,17 @@ scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                     /* Decode 4 hex digits */
                     for (next += 2; next < end; next++) {
                         c2 <<= 4;
-                        JSON_UNICHR digit = buf[next];
-                        switch (digit) {
+                        JSON_UNICHR hex_digit = buf[next];
+                        switch (hex_digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
-                            c2 |= (digit - '0'); break;
+                            c2 |= (hex_digit - '0'); break;
                         case 'a': case 'b': case 'c': case 'd': case 'e':
                         case 'f':
-                            c2 |= (digit - 'a' + 10); break;
+                            c2 |= (hex_digit - 'a' + 10); break;
                         case 'A': case 'B': case 'C': case 'D': case 'E':
                         case 'F':
-                            c2 |= (digit - 'A' + 10); break;
+                            c2 |= (hex_digit - 'A' + 10); break;
                         default:
                             raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
                             goto bail;
@@ -1221,18 +1221,18 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
             }
             /* Decode 4 hex digits */
             for (; next < end; next++) {
-                JSON_UNICHR digit = PyUnicode_READ(kind, buf, next);
+                JSON_UNICHR hex_digit = PyUnicode_READ(kind, buf, next);
                 c <<= 4;
-                switch (digit) {
+                switch (hex_digit) {
                     case '0': case '1': case '2': case '3': case '4':
                     case '5': case '6': case '7': case '8': case '9':
-                        c |= (digit - '0'); break;
+                        c |= (hex_digit - '0'); break;
                     case 'a': case 'b': case 'c': case 'd': case 'e':
                     case 'f':
-                        c |= (digit - 'a' + 10); break;
+                        c |= (hex_digit - 'a' + 10); break;
                     case 'A': case 'B': case 'C': case 'D': case 'E':
                     case 'F':
-                        c |= (digit - 'A' + 10); break;
+                        c |= (hex_digit - 'A' + 10); break;
                     default:
                         raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
                         goto bail;
@@ -1248,18 +1248,18 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                     end += 6;
                     /* Decode 4 hex digits */
                     for (next += 2; next < end; next++) {
-                        JSON_UNICHR digit = PyUnicode_READ(kind, buf, next);
+                        JSON_UNICHR hex_digit = PyUnicode_READ(kind, buf, next);
                         c2 <<= 4;
-                        switch (digit) {
+                        switch (hex_digit) {
                         case '0': case '1': case '2': case '3': case '4':
                         case '5': case '6': case '7': case '8': case '9':
-                            c2 |= (digit - '0'); break;
+                            c2 |= (hex_digit - '0'); break;
                         case 'a': case 'b': case 'c': case 'd': case 'e':
                         case 'f':
-                            c2 |= (digit - 'a' + 10); break;
+                            c2 |= (hex_digit - 'a' + 10); break;
                         case 'A': case 'B': case 'C': case 'D': case 'E':
                         case 'F':
-                            c2 |= (digit - 'A' + 10); break;
+                            c2 |= (hex_digit - 'A' + 10); break;
                         default:
                             raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
                             goto bail;
@@ -3055,7 +3055,6 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             }
             else {
             PyObject *ident = NULL;
-            PyObject *newobj;
             if (s->iterable_as_array) {
                 newobj = PyObject_GetIter(obj);
                 if (newobj == NULL) {
