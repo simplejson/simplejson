@@ -2374,21 +2374,40 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
         /*
          * Only cache the encoding of string keys. False and True are
          * indistinguishable from 0 and 1 in a dictionary lookup and there
-         * may be other quirks with user defined subclasses.
+         * may be other quirks with user defined subclasses. In the
+         * string-key branch kstr is an INCREF'd alias of key, so storing
+         * under `key` finds the same entry via the `kstr` lookup on the
+         * next iteration. For non-string keys kstr is a freshly created
+         * string object, so a store under `key` would be write-only and
+         * the cache entry would never be reused — skip it entirely.
          */
-        encoded = PyDict_GetItemWithError(s->key_memo, kstr);
-        if (encoded != NULL) {
-            Py_INCREF(encoded);
-            Py_CLEAR(kstr);
-        } else if (PyErr_Occurred()) {
-            goto bail;
-        } else {
-            encoded = encoder_encode_string(s, kstr);
-            Py_CLEAR(kstr);
-            if (encoded == NULL)
-                goto bail;
-            if (PyDict_SetItem(s->key_memo, key, encoded))
-                goto bail;
+        {
+            int is_string_key = PyUnicode_Check(key)
+#if PY_MAJOR_VERSION < 3
+                                || PyString_Check(key)
+#endif
+                                ;
+            if (is_string_key) {
+                encoded = PyDict_GetItemWithError(s->key_memo, kstr);
+                if (encoded != NULL) {
+                    Py_INCREF(encoded);
+                    Py_CLEAR(kstr);
+                } else if (PyErr_Occurred()) {
+                    goto bail;
+                } else {
+                    encoded = encoder_encode_string(s, kstr);
+                    Py_CLEAR(kstr);
+                    if (encoded == NULL)
+                        goto bail;
+                    if (PyDict_SetItem(s->key_memo, key, encoded))
+                        goto bail;
+                }
+            } else {
+                encoded = encoder_encode_string(s, kstr);
+                Py_CLEAR(kstr);
+                if (encoded == NULL)
+                    goto bail;
+            }
         }
         if (JSON_Accu_Accumulate(state, rval, encoded)) {
             goto bail;

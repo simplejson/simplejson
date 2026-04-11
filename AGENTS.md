@@ -189,12 +189,18 @@ from simplejson.tests._helpers import skip_if_speedups_missing
 ## Useful CFLAGS combinations
 
 ```bash
-# Everything on, matches the test_debug_build CI job
+# Everything on, matches the test_debug_build CI job. Use this for
+# the standard (non-free-threaded) debug and release builds.
 CFLAGS="-Wall -Wextra -Wshadow -Wstrict-prototypes -Werror \
         -Wno-unused-parameter -Wno-missing-field-initializers \
         -Wno-cast-function-type"
 
-# Add -Wdeclaration-after-statement to verify the file stays C89-clean
+# Add -Wdeclaration-after-statement to verify the file stays C89-clean.
+# Works on standard and standard-debug builds but NOT on free-threaded
+# builds: cp314t's own `refcount.h` has a mixed-decls-and-code block
+# (around refcount.h:113) that trips -Werror before your source is
+# even compiled. Use the plain CFLAGS above when building against
+# cpython-3.14+freethreaded+debug.
 CFLAGS="-Wall -Wextra -Wshadow -Wstrict-prototypes -Wdeclaration-after-statement \
         -Werror -Wno-unused-parameter -Wno-missing-field-initializers \
         -Wno-cast-function-type"

@@ -233,3 +233,63 @@ class TestRefcountLeaks(TestCase):
         self._assert_no_leak(try_bad_scanner)
         self._assert_no_leak(try_bad_encoder)
 
+    @skip_if_speedups_missing
+    def test_circular_reference_no_leak(self):
+        """ValueError mid-encode must not leak the partial accumulator,
+        markers dict entry, or the ident PyLong."""
+        def circular():
+            d = {}
+            d["self"] = d
+            try:
+                simplejson.dumps(d)
+            except ValueError:
+                pass
+        self._assert_no_leak(circular)
+
+    @skip_if_speedups_missing
+    def test_asdict_returning_non_dict_no_leak(self):
+        """encoder_steal_encode's TypeError path on _asdict() returning
+        a non-dict must release the stolen newobj reference."""
+        class BadNT:
+            def _asdict(self):
+                return "not a dict"
+
+        def bad_asdict():
+            try:
+                simplejson.dumps(BadNT(), namedtuple_as_object=True)
+            except TypeError:
+                pass
+        self._assert_no_leak(bad_asdict)
+
+    @skip_if_speedups_missing
+    def test_for_json_raising_no_leak(self):
+        """for_json() raising inside its body must not leak the method
+        binding or partial accumulator state."""
+        class Explodes:
+            def for_json(self):
+                raise RuntimeError("boom")
+
+        def explode():
+            try:
+                simplejson.dumps(Explodes(), for_json=True)
+            except RuntimeError:
+                pass
+        self._assert_no_leak(explode)
+
+    @skip_if_speedups_missing
+    def test_non_string_dict_keys_no_leak(self):
+        """Dict keys that aren't already strings go through
+        encoder_stringify_key and the non-cached branch of the key_memo
+        logic. Both paths must release the transient stringified key."""
+        data = {1: "a", 2: "b", 3: "c", True: "x", False: "y"}
+        self._assert_no_leak(lambda: simplejson.dumps(data, sort_keys=True))
+
+    @skip_if_speedups_missing
+    def test_bigint_as_string_no_leak(self):
+        """maybe_quote_bigint's comparison path must release `encoded`
+        on the RichCompareBool error branch and on the quoted-return
+        path that replaces the unquoted string."""
+        big = 1 << 40
+        self._assert_no_leak(
+            lambda: simplejson.dumps(big, int_as_string_bitcount=31))
+
