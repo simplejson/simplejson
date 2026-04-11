@@ -151,9 +151,7 @@ get_speedups_state(PyObject *module)
 typedef struct {
     PyObject *large_strings;  /* A list of previously accumulated large strings */
     PyObject *small_strings;  /* Pending small strings */
-#if PY_MAJOR_VERSION >= 3
-    PyObject *empty_unicode;  /* Borrowed ref to state->JSON_EmptyUnicode */
-#endif
+    _speedups_state *state;   /* borrowed */
 } JSON_Accu;
 
 static int
@@ -253,7 +251,7 @@ static PyMemberDef encoder_members[] = {
 };
 
 static PyObject *
-join_list_unicode(PyObject *lst, PyObject *empty_unicode);
+join_list_unicode(PyObject *lst, _speedups_state *state);
 static PyObject *
 JSON_ParseEncoding(PyObject *encoding);
 static PyObject *
@@ -280,7 +278,7 @@ _parse_object_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
 #endif
 static PyObject *
 scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr,
-                   PyObject *JSON_EmptyUnicode, PyObject *JSONDecodeError);
+                   _speedups_state *state);
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
@@ -298,7 +296,7 @@ encoder_dealloc(PyObject *self);
 static int
 encoder_clear(PyObject *self);
 static int
-is_raw_json(PyObject *obj, PyObject *RawJSONType);
+is_raw_json(PyObject *obj, _speedups_state *state);
 static PyObject *
 encoder_stringify_key(PyEncoderObject *s, PyObject *key);
 static int
@@ -308,9 +306,9 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
 static int
 encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_ssize_t indent_level);
 static PyObject *
-_encoded_const(PyObject *obj, PyObject *JSON_s_null, PyObject *JSON_s_true, PyObject *JSON_s_false);
+_encoded_const(PyObject *obj, _speedups_state *state);
 static void
-raise_errmsg_impl(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError);
+raise_errmsg_impl(char *msg, PyObject *s, Py_ssize_t end, _speedups_state *state);
 static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj);
 static int
@@ -330,21 +328,11 @@ init_speedups_state(_speedups_state *state, PyObject *module);
 static PyObject *
 import_dependency(char *module_name, char *attr_name);
 
-/* Short aliases for helpers that take state-derived arguments. Defined
-   once for all Python versions now that the state layout is unified. */
-#define RAISE_ERRMSG(msg, s, end, jde) raise_errmsg_impl(msg, s, end, jde)
-#define ENCODED_CONST(obj, sn, st, sf) _encoded_const(obj, sn, st, sf)
-#define IS_RAW_JSON(obj, rjt) is_raw_json(obj, rjt)
-#define JOIN_LIST_UNICODE(lst, eu) join_list_unicode(lst, eu)
-#define SCANSTRING_UNICODE(pystr, end, strict, next_end_ptr, eu, jde) \
-    scanstring_unicode(pystr, end, strict, next_end_ptr, eu, jde)
-
 #if PY_MAJOR_VERSION < 3
-/* Python 2 call sites use a 3-arg form without threading state
-   through the scanner functions; resolve JSONDecodeError from the
-   static state at the call site. */
+/* Python 2 scanner functions don't thread state through explicitly,
+   so the 3-arg form resolves state from the single static instance. */
 #define raise_errmsg(msg, s, end) \
-    raise_errmsg_impl(msg, s, end, _speedups_static_state.JSONDecodeError)
+    raise_errmsg_impl(msg, s, end, &_speedups_static_state)
 #endif
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
@@ -353,9 +341,9 @@ import_dependency(char *module_name, char *attr_name);
 #define MIN_EXPANSION 6
 
 static int
-is_raw_json(PyObject *obj, PyObject *RawJSONType)
+is_raw_json(PyObject *obj, _speedups_state *state)
 {
-    int r = PyObject_IsInstance(obj, RawJSONType);
+    int r = PyObject_IsInstance(obj, state->RawJSONType);
     if (r < 0)
         return -1;
     return r;
@@ -369,11 +357,7 @@ JSON_Accu_Init(JSON_Accu *acc, _speedups_state *state)
     acc->small_strings = PyList_New(0);
     if (acc->small_strings == NULL)
         return -1;
-#if PY_MAJOR_VERSION >= 3
-    acc->empty_unicode = state->JSON_EmptyUnicode;  /* borrowed */
-#else
-    (void)state;
-#endif
+    acc->state = state;  /* borrowed */
     return 0;
 }
 
@@ -390,7 +374,7 @@ flush_accumulator(JSON_Accu *acc)
                 return -1;
         }
 #if PY_MAJOR_VERSION >= 3
-        joined = join_list_unicode(acc->small_strings, acc->empty_unicode);
+        joined = join_list_unicode(acc->small_strings, acc->state);
 #else
         joined = join_list_string(acc->small_strings);
 #endif
@@ -713,9 +697,6 @@ static PyObject *
 encoder_stringify_key(PyEncoderObject *s, PyObject *key)
 {
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_s_null = _st->JSON_s_null;
-    PyObject *JSON_s_true = _st->JSON_s_true;
-    PyObject *JSON_s_false = _st->JSON_s_false;
     if (PyUnicode_Check(key)) {
         Py_INCREF(key);
         return key;
@@ -743,7 +724,7 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
     else if (key == Py_True || key == Py_False || key == Py_None) {
         /* This must come before the PyInt_Check because
            True and False are also 1 and 0.*/
-        return ENCODED_CONST(key, JSON_s_null, JSON_s_true, JSON_s_false);
+        return _encoded_const(key, _st);
     }
     else if (PyInt_Check(key) || PyLong_Check(key)) {
         if (!(PyInt_CheckExact(key) || PyLong_CheckExact(key))) {
@@ -778,7 +759,6 @@ static PyObject *
 encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 {
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_sortargs = _st->JSON_sortargs;
     PyObject *items;
     PyObject *iter = NULL;
     PyObject *lst = NULL;
@@ -849,7 +829,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     sortfun = PyObject_GetAttrString(lst, "sort");
     if (sortfun == NULL)
         goto bail;
-    sortres = PyObject_Call(sortfun, JSON_sortargs, s->item_sort_kw);
+    sortres = PyObject_Call(sortfun, _st->JSON_sortargs, s->item_sort_kw);
     if (!sortres)
         goto bail;
     Py_DECREF(sortres);
@@ -868,8 +848,9 @@ bail:
 
 /* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
 static void
-raise_errmsg_impl(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeError)
+raise_errmsg_impl(char *msg, PyObject *s, Py_ssize_t end, _speedups_state *state)
 {
+    PyObject *JSONDecodeError = state->JSONDecodeError;
     PyObject *exc = PyObject_CallFunction(JSONDecodeError, "(zOO&)", msg, s, _convertPyInt_FromSsize_t, &end);
     if (exc) {
         PyErr_SetObject(JSONDecodeError, exc);
@@ -878,10 +859,10 @@ raise_errmsg_impl(char *msg, PyObject *s, Py_ssize_t end, PyObject *JSONDecodeEr
 }
 
 static PyObject *
-join_list_unicode(PyObject *lst, PyObject *empty_unicode)
+join_list_unicode(PyObject *lst, _speedups_state *state)
 {
     /* return u''.join(lst) */
-    return PyUnicode_Join(empty_unicode, lst);
+    return PyUnicode_Join(state->JSON_EmptyUnicode, lst);
 }
 
 #if PY_MAJOR_VERSION < 3
@@ -1152,7 +1133,7 @@ bail:
 
 static PyObject *
 scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next_end_ptr,
-                   PyObject *JSON_EmptyUnicode, PyObject *JSONDecodeError)
+                   _speedups_state *state)
 {
     /* Read the JSON string from PyUnicode pystr.
     end is the index of the first character after the quote.
@@ -1172,7 +1153,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
     PyObject *chunk = NULL;
 
     if (len == end) {
-        RAISE_ERRMSG(ERR_STRING_UNTERMINATED, pystr, begin, JSONDecodeError);
+        raise_errmsg_impl(ERR_STRING_UNTERMINATED, pystr, begin, state);
         goto bail;
     }
     else if (end < 0 || len < end) {
@@ -1188,12 +1169,12 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                 break;
             }
             else if (strict && c <= 0x1f) {
-                RAISE_ERRMSG(ERR_STRING_CONTROL, pystr, next, JSONDecodeError);
+                raise_errmsg_impl(ERR_STRING_CONTROL, pystr, next, state);
                 goto bail;
             }
         }
         if (!(c == '"' || c == '\\')) {
-            RAISE_ERRMSG(ERR_STRING_UNTERMINATED, pystr, begin, JSONDecodeError);
+            raise_errmsg_impl(ERR_STRING_UNTERMINATED, pystr, begin, state);
             goto bail;
         }
         /* Pick up this chunk if it's not zero length */
@@ -1214,7 +1195,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
             break;
         }
         if (next == len) {
-            RAISE_ERRMSG(ERR_STRING_UNTERMINATED, pystr, begin, JSONDecodeError);
+            raise_errmsg_impl(ERR_STRING_UNTERMINATED, pystr, begin, state);
             goto bail;
         }
         c = PyUnicode_READ(kind, buf, next);
@@ -1233,7 +1214,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                 default: c = 0;
             }
             if (c == 0) {
-                RAISE_ERRMSG(ERR_STRING_ESC1, pystr, end - 2, JSONDecodeError);
+                raise_errmsg_impl(ERR_STRING_ESC1, pystr, end - 2, state);
                 goto bail;
             }
         }
@@ -1242,7 +1223,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
             next++;
             end = next + 4;
             if (end >= len) {
-                RAISE_ERRMSG(ERR_STRING_ESC4, pystr, next - 1, JSONDecodeError);
+                raise_errmsg_impl(ERR_STRING_ESC4, pystr, next - 1, state);
                 goto bail;
             }
             /* Decode 4 hex digits */
@@ -1260,7 +1241,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                     case 'F':
                         c |= (digit - 'A' + 10); break;
                     default:
-                        RAISE_ERRMSG(ERR_STRING_ESC4, pystr, end - 5, JSONDecodeError);
+                        raise_errmsg_impl(ERR_STRING_ESC4, pystr, end - 5, state);
                         goto bail;
                 }
             }
@@ -1287,7 +1268,7 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
                         case 'F':
                             c2 |= (digit - 'A' + 10); break;
                         default:
-                            RAISE_ERRMSG(ERR_STRING_ESC4, pystr, end - 5, JSONDecodeError);
+                            raise_errmsg_impl(ERR_STRING_ESC4, pystr, end - 5, state);
                             goto bail;
                         }
                     }
@@ -1314,13 +1295,13 @@ scanstring_unicode(PyObject *pystr, Py_ssize_t end, int strict, Py_ssize_t *next
         if (chunk != NULL)
             rval = chunk;
         else {
-            rval = JSON_EmptyUnicode;
+            rval = state->JSON_EmptyUnicode;
             Py_INCREF(rval);
         }
     }
     else {
         APPEND_OLD_CHUNK
-        rval = JOIN_LIST_UNICODE(chunks, JSON_EmptyUnicode);
+        rval = join_list_unicode(chunks, state);
         if (rval == NULL) {
             goto bail;
         }
@@ -1366,11 +1347,8 @@ py_scanstring(PyObject* self UNUSED, PyObject *args)
     if (PyUnicode_Check(pystr)) {
         if (PyUnicode_READY(pystr))
             return NULL;
-        {
-            _speedups_state *_st = get_speedups_state(self);
-            rval = scanstring_unicode(pystr, end, strict, &next_end,
-                                      _st->JSON_EmptyUnicode, _st->JSONDecodeError);
-        }
+        rval = scanstring_unicode(pystr, end, strict, &next_end,
+                                  get_speedups_state(self));
     }
 #if PY_MAJOR_VERSION < 3
     /* Using a bytes input is unsupported for scanning in Python 3.
@@ -1647,8 +1625,6 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
     Returns a new PyObject (usually a dict, but object_hook can change that)
     */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_EmptyUnicode = _st->JSON_EmptyUnicode;
-    PyObject *JSONDecodeError = _st->JSONDecodeError;
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
@@ -1684,10 +1660,10 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
 
             /* read key */
             if (PyUnicode_READ(kind, str, idx) != '"') {
-                RAISE_ERRMSG(ERR_OBJECT_PROPERTY, pystr, idx, JSONDecodeError);
+                raise_errmsg_impl(ERR_OBJECT_PROPERTY, pystr, idx, _st);
                 goto bail;
             }
-            key = SCANSTRING_UNICODE(pystr, idx + 1, s->strict, &next_idx, JSON_EmptyUnicode, JSONDecodeError);
+            key = scanstring_unicode(pystr, idx + 1, s->strict, &next_idx, _st);
             if (key == NULL)
                 goto bail;
             memokey = PyDict_GetItemWithError(s->memo, key);
@@ -1709,7 +1685,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
                whitespace */
             while (idx <= end_idx && IS_WHITESPACE(PyUnicode_READ(kind, str, idx))) idx++;
             if (idx > end_idx || PyUnicode_READ(kind, str, idx) != ':') {
-                RAISE_ERRMSG(ERR_OBJECT_PROPERTY_DELIMITER, pystr, idx, JSONDecodeError);
+                raise_errmsg_impl(ERR_OBJECT_PROPERTY_DELIMITER, pystr, idx, _st);
                 goto bail;
             }
             idx++;
@@ -1751,7 +1727,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
                 break;
             }
             else if (PyUnicode_READ(kind, str, idx) != ',') {
-                RAISE_ERRMSG(ERR_OBJECT_DELIMITER, pystr, idx, JSONDecodeError);
+                raise_errmsg_impl(ERR_OBJECT_DELIMITER, pystr, idx, _st);
                 goto bail;
             }
             idx++;
@@ -1761,7 +1737,7 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
             trailing_delimiter = 1;
         }
         if (trailing_delimiter) {
-            RAISE_ERRMSG(ERR_OBJECT_PROPERTY, pystr, idx, JSONDecodeError);
+            raise_errmsg_impl(ERR_OBJECT_PROPERTY, pystr, idx, _st);
             goto bail;
         }
     }
@@ -1769,9 +1745,9 @@ _parse_object_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ss
     /* verify that idx < end_idx, str[idx] should be '}' */
     if (idx > end_idx || PyUnicode_READ(kind, str, idx) != '}') {
         if (did_parse) {
-            RAISE_ERRMSG(ERR_OBJECT_DELIMITER, pystr, idx, JSONDecodeError);
+            raise_errmsg_impl(ERR_OBJECT_DELIMITER, pystr, idx, _st);
         } else {
-            RAISE_ERRMSG(ERR_OBJECT_PROPERTY_FIRST, pystr, idx, JSONDecodeError);
+            raise_errmsg_impl(ERR_OBJECT_PROPERTY_FIRST, pystr, idx, _st);
         }
         goto bail;
     }
@@ -1897,7 +1873,6 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
     Returns a new PyList
     */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSONDecodeError = _st->JSONDecodeError;
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
@@ -1936,7 +1911,7 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
                 break;
             }
             else if (PyUnicode_READ(kind, str, idx) != ',') {
-                RAISE_ERRMSG(ERR_ARRAY_DELIMITER, pystr, idx, JSONDecodeError);
+                raise_errmsg_impl(ERR_ARRAY_DELIMITER, pystr, idx, _st);
                 goto bail;
             }
             idx++;
@@ -1946,7 +1921,7 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
             trailing_delimiter = 1;
         }
         if (trailing_delimiter) {
-            RAISE_ERRMSG(ERR_EXPECTING_VALUE, pystr, idx, JSONDecodeError);
+            raise_errmsg_impl(ERR_EXPECTING_VALUE, pystr, idx, _st);
             goto bail;
         }
     }
@@ -1954,9 +1929,9 @@ _parse_array_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssi
     /* verify that idx < end_idx, str[idx] should be ']' */
     if (idx > end_idx || PyUnicode_READ(kind, str, idx) != ']') {
         if (PyList_GET_SIZE(rval)) {
-            RAISE_ERRMSG(ERR_ARRAY_DELIMITER, pystr, idx, JSONDecodeError);
+            raise_errmsg_impl(ERR_ARRAY_DELIMITER, pystr, idx, _st);
         } else {
-            RAISE_ERRMSG(ERR_ARRAY_VALUE_FIRST, pystr, idx, JSONDecodeError);
+            raise_errmsg_impl(ERR_ARRAY_VALUE_FIRST, pystr, idx, _st);
         }
         goto bail;
     }
@@ -1980,11 +1955,10 @@ _parse_constant(PyScannerObject *s, PyObject *pystr, PyObject *constant, Py_ssiz
 
     Returns the result of parse_constant
     */
-    _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSONDecodeError = _st->JSONDecodeError;
     PyObject *rval;
     if (s->parse_constant == Py_None) {
-        RAISE_ERRMSG(ERR_EXPECTING_VALUE, pystr, idx, JSONDecodeError);
+        raise_errmsg_impl(ERR_EXPECTING_VALUE, pystr, idx,
+                          get_speedups_state(s->module_ref));
         return NULL;
     }
 
@@ -2116,7 +2090,6 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
         May return other types if parse_int or parse_float are set
     */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSONDecodeError = _st->JSONDecodeError;
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t end_idx = PyUnicode_GET_LENGTH(pystr) - 1;
@@ -2129,7 +2102,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     /* read a sign if it's there, make sure it's not the end of the string */
     if (PyUnicode_READ(kind, str, idx) == '-') {
         if (idx >= end_idx) {
-            RAISE_ERRMSG(ERR_EXPECTING_VALUE, pystr, start, JSONDecodeError);
+            raise_errmsg_impl(ERR_EXPECTING_VALUE, pystr, start, _st);
             return NULL;
         }
         idx++;
@@ -2149,7 +2122,7 @@ _match_number_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t start, Py_
     }
     else {
         /* no integer digits, error */
-        RAISE_ERRMSG(ERR_EXPECTING_VALUE, pystr, start, JSONDecodeError);
+        raise_errmsg_impl(ERR_EXPECTING_VALUE, pystr, start, _st);
         return NULL;
     }
 
@@ -2228,9 +2201,6 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
     Returns a new PyObject representation of the term.
     */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_NaN = _st->JSON_NaN;
-    PyObject *JSON_Infinity = _st->JSON_Infinity;
-    PyObject *JSON_NegInfinity = _st->JSON_NegInfinity;
     char *str = PyString_AS_STRING(pystr);
     Py_ssize_t length = PyString_GET_SIZE(pystr);
     PyObject *rval = NULL;
@@ -2296,7 +2266,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
         case 'N':
             /* NaN */
             if ((idx + 2 < length) && str[idx + 1] == 'a' && str[idx + 2] == 'N') {
-                rval = _parse_constant(s, pystr, JSON_NaN, idx, next_idx_ptr);
+                rval = _parse_constant(s, pystr, _st->JSON_NaN, idx, next_idx_ptr);
             }
             else
                 fallthrough = 1;
@@ -2304,7 +2274,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
         case 'I':
             /* Infinity */
             if ((idx + 7 < length) && str[idx + 1] == 'n' && str[idx + 2] == 'f' && str[idx + 3] == 'i' && str[idx + 4] == 'n' && str[idx + 5] == 'i' && str[idx + 6] == 't' && str[idx + 7] == 'y') {
-                rval = _parse_constant(s, pystr, JSON_Infinity, idx, next_idx_ptr);
+                rval = _parse_constant(s, pystr, _st->JSON_Infinity, idx, next_idx_ptr);
             }
             else
                 fallthrough = 1;
@@ -2312,7 +2282,7 @@ scan_once_str(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *n
         case '-':
             /* -Infinity */
             if ((idx + 8 < length) && str[idx + 1] == 'I' && str[idx + 2] == 'n' && str[idx + 3] == 'f' && str[idx + 4] == 'i' && str[idx + 5] == 'n' && str[idx + 6] == 'i' && str[idx + 7] == 't' && str[idx + 8] == 'y') {
-                rval = _parse_constant(s, pystr, JSON_NegInfinity, idx, next_idx_ptr);
+                rval = _parse_constant(s, pystr, _st->JSON_NegInfinity, idx, next_idx_ptr);
             }
             else
                 fallthrough = 1;
@@ -2339,26 +2309,20 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
     Returns a new PyObject representation of the term.
     */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_NaN = _st->JSON_NaN;
-    PyObject *JSON_Infinity = _st->JSON_Infinity;
-    PyObject *JSON_NegInfinity = _st->JSON_NegInfinity;
-    PyObject *JSON_EmptyUnicode = _st->JSON_EmptyUnicode;
-    PyObject *JSONDecodeError = _st->JSONDecodeError;
     PY2_UNUSED int kind = PyUnicode_KIND(pystr);
     void *str = PyUnicode_DATA(pystr);
     Py_ssize_t length = PyUnicode_GET_LENGTH(pystr);
     PyObject *rval = NULL;
     int fallthrough = 0;
     if (idx < 0 || idx >= length) {
-        RAISE_ERRMSG(ERR_EXPECTING_VALUE, pystr, idx, JSONDecodeError);
+        raise_errmsg_impl(ERR_EXPECTING_VALUE, pystr, idx, _st);
         return NULL;
     }
     switch (PyUnicode_READ(kind, str, idx)) {
         case '"':
             /* string */
-            rval = SCANSTRING_UNICODE(pystr, idx + 1,
-                s->strict,
-                next_idx_ptr, JSON_EmptyUnicode, JSONDecodeError);
+            rval = scanstring_unicode(pystr, idx + 1, s->strict,
+                                      next_idx_ptr, _st);
             break;
         case '{':
             /* object */
@@ -2421,7 +2385,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
             if ((idx + 2 < length) &&
                 PyUnicode_READ(kind, str, idx + 1) == 'a' &&
                 PyUnicode_READ(kind, str, idx + 2) == 'N') {
-                rval = _parse_constant(s, pystr, JSON_NaN, idx, next_idx_ptr);
+                rval = _parse_constant(s, pystr, _st->JSON_NaN, idx, next_idx_ptr);
             }
             else
                 fallthrough = 1;
@@ -2436,7 +2400,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
                 PyUnicode_READ(kind, str, idx + 5) == 'i' &&
                 PyUnicode_READ(kind, str, idx + 6) == 't' &&
                 PyUnicode_READ(kind, str, idx + 7) == 'y') {
-                rval = _parse_constant(s, pystr, JSON_Infinity, idx, next_idx_ptr);
+                rval = _parse_constant(s, pystr, _st->JSON_Infinity, idx, next_idx_ptr);
             }
             else
                 fallthrough = 1;
@@ -2452,7 +2416,7 @@ scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_
                 PyUnicode_READ(kind, str, idx + 6) == 'i' &&
                 PyUnicode_READ(kind, str, idx + 7) == 't' &&
                 PyUnicode_READ(kind, str, idx + 8) == 'y') {
-                rval = _parse_constant(s, pystr, JSON_NegInfinity, idx, next_idx_ptr);
+                rval = _parse_constant(s, pystr, _st->JSON_NegInfinity, idx, next_idx_ptr);
             }
             else
                 fallthrough = 1;
@@ -2884,20 +2848,20 @@ encoder_call(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-_encoded_const(PyObject *obj, PyObject *JSON_s_null, PyObject *JSON_s_true, PyObject *JSON_s_false)
+_encoded_const(PyObject *obj, _speedups_state *state)
 {
     /* Return the JSON string representation of None, True, False */
     if (obj == Py_None) {
-        Py_INCREF(JSON_s_null);
-        return JSON_s_null;
+        Py_INCREF(state->JSON_s_null);
+        return state->JSON_s_null;
     }
     else if (obj == Py_True) {
-        Py_INCREF(JSON_s_true);
-        return JSON_s_true;
+        Py_INCREF(state->JSON_s_true);
+        return state->JSON_s_true;
     }
     else if (obj == Py_False) {
-        Py_INCREF(JSON_s_false);
-        return JSON_s_false;
+        Py_INCREF(state->JSON_s_false);
+        return state->JSON_s_false;
     }
     else {
         PyErr_SetString(PyExc_ValueError, "not a const");
@@ -2910,12 +2874,6 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
 {
     /* Return the JSON representation of a PyFloat */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_Infinity = _st->JSON_Infinity;
-    PyObject *JSON_NegInfinity = _st->JSON_NegInfinity;
-    PyObject *JSON_NaN = _st->JSON_NaN;
-    PyObject *JSON_s_null = _st->JSON_s_null;
-    PyObject *JSON_s_true = _st->JSON_s_true;
-    PyObject *JSON_s_false = _st->JSON_s_false;
     double i = PyFloat_AS_DOUBLE(obj);
     if (!Py_IS_FINITE(i)) {
         if (!s->allow_or_ignore_nan) {
@@ -2923,20 +2881,20 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
             return NULL;
         }
         if (s->allow_or_ignore_nan & JSON_IGNORE_NAN) {
-            return ENCODED_CONST(Py_None, JSON_s_null, JSON_s_true, JSON_s_false);
+            return _encoded_const(Py_None, _st);
         }
         /* JSON_ALLOW_NAN is set */
         else if (i > 0) {
-            Py_INCREF(JSON_Infinity);
-            return JSON_Infinity;
+            Py_INCREF(_st->JSON_Infinity);
+            return _st->JSON_Infinity;
         }
         else if (i < 0) {
-            Py_INCREF(JSON_NegInfinity);
-            return JSON_NegInfinity;
+            Py_INCREF(_st->JSON_NegInfinity);
+            return _st->JSON_NegInfinity;
         }
         else {
-            Py_INCREF(JSON_NaN);
-            return JSON_NaN;
+            Py_INCREF(_st->JSON_NaN);
+            return _st->JSON_NaN;
         }
     }
     /* Use a better float format here? */
@@ -2995,15 +2953,11 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
 {
     /* Encode Python object obj to a JSON term, rval is a PyList */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_s_null = _st->JSON_s_null;
-    PyObject *JSON_s_true = _st->JSON_s_true;
-    PyObject *JSON_s_false = _st->JSON_s_false;
-    PyObject *RawJSONType = _st->RawJSONType;
     int rv = -1;
     do {
         PyObject *newobj;
         if (obj == Py_None || obj == Py_True || obj == Py_False) {
-            PyObject *cstr = ENCODED_CONST(obj, JSON_s_null, JSON_s_true, JSON_s_false);
+            PyObject *cstr = _encoded_const(obj, _st);
             if (cstr != NULL)
                 rv = _steal_accumulate(rval, cstr);
         }
@@ -3093,7 +3047,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
                 rv = _steal_accumulate(rval, encoded);
         }
         else {
-            int raw = IS_RAW_JSON(obj, RawJSONType);
+            int raw = is_raw_json(obj, _st);
             if (raw < 0)
                 break;
             if (raw) {
@@ -3168,9 +3122,6 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 {
     /* Encode Python dict dct a JSON term */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_empty_dict = _st->JSON_empty_dict;
-    PyObject *JSON_open_dict = _st->JSON_open_dict;
-    PyObject *JSON_close_dict = _st->JSON_close_dict;
     PyObject *kstr = NULL;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
@@ -3180,7 +3131,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     Py_ssize_t idx;
 
     if (PyDict_Size(dct) == 0)
-        return JSON_Accu_Accumulate(rval, JSON_empty_dict);
+        return JSON_Accu_Accumulate(rval, _st->JSON_empty_dict);
 
     if (s->markers != Py_None) {
         int has_key;
@@ -3198,7 +3149,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
         }
     }
 
-    if (JSON_Accu_Accumulate(rval, JSON_open_dict))
+    if (JSON_Accu_Accumulate(rval, _st->JSON_open_dict))
         goto bail;
 
     if (s->indent != Py_None) {
@@ -3287,7 +3238,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             yield '\n' + (_indent * _current_indent_level)
         */
     }
-    if (JSON_Accu_Accumulate(rval, JSON_close_dict))
+    if (JSON_Accu_Accumulate(rval, _st->JSON_close_dict))
         goto bail;
     return 0;
 
@@ -3307,9 +3258,6 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
 {
     /* Encode Python list seq to a JSON term */
     _speedups_state *_st = get_speedups_state(s->module_ref);
-    PyObject *JSON_empty_array = _st->JSON_empty_array;
-    PyObject *JSON_open_array = _st->JSON_open_array;
-    PyObject *JSON_close_array = _st->JSON_close_array;
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *obj = NULL;
@@ -3321,7 +3269,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     if (is_true == -1)
         return -1;
     else if (is_true == 0)
-        return JSON_Accu_Accumulate(rval, JSON_empty_array);
+        return JSON_Accu_Accumulate(rval, _st->JSON_empty_array);
 
     if (s->markers != Py_None) {
         int has_key;
@@ -3343,7 +3291,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     if (iter == NULL)
         goto bail;
 
-    if (JSON_Accu_Accumulate(rval, JSON_open_array))
+    if (JSON_Accu_Accumulate(rval, _st->JSON_open_array))
         goto bail;
     if (s->indent != Py_None) {
         /* TODO: DOES NOT RUN */
@@ -3379,7 +3327,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
             yield '\n' + (_indent * _current_indent_level)
         */
     }
-    if (JSON_Accu_Accumulate(rval, JSON_close_array))
+    if (JSON_Accu_Accumulate(rval, _st->JSON_close_array))
         goto bail;
     return 0;
 
