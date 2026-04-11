@@ -4,6 +4,7 @@
 *.so
 *.pyd
 .DS_Store
+/.claude/
 /MANIFEST
 /.coverage
 /coverage.xml
