@@ -2746,8 +2746,17 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         if (int_as_string_bitcount_val == -1 && PyErr_Occurred())
             goto bail;
         if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < (long)long_long_bitsize) {
-            s->max_long_size = PyLong_FromUnsignedLongLong(1ULL << (int)int_as_string_bitcount_val);
-            s->min_long_size = PyLong_FromLongLong(-1LL << (int)int_as_string_bitcount_val);
+            int n = (int)int_as_string_bitcount_val;
+            /* Compute 2^n as unsigned (well-defined for n < 64) and
+             * -(2^n) as signed without UB. Naive "-1LL << n" is a
+             * shift of a negative value, which is undefined, and
+             * "-(1LL << n)" overflows when n == 63. The expression
+             * below avoids both: (1ULL << n) - 1 is always >= 0, so
+             * negating it and subtracting 1 stays in range and
+             * produces LLONG_MIN at n == 63. */
+            s->max_long_size = PyLong_FromUnsignedLongLong(1ULL << n);
+            s->min_long_size = PyLong_FromLongLong(
+                -(long long)((1ULL << n) - 1ULL) - 1LL);
             if (s->min_long_size == NULL || s->max_long_size == NULL) {
                 goto bail;
             }

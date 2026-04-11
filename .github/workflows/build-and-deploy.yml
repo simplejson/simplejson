@@ -63,57 +63,29 @@ jobs:
   test_debug_build:
     name: Tests on Python 3.14 debug build
     runs-on: ubuntu-latest
-    env:
-      # Pin the Python version so the cache key is stable. Bump when
-      # we want to pick up a new 3.14.x release.
-      PYTHON_VERSION: '3.14.4'
-      PYTHON_PREFIX: /opt/python-debug
     steps:
       - uses: actions/checkout@v6
-
-      - name: Cache Python debug build
-        id: cache-python
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.PYTHON_PREFIX }}
-          key: python-${{ env.PYTHON_VERSION }}-debug-${{ runner.os }}-v1
-
-      - name: Build Python ${{ env.PYTHON_VERSION }} with --with-pydebug
-        if: steps.cache-python.outputs.cache-hit != 'true'
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+      - name: Install Python 3.14.4 debug build via python-build-standalone
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential libssl-dev zlib1g-dev libbz2-dev \
-            libreadline-dev libsqlite3-dev libffi-dev liblzma-dev
-          curl -fsSL -o Python.tar.xz \
-            "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tar.xz"
-          tar xf Python.tar.xz
-          cd Python-${PYTHON_VERSION}
-          ./configure --with-pydebug --disable-test-modules \
-            --prefix="${PYTHON_PREFIX}" --with-ensurepip=install
-          make -j "$(nproc)"
-          sudo make install
-          sudo chown -R "$(id -u):$(id -g)" "${PYTHON_PREFIX}"
-
-      - name: Add debug Python to PATH
-        run: echo "${PYTHON_PREFIX}/bin" >> "$GITHUB_PATH"
-
+          uv python install cpython-3.14.4+debug
+          uv venv --python cpython-3.14.4+debug .venv
+          uv pip install --python .venv/bin/python setuptools wheel
       - name: Verify debug build
         run: |
-          python3 -c "
+          .venv/bin/python -c "
           import sys
           assert hasattr(sys, 'gettotalrefcount'), (
               'not a debug build (sys.gettotalrefcount missing)')
           print('OK:', sys.version)
           "
-
-      - name: Build extension
-        run: |
-          python3 -m pip install --upgrade setuptools wheel
-          REQUIRE_SPEEDUPS=1 python3 setup.py build_ext -i
-
+      - name: Build extension with strict warnings (-Werror)
+        env:
+          CFLAGS: "-Wall -Wextra -Wshadow -Wstrict-prototypes -Werror -Wno-unused-parameter -Wno-missing-field-initializers -Wno-cast-function-type"
+        run: REQUIRE_SPEEDUPS=1 .venv/bin/python setup.py build_ext -i
       - name: Run tests (TestRefcountLeaks auto-enabled on debug build)
-        run: python3 -m simplejson.tests._cibw_runner .
+        run: .venv/bin/python -m simplejson.tests._cibw_runner .
 
   build_wheels:
     name: Build wheels (${{ matrix.os }}, ${{ matrix.arch }})
