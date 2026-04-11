@@ -106,6 +106,7 @@ typedef struct {
     PyObject *JSON_EmptyUnicode;
 #if PY_MAJOR_VERSION < 3
     PyObject *JSON_EmptyStr;
+    PyObject *JSON_EmptyStr_join;  /* bound method: ''.join */
 #endif
     PyObject *JSON_s_null;
     PyObject *JSON_s_true;
@@ -871,13 +872,7 @@ static PyObject *
 join_list_string(_speedups_state *state, PyObject *lst)
 {
     /* return ''.join(lst) */
-    static PyObject *joinfn = NULL;
-    if (joinfn == NULL) {
-        joinfn = PyObject_GetAttrString(state->JSON_EmptyStr, "join");
-        if (joinfn == NULL)
-            return NULL;
-    }
-    return PyObject_CallOneArg(joinfn, lst);
+    return PyObject_CallOneArg(state->JSON_EmptyStr_join, lst);
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
@@ -3522,6 +3517,7 @@ reset_speedups_state_constants(_speedups_state *state)
     Py_CLEAR(state->JSON_EmptyUnicode);
 #if PY_MAJOR_VERSION < 3
     Py_CLEAR(state->JSON_EmptyStr);
+    Py_CLEAR(state->JSON_EmptyStr_join);
 #endif
     Py_CLEAR(state->JSON_s_null);
     Py_CLEAR(state->JSON_s_true);
@@ -3564,6 +3560,9 @@ init_speedups_state(_speedups_state *state, PyObject *module)
 #else
     state->JSON_EmptyStr = PyString_FromString("");
     if (state->JSON_EmptyStr == NULL)
+        return -1;
+    state->JSON_EmptyStr_join = PyObject_GetAttrString(state->JSON_EmptyStr, "join");
+    if (state->JSON_EmptyStr_join == NULL)
         return -1;
     state->JSON_EmptyUnicode = PyUnicode_FromUnicode(NULL, 0);
 #endif
