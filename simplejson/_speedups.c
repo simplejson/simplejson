@@ -79,6 +79,17 @@ json_PyOS_string_to_double(const char *s, char **endptr, PyObject *overflow_exce
 #define UNUSED
 #endif
 
+/* Py_T_OBJECT_EX is the stable public name added in Python 3.12 for the
+ * member descriptor type that raises AttributeError when the underlying
+ * slot is NULL. Pre-3.12 headers spell it T_OBJECT_EX (via the
+ * internal-ish <structmember.h>), with identical semantics. Use the
+ * stable name everywhere in this file and fall back to the legacy
+ * spelling on older Pythons. The previous spelling was plain T_OBJECT,
+ * which returned Py_None for NULL slots and is deprecated in 3.12+. */
+#if !defined(Py_T_OBJECT_EX)
+#  define Py_T_OBJECT_EX T_OBJECT_EX
+#endif
+
 /* Py_BEGIN_CRITICAL_SECTION was added in Python 3.13.
    On older versions, define as no-ops. */
 #if PY_VERSION_HEX < 0x030d0000
@@ -239,13 +250,13 @@ typedef struct _PyScannerObject {
     X(memo)
 
 static PyMemberDef scanner_members[] = {
-    {"encoding", T_OBJECT, offsetof(PyScannerObject, encoding), READONLY, "encoding"},
-    {"strict", T_OBJECT, offsetof(PyScannerObject, strict_bool), READONLY, "strict"},
-    {"object_hook", T_OBJECT, offsetof(PyScannerObject, object_hook), READONLY, "object_hook"},
-    {"object_pairs_hook", T_OBJECT, offsetof(PyScannerObject, pairs_hook), READONLY, "object_pairs_hook"},
-    {"parse_float", T_OBJECT, offsetof(PyScannerObject, parse_float), READONLY, "parse_float"},
-    {"parse_int", T_OBJECT, offsetof(PyScannerObject, parse_int), READONLY, "parse_int"},
-    {"parse_constant", T_OBJECT, offsetof(PyScannerObject, parse_constant), READONLY, "parse_constant"},
+    {"encoding", Py_T_OBJECT_EX, offsetof(PyScannerObject, encoding), READONLY, "encoding"},
+    {"strict", Py_T_OBJECT_EX, offsetof(PyScannerObject, strict_bool), READONLY, "strict"},
+    {"object_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, object_hook), READONLY, "object_hook"},
+    {"object_pairs_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, pairs_hook), READONLY, "object_pairs_hook"},
+    {"parse_float", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_float), READONLY, "parse_float"},
+    {"parse_int", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_int), READONLY, "parse_int"},
+    {"parse_constant", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_constant), READONLY, "parse_constant"},
     {NULL}
 };
 
@@ -302,20 +313,20 @@ typedef struct _PyEncoderObject {
     X(Decimal)
 
 static PyMemberDef encoder_members[] = {
-    {"markers", T_OBJECT, offsetof(PyEncoderObject, markers), READONLY, "markers"},
-    {"default", T_OBJECT, offsetof(PyEncoderObject, defaultfn), READONLY, "default"},
-    {"encoder", T_OBJECT, offsetof(PyEncoderObject, encoder), READONLY, "encoder"},
-    {"encoding", T_OBJECT, offsetof(PyEncoderObject, encoding), READONLY, "encoding"},
-    {"indent", T_OBJECT, offsetof(PyEncoderObject, indent), READONLY, "indent"},
-    {"key_separator", T_OBJECT, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
-    {"item_separator", T_OBJECT, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
-    {"sort_keys", T_OBJECT, offsetof(PyEncoderObject, sort_keys), READONLY, "sort_keys"},
+    {"markers", Py_T_OBJECT_EX, offsetof(PyEncoderObject, markers), READONLY, "markers"},
+    {"default", Py_T_OBJECT_EX, offsetof(PyEncoderObject, defaultfn), READONLY, "default"},
+    {"encoder", Py_T_OBJECT_EX, offsetof(PyEncoderObject, encoder), READONLY, "encoder"},
+    {"encoding", Py_T_OBJECT_EX, offsetof(PyEncoderObject, encoding), READONLY, "encoding"},
+    {"indent", Py_T_OBJECT_EX, offsetof(PyEncoderObject, indent), READONLY, "indent"},
+    {"key_separator", Py_T_OBJECT_EX, offsetof(PyEncoderObject, key_separator), READONLY, "key_separator"},
+    {"item_separator", Py_T_OBJECT_EX, offsetof(PyEncoderObject, item_separator), READONLY, "item_separator"},
+    {"sort_keys", Py_T_OBJECT_EX, offsetof(PyEncoderObject, sort_keys), READONLY, "sort_keys"},
     /* Python 2.5 does not support T_BOOl */
-    {"skipkeys", T_OBJECT, offsetof(PyEncoderObject, skipkeys_bool), READONLY, "skipkeys"},
-    {"key_memo", T_OBJECT, offsetof(PyEncoderObject, key_memo), READONLY, "key_memo"},
-    {"item_sort_key", T_OBJECT, offsetof(PyEncoderObject, item_sort_key), READONLY, "item_sort_key"},
-    {"max_long_size", T_OBJECT, offsetof(PyEncoderObject, max_long_size), READONLY, "max_long_size"},
-    {"min_long_size", T_OBJECT, offsetof(PyEncoderObject, min_long_size), READONLY, "min_long_size"},
+    {"skipkeys", Py_T_OBJECT_EX, offsetof(PyEncoderObject, skipkeys_bool), READONLY, "skipkeys"},
+    {"key_memo", Py_T_OBJECT_EX, offsetof(PyEncoderObject, key_memo), READONLY, "key_memo"},
+    {"item_sort_key", Py_T_OBJECT_EX, offsetof(PyEncoderObject, item_sort_key), READONLY, "item_sort_key"},
+    {"max_long_size", Py_T_OBJECT_EX, offsetof(PyEncoderObject, max_long_size), READONLY, "max_long_size"},
+    {"min_long_size", Py_T_OBJECT_EX, offsetof(PyEncoderObject, min_long_size), READONLY, "min_long_size"},
     {NULL}
 };
 
@@ -824,7 +835,7 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
         return key;
     }
 #if PY_MAJOR_VERSION >= 3
-    else if (PyBytes_Check(key) && s->encoding != NULL) {
+    else if (PyBytes_Check(key) && s->encoding != Py_None) {
         const char *encoding = PyUnicode_AsUTF8(s->encoding);
         if (encoding == NULL)
             return NULL;
@@ -864,63 +875,127 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
     return NULL;
 }
 
+/* Call list.sort(**item_sort_kw) on `lst`. Returns 0 on success,
+ * -1 on error. Factored out so the fast and slow paths of
+ * encoder_dict_iteritems share one implementation. */
+static int
+encoder_sort_items_inplace(PyEncoderObject *s, PyObject *lst)
+{
+    _speedups_state *state = get_speedups_state(s->module_ref);
+    PyObject *sortfun;
+    PyObject *sortres;
+    sortfun = PyObject_GetAttr(lst, state->JSON_attr_sort);
+    if (sortfun == NULL)
+        return -1;
+    sortres = PyObject_Call(sortfun, state->JSON_sortargs, s->item_sort_kw);
+    Py_DECREF(sortfun);
+    if (sortres == NULL)
+        return -1;
+    Py_DECREF(sortres);
+    return 0;
+}
+
+/* True iff `key` is a Python string type that can be used verbatim
+ * as a JSON object key (PyUnicode on all versions, PyString also on
+ * Python 2). */
+static inline int
+is_json_string_key(PyObject *key)
+{
+#if PY_MAJOR_VERSION < 3
+    if (PyString_Check(key))
+        return 1;
+#endif
+    return PyUnicode_Check(key);
+}
+
 static PyObject *
 encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
 {
-    _speedups_state *state = get_speedups_state(s->module_ref);
     PyObject *items;
     PyObject *iter = NULL;
     PyObject *lst = NULL;
     PyObject *item = NULL;
     PyObject *kstr = NULL;
-    PyObject *sortfun = NULL;
-    PyObject *sortres;
+    Py_ssize_t size;
+    Py_ssize_t i;
     if (PyDict_CheckExact(dct))
         items = PyDict_Items(dct);
     else
         items = PyMapping_Items(dct);
     if (items == NULL)
         return NULL;
+
+    /* Unsorted path: return iter(items) directly. */
+    if (s->item_sort_kw == Py_None) {
+        iter = PyObject_GetIter(items);
+        Py_DECREF(items);
+        return iter;
+    }
+
+    /* Sorted path. Fast sub-path: if every key is already a JSON-
+     * compatible string, sort the items list in place and return
+     * iter(items). No per-item tuple rebuild, no list alloc, no
+     * stringify branch in the hot loop. This is the overwhelmingly
+     * common case — JSON object keys are typically strings. Scan the
+     * list once to establish it; on any non-string key fall through
+     * to the general path below. */
+    size = PyList_GET_SIZE(items);
+    for (i = 0; i < size; i++) {
+        PyObject *it = PyList_GET_ITEM(items, i);
+        PyObject *key;
+        if (!PyTuple_Check(it) || Py_SIZE(it) != 2) {
+            PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
+            Py_DECREF(items);
+            return NULL;
+        }
+        key = PyTuple_GET_ITEM(it, 0);
+        if (!is_json_string_key(key))
+            break;
+    }
+    if (i == size) {
+        if (encoder_sort_items_inplace(s, items) < 0) {
+            Py_DECREF(items);
+            return NULL;
+        }
+        iter = PyObject_GetIter(items);
+        Py_DECREF(items);
+        return iter;
+    }
+
+    /* Slow path: at least one key needs to be stringified before the
+     * sort. Walk the items list from the first offending index `i`,
+     * accumulating a new list with replacement tuples as needed. */
     iter = PyObject_GetIter(items);
     Py_DECREF(items);
     if (iter == NULL)
         return NULL;
-    if (s->item_sort_kw == Py_None)
-        return iter;
     lst = PyList_New(0);
     if (lst == NULL)
         goto bail;
     while ((item = PyIter_Next(iter))) {
         PyObject *key, *value;
+        /* items comes from the original iter we built; the tuple shape
+         * was already validated by the fast-path pre-scan above, but
+         * a user-defined mapping could return non-tuples out of order
+         * here if the 2-tuple check above happened to succeed on
+         * other entries — revalidate. */
         if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
             PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
             goto bail;
         }
         key = PyTuple_GET_ITEM(item, 0);
-        if (key == NULL)
-            goto bail;
-#if PY_MAJOR_VERSION < 3
-        else if (PyString_Check(key)) {
-            /* item can be added as-is */
-        }
-#endif /* PY_MAJOR_VERSION < 3 */
-        else if (PyUnicode_Check(key)) {
-            /* item can be added as-is */
-        }
-        else {
+        if (!is_json_string_key(key)) {
             PyObject *tpl;
             kstr = encoder_stringify_key(s, key);
             if (kstr == NULL)
                 goto bail;
-            else if (kstr == Py_None) {
+            if (kstr == Py_None) {
                 /* skipkeys */
-                Py_DECREF(kstr);
-                Py_DECREF(item);
+                Py_CLEAR(kstr);
+                Py_CLEAR(item);
                 continue;
             }
             value = PyTuple_GET_ITEM(item, 1);
-            if (value == NULL)
-                goto bail;
             tpl = PyTuple_Pack(2, kstr, value);
             if (tpl == NULL)
                 goto bail;
@@ -930,24 +1005,17 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
         }
         if (PyList_Append(lst, item))
             goto bail;
-        Py_DECREF(item);
+        Py_CLEAR(item);
     }
     Py_CLEAR(iter);
     if (PyErr_Occurred())
         goto bail;
-    sortfun = PyObject_GetAttr(lst, state->JSON_attr_sort);
-    if (sortfun == NULL)
+    if (encoder_sort_items_inplace(s, lst) < 0)
         goto bail;
-    sortres = PyObject_Call(sortfun, state->JSON_sortargs, s->item_sort_kw);
-    if (!sortres)
-        goto bail;
-    Py_DECREF(sortres);
-    Py_CLEAR(sortfun);
     iter = PyObject_GetIter(lst);
     Py_CLEAR(lst);
     return iter;
 bail:
-    Py_XDECREF(sortfun);
     Py_XDECREF(kstr);
     Py_XDECREF(item);
     Py_XDECREF(lst);
@@ -1943,7 +2011,14 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     s->encoder = encoder;
 #if PY_MAJOR_VERSION >= 3
     if (encoding == Py_None) {
-        s->encoding = NULL;
+        /* Py3: encoding=None means "don't decode bytes keys/values".
+         * Store Py_None rather than NULL so Py_T_OBJECT_EX exposes the
+         * attribute as None (not AttributeError) and so tp_traverse /
+         * tp_clear handle the slot uniformly. The bytes-path sentinel
+         * checks in encoder_stringify_key and encoder_listencode_obj
+         * compare against Py_None. */
+        Py_INCREF(Py_None);
+        s->encoding = Py_None;
     }
     else
 #endif /* PY_MAJOR_VERSION >= 3 */
@@ -2371,7 +2446,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (cstr != NULL)
                 rv = _steal_accumulate(state, rval, cstr);
         }
-        else if ((PyBytes_Check(obj) && s->encoding != NULL) ||
+        else if ((PyBytes_Check(obj) && s->encoding != Py_None) ||
                  PyUnicode_Check(obj))
         {
             PyObject *encoded = encoder_encode_string(s, obj);
