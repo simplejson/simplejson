@@ -1527,7 +1527,6 @@ _match_number_int_fast_str(PyScannerObject *s, PyObject *numstr)
 #endif
 #define JSON_SCAN_PARSE_FLOAT_FAST(ns) _match_number_float_fast_unicode(ns)
 #define JSON_SCAN_PARSE_INT_FAST(ns)   _match_number_int_fast_unicode(s, ns)
-#define JSON_SCAN_MAYBE_ENCODING_DECL  ((void)0)
 #include "_speedups_scan.h"
 
 /* -- Generate the corresponding _str variants on Python 2. -- */
@@ -1538,12 +1537,12 @@ _match_number_int_fast_str(PyScannerObject *s, PyObject *numstr)
     Py_ssize_t end_idx = PyString_GET_SIZE(p) - 1
 #define JSON_SCAN_READ(i) ((unsigned char)str[(i)])
 #define JSON_SCAN_SCANSTRING_CALL(pos, nextp) \
-    scanstring_str(state, pystr, (pos), encoding, s->strict, (nextp))
+    scanstring_str(state, pystr, (pos), \
+                   PyString_AS_STRING(s->encoding), s->strict, (nextp))
 #define JSON_SCAN_NUMSTR_CREATE(sidx, eidx) \
     PyString_FromStringAndSize(&str[(sidx)], (eidx) - (sidx))
 #define JSON_SCAN_PARSE_FLOAT_FAST(ns) _match_number_float_fast_str(ns)
 #define JSON_SCAN_PARSE_INT_FAST(ns)   _match_number_int_fast_str(s, ns)
-#define JSON_SCAN_MAYBE_ENCODING_DECL  char *encoding = PyString_AS_STRING(s->encoding)
 #include "_speedups_scan.h"
 #endif /* PY_MAJOR_VERSION < 3 */
 

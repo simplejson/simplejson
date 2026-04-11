@@ -18,8 +18,6 @@
  *                                     substring from start..end
  *   JSON_SCAN_PARSE_FLOAT_FAST(ns)  - Fast-path float parse (or fallback)
  *   JSON_SCAN_PARSE_INT_FAST(ns)    - Fast-path int parse (or fallback)
- *   JSON_SCAN_MAYBE_ENCODING_DECL   - `char *encoding = ...;` for str path,
- *                                     nothing for unicode path
  *
  * The macros are #undef'd at the bottom of the file so the caller can
  * redefine them for the next #include.
@@ -142,7 +140,6 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
        after the closing curly brace. */
     _speedups_state *state = get_speedups_state(s->module_ref);
     JSON_SCAN_DATA_INIT(pystr);
-    JSON_SCAN_MAYBE_ENCODING_DECL;
     PyObject *rval = NULL;
     PyObject *pairs = NULL;
     PyObject *item;
@@ -511,4 +508,3 @@ JSON_SCAN_FN(scan_once)(PyScannerObject *s, PyObject *pystr,
 #undef JSON_SCAN_NUMSTR_CREATE
 #undef JSON_SCAN_PARSE_FLOAT_FAST
 #undef JSON_SCAN_PARSE_INT_FAST
-#undef JSON_SCAN_MAYBE_ENCODING_DECL
