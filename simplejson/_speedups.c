@@ -361,6 +361,61 @@ import_dependency(const char *module_name, const char *attr_name);
 
 #define MIN_EXPANSION 6
 
+/* Cross-version helpers for dict ops used in the scanner/encoder hot
+ * paths. On Python 3.13+ these forward to the new APIs that atomically
+ * return strong references (avoiding borrowed-ref races under free
+ * threading); on older Python versions they fall back to the legacy
+ * borrowed-ref APIs with explicit Py_INCREF. */
+
+static inline int
+json_PyDict_GetItemRef(PyObject *dict, PyObject *key, PyObject **result)
+{
+    /* Atomically fetch a strong reference to dict[key]. Returns 1 if
+     * found (with *result set to a new strong reference), 0 if not
+     * found (with *result set to NULL), -1 on error. */
+#if PY_VERSION_HEX >= 0x030D0000
+    return PyDict_GetItemRef(dict, key, result);
+#else
+    PyObject *obj = PyDict_GetItemWithError(dict, key);
+    if (obj != NULL) {
+        Py_INCREF(obj);
+        *result = obj;
+        return 1;
+    }
+    *result = NULL;
+    return PyErr_Occurred() ? -1 : 0;
+#endif
+}
+
+static inline int
+json_memo_intern_key(PyObject *memo, PyObject **key_ptr)
+{
+    /* Intern *key_ptr into memo with a single atomic lookup, replacing
+     * *key_ptr with a strong reference to the canonical entry (the
+     * existing one if already present, or *key_ptr itself if it was
+     * freshly inserted). The original reference in *key_ptr is always
+     * dropped on success. Returns 0 on success, -1 on error. */
+    PyObject *old = *key_ptr;
+#if PY_VERSION_HEX >= 0x030D0000
+    PyObject *canonical = NULL;
+    if (PyDict_SetDefaultRef(memo, old, old, &canonical) < 0)
+        return -1;
+    Py_DECREF(old);
+    *key_ptr = canonical;
+    return 0;
+#else
+    /* PyDict_SetDefault has been in the C API since Python 2.6 and
+     * returns a borrowed reference to the canonical entry. */
+    PyObject *canonical = PyDict_SetDefault(memo, old, old);
+    if (canonical == NULL)
+        return -1;
+    Py_INCREF(canonical);
+    Py_DECREF(old);
+    *key_ptr = canonical;
+    return 0;
+#endif
+}
+
 static int
 is_raw_json(_speedups_state *state, PyObject *obj)
 {
@@ -2388,20 +2443,26 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 #endif
                                 ;
             if (is_string_key) {
-                encoded = PyDict_GetItemWithError(s->key_memo, kstr);
-                if (encoded != NULL) {
-                    Py_INCREF(encoded);
-                    Py_CLEAR(kstr);
-                } else if (PyErr_Occurred()) {
+                /* Fetch any cached encoding for this key. json_PyDict_GetItemRef
+                 * atomically returns a strong reference (or 0/-1), avoiding the
+                 * borrowed-ref + explicit Py_INCREF dance and handling the
+                 * error sentinel path in a single check. */
+                int cached = json_PyDict_GetItemRef(s->key_memo, kstr, &encoded);
+                if (cached < 0) {
                     goto bail;
-                } else {
-                    encoded = encoder_encode_string(s, kstr);
-                    Py_CLEAR(kstr);
-                    if (encoded == NULL)
-                        goto bail;
-                    if (PyDict_SetItem(s->key_memo, key, encoded))
-                        goto bail;
                 }
+                if (cached == 0) {
+                    encoded = encoder_encode_string(s, kstr);
+                    if (encoded == NULL) {
+                        Py_CLEAR(kstr);
+                        goto bail;
+                    }
+                    if (PyDict_SetItem(s->key_memo, key, encoded)) {
+                        Py_CLEAR(kstr);
+                        goto bail;
+                    }
+                }
+                Py_CLEAR(kstr);
             } else {
                 encoded = encoder_encode_string(s, kstr);
                 Py_CLEAR(kstr);

@@ -196,7 +196,6 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
     if (idx <= end_idx && JSON_SCAN_READ(idx) != '}') {
         int trailing_delimiter = 0;
         while (idx <= end_idx) {
-            PyObject *memokey;
             trailing_delimiter = 0;
 
             /* read key */
@@ -207,19 +206,12 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
             key = JSON_SCAN_SCANSTRING_CALL(idx + 1, &next_idx);
             if (key == NULL)
                 goto bail;
-            memokey = PyDict_GetItemWithError(s->memo, key);
-            if (memokey != NULL) {
-                Py_INCREF(memokey);
-                Py_DECREF(key);
-                key = memokey;
-            }
-            else if (PyErr_Occurred()) {
+            /* Intern the key through s->memo so repeated key strings
+             * share one PyObject across this decode. Using SetDefault
+             * collapses what used to be separate Get/Set lookups into
+             * a single atomic call. */
+            if (json_memo_intern_key(s->memo, &key) < 0)
                 goto bail;
-            }
-            else {
-                if (PyDict_SetItem(s->memo, key, key) < 0)
-                    goto bail;
-            }
             idx = next_idx;
 
             /* skip whitespace between key and : delimiter, read :, skip
