@@ -53,8 +53,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           REQUIRE_SPEEDUPS=1 python setup.py build_ext -i
-      - name: Verify GIL-free import (no RuntimeWarning)
-        run: PYTHON_GIL=0 python -W error::RuntimeWarning -c "import simplejson._speedups"
+      - name: Verify GIL-free import and C speedups loaded
+        run: |
+          PYTHON_GIL=0 python -W error::RuntimeWarning -c "
+          import simplejson, simplejson.encoder, simplejson.scanner
+          from simplejson._speedups import make_encoder, make_scanner
+          assert simplejson.encoder.c_make_encoder is make_encoder, 'c_make_encoder not wired'
+          assert simplejson.scanner.c_make_scanner is make_scanner, 'c_make_scanner not wired'
+          print('OK: C speedups loaded and wired in')
+          "
       - name: Run tests
         run: python -m simplejson.tests._cibw_runner .
       - name: Run tests with GIL disabled
@@ -84,6 +91,15 @@ jobs:
         env:
           CFLAGS: "-Wall -Wextra -Wshadow -Wstrict-prototypes -Werror -Wno-unused-parameter -Wno-missing-field-initializers -Wno-cast-function-type"
         run: REQUIRE_SPEEDUPS=1 .venv/bin/python setup.py build_ext -i
+      - name: Verify C speedups loaded
+        run: |
+          .venv/bin/python -c "
+          import simplejson, simplejson.encoder, simplejson.scanner
+          from simplejson._speedups import make_encoder, make_scanner
+          assert simplejson.encoder.c_make_encoder is make_encoder, 'c_make_encoder not wired'
+          assert simplejson.scanner.c_make_scanner is make_scanner, 'c_make_scanner not wired'
+          print('OK: C speedups loaded and wired in')
+          "
       - name: Run tests (TestRefcountLeaks auto-enabled on debug build)
         run: .venv/bin/python -m simplejson.tests._cibw_runner .
 
