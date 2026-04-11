@@ -25,7 +25,7 @@ jobs:
           - graalpy-25.0
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - run: python -m simplejson.tests._cibw_runner .
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.14t'
       - name: Verify Python is a free-threaded build
@@ -118,7 +118,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5.6.0
+      - uses: actions/setup-python@v5
         name: Install Python
         with:
           python-version: '3.14'
