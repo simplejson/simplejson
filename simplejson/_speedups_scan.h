@@ -60,6 +60,15 @@
 #define JSON_SCAN_CONCAT(a, b) JSON_SCAN_CONCAT_(a, b)
 #define JSON_SCAN_FN(base) JSON_SCAN_CONCAT(base, JSON_SCAN_SUFFIX)
 
+/* Advance idx past any JSON whitespace (space, tab, CR, LF). The
+ * idx <= end_idx guard matches the parser's convention that end_idx
+ * is the index of the LAST valid byte (i.e. length - 1). */
+#define SKIP_WHITESPACE() \
+    do { \
+        while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) \
+            idx++; \
+    } while (0)
+
 static PyObject *
 JSON_SCAN_FN(_match_number)(PyScannerObject *s, PyObject *pystr,
                             Py_ssize_t start, Py_ssize_t *next_idx_ptr)
@@ -190,7 +199,7 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
     }
 
     /* skip whitespace after { */
-    while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+    SKIP_WHITESPACE();
 
     /* only loop if the object is non-empty */
     if (idx <= end_idx && JSON_SCAN_READ(idx) != '}') {
@@ -216,13 +225,13 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
 
             /* skip whitespace between key and : delimiter, read :, skip
                whitespace */
-            while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+            SKIP_WHITESPACE();
             if (idx > end_idx || JSON_SCAN_READ(idx) != ':') {
                 raise_errmsg(state, ERR_OBJECT_PROPERTY_DELIMITER, pystr, idx);
                 goto bail;
             }
             idx++;
-            while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+            SKIP_WHITESPACE();
 
             /* read any JSON term */
             val = JSON_SCAN_FN(scan_once)(s, pystr, idx, &next_idx);
@@ -250,7 +259,7 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
             idx = next_idx;
 
             /* skip whitespace before } or , */
-            while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+            SKIP_WHITESPACE();
 
             /* bail if the object is closed or we didn't get the , delimiter */
             did_parse = 1;
@@ -265,7 +274,7 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
             idx++;
 
             /* skip whitespace after , delimiter */
-            while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+            SKIP_WHITESPACE();
             trailing_delimiter = 1;
         }
         if (trailing_delimiter) {
@@ -330,7 +339,7 @@ JSON_SCAN_FN(_parse_array)(PyScannerObject *s, PyObject *pystr,
         return NULL;
 
     /* skip whitespace after [ */
-    while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+    SKIP_WHITESPACE();
 
     /* only loop if the array is non-empty */
     if (idx <= end_idx && JSON_SCAN_READ(idx) != ']') {
@@ -350,7 +359,7 @@ JSON_SCAN_FN(_parse_array)(PyScannerObject *s, PyObject *pystr,
             idx = next_idx;
 
             /* skip whitespace between term and , */
-            while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+            SKIP_WHITESPACE();
 
             /* bail if the array is closed or we didn't get the , delimiter */
             if (idx > end_idx) break;
@@ -364,7 +373,7 @@ JSON_SCAN_FN(_parse_array)(PyScannerObject *s, PyObject *pystr,
             idx++;
 
             /* skip whitespace after , */
-            while (idx <= end_idx && IS_WHITESPACE(JSON_SCAN_READ(idx))) idx++;
+            SKIP_WHITESPACE();
             trailing_delimiter = 1;
         }
         if (trailing_delimiter) {
@@ -529,3 +538,4 @@ JSON_SCAN_FN(scan_once)(PyScannerObject *s, PyObject *pystr,
 #undef JSON_SCAN_NUMSTR_CREATE
 #undef JSON_SCAN_PARSE_FLOAT_FAST
 #undef JSON_SCAN_PARSE_INT_FAST
+#undef SKIP_WHITESPACE
