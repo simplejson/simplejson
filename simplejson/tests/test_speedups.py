@@ -248,3 +248,4 @@ class TestRefcountLeaks(TestCase):
 
         self._assert_no_leak(try_bad_scanner)
         self._assert_no_leak(try_bad_encoder)
+
