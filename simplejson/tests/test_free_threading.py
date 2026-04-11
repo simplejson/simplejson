@@ -8,24 +8,10 @@ disabled. The test_free_threading CI job runs these with
 from __future__ import with_statement
 
 import threading
-import unittest
 from unittest import TestCase
 
 import simplejson
-from simplejson import encoder
-
-
-def has_speedups():
-    return encoder.c_make_encoder is not None
-
-
-def skip_if_speedups_missing(func):
-    def wrapper(*args, **kwargs):
-        if not has_speedups():
-            raise unittest.SkipTest("C Extension not available")
-        return func(*args, **kwargs)
-
-    return wrapper
+from simplejson.tests._helpers import skip_if_speedups_missing
 
 
 class TestFreeThreading(TestCase):

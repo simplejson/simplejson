@@ -7,23 +7,7 @@ from unittest import TestCase
 import simplejson
 from simplejson import encoder, decoder, scanner
 from simplejson.compat import PY3, long_type, b
-
-
-def has_speedups():
-    return encoder.c_make_encoder is not None
-
-
-def skip_if_speedups_missing(func):
-    def wrapper(*args, **kwargs):
-        if not has_speedups():
-            if hasattr(unittest, 'SkipTest'):
-                raise unittest.SkipTest("C Extension not available")
-            else:
-                sys.stdout.write("C Extension not available")
-                return
-        return func(*args, **kwargs)
-
-    return wrapper
+from simplejson.tests._helpers import has_speedups, skip_if_speedups_missing
 
 
 class BadBool:

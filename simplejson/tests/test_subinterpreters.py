@@ -10,20 +10,7 @@ import sys
 import unittest
 from unittest import TestCase
 
-from simplejson import encoder
-
-
-def has_speedups():
-    return encoder.c_make_encoder is not None
-
-
-def skip_if_speedups_missing(func):
-    def wrapper(*args, **kwargs):
-        if not has_speedups():
-            raise unittest.SkipTest("C Extension not available")
-        return func(*args, **kwargs)
-
-    return wrapper
+from simplejson.tests._helpers import skip_if_speedups_missing
 
 
 @unittest.skipIf(sys.version_info < (3, 12),

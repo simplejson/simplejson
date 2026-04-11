@@ -37,10 +37,10 @@
 
 #if PY_VERSION_HEX < 0x03090000
 #if !defined(PyObject_CallNoArgs)
-#define PyObject_CallNoArgs(callable) PyObject_CallFunctionObjArgs(callable, NULL);
+#define PyObject_CallNoArgs(callable) PyObject_CallFunctionObjArgs(callable, NULL)
 #endif
 #if !defined(PyObject_CallOneArg)
-#define PyObject_CallOneArg(callable, arg) PyObject_CallFunctionObjArgs(callable, arg, NULL);
+#define PyObject_CallOneArg(callable, arg) PyObject_CallFunctionObjArgs(callable, arg, NULL)
 #endif
 #endif /* PY_VERSION_HEX < 0x03090000 */
 
@@ -119,6 +119,14 @@ typedef struct {
     PyObject *JSON_empty_array;
     PyObject *JSON_sortargs;
     PyObject *JSON_itemgetter0;
+    /* Interned attribute-name strings used in hot paths. Caching them
+     * here lets the scanner/encoder use PyObject_GetAttr (which takes
+     * a PyObject *) instead of PyObject_GetAttrString (which interns
+     * the C string every call). */
+    PyObject *JSON_attr_for_json;     /* "for_json" */
+    PyObject *JSON_attr_asdict;       /* "_asdict" */
+    PyObject *JSON_attr_sort;         /* "sort" */
+    PyObject *JSON_attr_encoded_json; /* "encoded_json" */
     PyObject *RawJSONType;
     PyObject *JSONDecodeError;
 } _speedups_state;
@@ -130,15 +138,22 @@ static struct PyModuleDef moduledef;
 /* Pre-3.13: a single static state instance serves the whole process,
    and a borrowed reference to the module object so that Scanner and
    Encoder instances can store module_ref uniformly. The module object
-   is kept alive by sys.modules for the entire interpreter lifetime. */
+   is kept alive by sys.modules for the entire interpreter lifetime.
+   PyScannerType and PyEncoderType are defined later in this file
+   (the full PyTypeObject bodies); their addresses are cached in
+   _speedups_static_state.{PyScannerType,PyEncoderType} by
+   module_exec, so the PyScanner_Check / PyEncoder_Check macros don't
+   need a forward declaration of those symbols. */
 static _speedups_state _speedups_static_state;
 static PyObject *_speedups_module = NULL;  /* borrowed */
-static PyTypeObject PyScannerType;
-static PyTypeObject PyEncoderType;
-#define PyScanner_Check(op) PyObject_TypeCheck(op, &PyScannerType)
-#define PyScanner_CheckExact(op) (Py_TYPE(op) == &PyScannerType)
-#define PyEncoder_Check(op) PyObject_TypeCheck(op, &PyEncoderType)
-#define PyEncoder_CheckExact(op) (Py_TYPE(op) == &PyEncoderType)
+#define PyScanner_Check(op) \
+    PyObject_TypeCheck(op, (PyTypeObject *)_speedups_static_state.PyScannerType)
+#define PyScanner_CheckExact(op) \
+    (Py_TYPE(op) == (PyTypeObject *)_speedups_static_state.PyScannerType)
+#define PyEncoder_Check(op) \
+    PyObject_TypeCheck(op, (PyTypeObject *)_speedups_static_state.PyEncoderType)
+#define PyEncoder_CheckExact(op) \
+    (Py_TYPE(op) == (PyTypeObject *)_speedups_static_state.PyEncoderType)
 #endif
 
 static inline _speedups_state *
@@ -150,9 +165,14 @@ get_speedups_state(PyObject *module)
      * uninitialized instance leaks into the hot path. */
     assert(module != NULL);
 #if PY_VERSION_HEX >= 0x030D0000
-    void *state = PyModule_GetState(module);
-    assert(state != NULL);
-    return (_speedups_state *)state;
+    {
+        /* Wrapped in an inner block so `state` is declared at the top
+         * of a scope, keeping the file C89-clean under
+         * -Wdeclaration-after-statement. */
+        void *state = PyModule_GetState(module);
+        assert(state != NULL);
+        return (_speedups_state *)state;
+    }
 #else
     (void)module;
     return &_speedups_static_state;
@@ -187,8 +207,6 @@ JSON_Accu_Destroy(JSON_Accu *acc);
 #define ERR_STRING_CONTROL "Invalid control character %r at"
 #define ERR_STRING_ESC1 "Invalid \\X escape sequence %r"
 #define ERR_STRING_ESC4 "Invalid \\uXXXX escape sequence"
-#define FOR_JSON_METHOD_NAME "for_json"
-#define ASDICT_METHOD_NAME "_asdict"
 
 
 typedef struct _PyScannerObject {
@@ -330,7 +348,7 @@ _convertPyInt_AsSsize_t(PyObject *o, Py_ssize_t *size_ptr);
 static PyObject *
 _convertPyInt_FromSsize_t(Py_ssize_t *size_ptr);
 static int
-_call_json_method(PyObject *obj, const char *method_name, PyObject **result);
+_call_json_method(PyObject *obj, PyObject *method_name, PyObject **result);
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
 static int
@@ -454,12 +472,13 @@ static PyObject *
 maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 {
     if (s->max_long_size != Py_None && s->min_long_size != Py_None) {
-        int ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
+        int ge, le;
+        ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
         if (ge < 0) {
             Py_DECREF(encoded);
             return NULL;
         }
-        int le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
+        le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
         if (le < 0) {
             Py_DECREF(encoded);
             return NULL;
@@ -480,10 +499,13 @@ maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 }
 
 static int
-_call_json_method(PyObject *obj, const char *method_name, PyObject **result)
+_call_json_method(PyObject *obj, PyObject *method_name, PyObject **result)
 {
     int rval = 0;
-    PyObject *method = PyObject_GetAttrString(obj, method_name);
+    /* method_name is an interned PyObject string cached in module state
+     * (state->JSON_attr_for_json or state->JSON_attr_asdict), so this
+     * avoids the char-to-interned-unicode conversion on every call. */
+    PyObject *method = PyObject_GetAttr(obj, method_name);
     if (method == NULL) {
         PyErr_Clear();
         return 0;
@@ -493,8 +515,8 @@ _call_json_method(PyObject *obj, const char *method_name, PyObject **result)
         if (tmp == NULL && PyErr_ExceptionMatches(PyExc_TypeError)) {
             PyErr_Clear();
         } else {
-            // This will set result to NULL if a TypeError occurred,
-            // which must be checked by the caller
+            /* This will set result to NULL if a TypeError occurred,
+             * which must be checked by the caller */
             *result = tmp;
             rval = 1;
         }
@@ -828,7 +850,7 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
     Py_CLEAR(iter);
     if (PyErr_Occurred())
         goto bail;
-    sortfun = PyObject_GetAttrString(lst, "sort");
+    sortfun = PyObject_GetAttr(lst, state->JSON_attr_sort);
     if (sortfun == NULL)
         goto bail;
     sortres = PyObject_Call(sortfun, state->JSON_sortargs, s->item_sort_kw);
@@ -2124,7 +2146,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (encoded != NULL)
                 rv = _steal_accumulate(state, rval, encoded);
         }
-        else if (s->for_json && _call_json_method(obj, FOR_JSON_METHOD_NAME, &newobj)) {
+        else if (s->for_json && _call_json_method(obj, state->JSON_attr_for_json, &newobj)) {
             if (newobj == NULL) {
                 return -1;
             }
@@ -2136,7 +2158,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             Py_DECREF(newobj);
             Py_LeaveRecursiveCall();
         }
-        else if (s->namedtuple_as_object && _call_json_method(obj, ASDICT_METHOD_NAME, &newobj)) {
+        else if (s->namedtuple_as_object && _call_json_method(obj, state->JSON_attr_asdict, &newobj)) {
             if (newobj == NULL) {
                 return -1;
             }
@@ -2179,7 +2201,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             if (raw < 0)
                 break;
             if (raw) {
-                PyObject *encoded = PyObject_GetAttrString(obj, "encoded_json");
+                PyObject *encoded = PyObject_GetAttr(obj, state->JSON_attr_encoded_json);
                 if (encoded != NULL)
                     rv = _steal_accumulate(state, rval, encoded);
             }
@@ -2647,6 +2669,10 @@ reset_speedups_state_constants(_speedups_state *state)
     Py_CLEAR(state->JSON_empty_array);
     Py_CLEAR(state->JSON_sortargs);
     Py_CLEAR(state->JSON_itemgetter0);
+    Py_CLEAR(state->JSON_attr_for_json);
+    Py_CLEAR(state->JSON_attr_asdict);
+    Py_CLEAR(state->JSON_attr_sort);
+    Py_CLEAR(state->JSON_attr_encoded_json);
     Py_CLEAR(state->RawJSONType);
     Py_CLEAR(state->JSONDecodeError);
 }
@@ -2732,6 +2758,21 @@ init_speedups_state(_speedups_state *state, PyObject *module)
         if (!state->JSON_itemgetter0)
             return -1;
     }
+
+    /* Interned attribute names used in encoder hot paths. */
+    state->JSON_attr_for_json = JSON_InternFromString("for_json");
+    if (state->JSON_attr_for_json == NULL)
+        return -1;
+    state->JSON_attr_asdict = JSON_InternFromString("_asdict");
+    if (state->JSON_attr_asdict == NULL)
+        return -1;
+    state->JSON_attr_sort = JSON_InternFromString("sort");
+    if (state->JSON_attr_sort == NULL)
+        return -1;
+    state->JSON_attr_encoded_json = JSON_InternFromString("encoded_json");
+    if (state->JSON_attr_encoded_json == NULL)
+        return -1;
+
     (void)module;
     return 0;
 }
@@ -2815,6 +2856,10 @@ speedups_traverse(PyObject *m, visitproc visit, void *arg)
     Py_VISIT(state->JSON_empty_array);
     Py_VISIT(state->JSON_sortargs);
     Py_VISIT(state->JSON_itemgetter0);
+    Py_VISIT(state->JSON_attr_for_json);
+    Py_VISIT(state->JSON_attr_asdict);
+    Py_VISIT(state->JSON_attr_sort);
+    Py_VISIT(state->JSON_attr_encoded_json);
     Py_VISIT(state->RawJSONType);
     Py_VISIT(state->JSONDecodeError);
     return 0;
