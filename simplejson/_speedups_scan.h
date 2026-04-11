@@ -1,11 +1,23 @@
 /*
  * _speedups_scan.h -- templated JSON scanner function bodies.
  *
- * This file is NOT a traditional header. It contains function definitions
- * and is #included multiple times from _speedups.c with different macro
- * settings to generate both the Py2 bytes (_str) and the universal
- * unicode (_unicode) variants of scan_once, _parse_object, _parse_array,
- * and _match_number without code duplication.
+ * This file is NOT a traditional header and must not be used as one.
+ * It contains function *definitions* and is #included multiple times
+ * from _speedups.c with different macro settings to generate both
+ * the Py2 bytes (_str) and the universal unicode (_unicode) variants
+ * of scan_once, _parse_object, _parse_array, and _match_number
+ * without code duplication. The caller must #define the following
+ * macros before each #include, and must wrap the inclusion with
+ *
+ *     #define JSON_SPEEDUPS_SCAN_INCLUDING 1
+ *     #include "_speedups_scan.h"
+ *     #undef  JSON_SPEEDUPS_SCAN_INCLUDING
+ *
+ * so that accidental inclusion from any other file (or any other
+ * code path in _speedups.c) is caught at compile time. The
+ * JSON_SPEEDUPS_SCAN_INCLUDING gate is the strong form of the
+ * sanity check; missing JSON_SCAN_SUFFIX is a weaker symptom and is
+ * also diagnosed below.
  *
  * Expected macros (must be defined before each #include):
  *
@@ -21,7 +33,24 @@
  *
  * The macros are #undef'd at the bottom of the file so the caller can
  * redefine them for the next #include.
+ *
+ * Example:
+ *
+ *   #define JSON_SCAN_SUFFIX _unicode
+ *   #define JSON_SCAN_DATA_INIT(p) \
+ *       PY2_UNUSED int kind = PyUnicode_KIND(p); \
+ *       void *str = PyUnicode_DATA(p); \
+ *       Py_ssize_t end_idx = PyUnicode_GET_LENGTH(p) - 1
+ *   #define JSON_SCAN_READ(i) PyUnicode_READ(kind, str, (i))
+ *   ...
+ *   #define JSON_SPEEDUPS_SCAN_INCLUDING 1
+ *   #include "_speedups_scan.h"
+ *   #undef  JSON_SPEEDUPS_SCAN_INCLUDING
  */
+
+#ifndef JSON_SPEEDUPS_SCAN_INCLUDING
+#error "_speedups_scan.h must only be included by _speedups.c. See the header comment."
+#endif
 
 #ifndef JSON_SCAN_SUFFIX
 #error "JSON_SCAN_SUFFIX must be defined before including _speedups_scan.h"

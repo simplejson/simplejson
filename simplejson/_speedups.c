@@ -13,7 +13,6 @@
 #define PyString_GET_SIZE PyUnicode_GET_LENGTH
 #define JSON_StringCheck PyUnicode_Check
 #define PY2_UNUSED
-#define PY3_UNUSED UNUSED
 #if PY_VERSION_HEX >= 0x030C0000
 /* PyUnicode_READY was deprecated in 3.10 and is a no-op since 3.12
  * (PEP 623). Skip calling it on modern Python to avoid the deprecation
@@ -23,7 +22,6 @@
 #endif
 #else /* PY_MAJOR_VERSION >= 3 */
 #define PY2_UNUSED UNUSED
-#define PY3_UNUSED
 #define JSON_StringCheck(obj) (PyString_Check(obj) || PyUnicode_Check(obj))
 #define PyBytes_Check PyString_Check
 #define PyUnicode_READY(obj) 0
@@ -458,6 +456,10 @@ JSON_Accu_FinishAsList(_speedups_state *state, JSON_Accu *acc)
 static void
 JSON_Accu_Destroy(JSON_Accu *acc)
 {
+    /* Safe to call unconditionally, including after JSON_Accu_FinishAsList
+     * (which clears small_strings and transfers ownership of
+     * large_strings to its return value). Py_CLEAR handles the NULL
+     * case, so repeat calls are no-ops. */
     Py_CLEAR(acc->small_strings);
     Py_CLEAR(acc->large_strings);
 }
@@ -471,31 +473,33 @@ IS_DIGIT(JSON_UNICHR c)
 static PyObject *
 maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 {
-    if (s->max_long_size != Py_None && s->min_long_size != Py_None) {
-        int ge, le;
-        ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
-        if (ge < 0) {
-            Py_DECREF(encoded);
-            return NULL;
-        }
-        le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
-        if (le < 0) {
-            Py_DECREF(encoded);
-            return NULL;
-        }
-        if (ge || le) {
-#if PY_MAJOR_VERSION >= 3
-            PyObject* quoted = PyUnicode_FromFormat("\"%U\"", encoded);
-#else
-            PyObject* quoted = PyString_FromFormat("\"%s\"",
-                                                   PyString_AsString(encoded));
-#endif
-            Py_DECREF(encoded);
-            encoded = quoted;
-        }
-    }
+    int ge, le;
+    PyObject *quoted;
 
-    return encoded;
+    /* int_as_string_bitcount is not set: fast path, return as-is. */
+    if (s->max_long_size == Py_None || s->min_long_size == Py_None)
+        return encoded;
+
+    ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
+    if (ge < 0) {
+        Py_DECREF(encoded);
+        return NULL;
+    }
+    le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
+    if (le < 0) {
+        Py_DECREF(encoded);
+        return NULL;
+    }
+    if (!(ge || le))
+        return encoded;
+
+#if PY_MAJOR_VERSION >= 3
+    quoted = PyUnicode_FromFormat("\"%U\"", encoded);
+#else
+    quoted = PyString_FromFormat("\"%s\"", PyString_AsString(encoded));
+#endif
+    Py_DECREF(encoded);
+    return quoted;
 }
 
 static int
@@ -1549,7 +1553,9 @@ _match_number_int_fast_str(PyScannerObject *s, PyObject *numstr)
 #endif
 #define JSON_SCAN_PARSE_FLOAT_FAST(ns) _match_number_float_fast_unicode(ns)
 #define JSON_SCAN_PARSE_INT_FAST(ns)   _match_number_int_fast_unicode(s, ns)
+#define JSON_SPEEDUPS_SCAN_INCLUDING 1
 #include "_speedups_scan.h"
+#undef JSON_SPEEDUPS_SCAN_INCLUDING
 
 /* -- Generate the corresponding _str variants on Python 2. -- */
 #if PY_MAJOR_VERSION < 3
@@ -1565,7 +1571,9 @@ _match_number_int_fast_str(PyScannerObject *s, PyObject *numstr)
     PyString_FromStringAndSize(&str[(sidx)], (eidx) - (sidx))
 #define JSON_SCAN_PARSE_FLOAT_FAST(ns) _match_number_float_fast_str(ns)
 #define JSON_SCAN_PARSE_INT_FAST(ns)   _match_number_int_fast_str(s, ns)
+#define JSON_SPEEDUPS_SCAN_INCLUDING 1
 #include "_speedups_scan.h"
+#undef JSON_SPEEDUPS_SCAN_INCLUDING
 #endif /* PY_MAJOR_VERSION < 3 */
 
 
@@ -1673,6 +1681,16 @@ scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
             goto bail;
     }
 
+    /* Load required attributes from the Python-side JSONDecoder context.
+     * Each getattr failure is a hard error; goto bail lets scanner_dealloc
+     * release whatever we managed to set on s. */
+#define LOAD_ATTR(field, name)                              \
+    do {                                                    \
+        s->field = PyObject_GetAttrString(ctx, name);       \
+        if (s->field == NULL)                               \
+            goto bail;                                      \
+    } while (0)
+
     encoding = PyObject_GetAttrString(ctx, "encoding");
     if (encoding == NULL)
         goto bail;
@@ -1681,28 +1699,17 @@ scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (s->encoding == NULL)
         goto bail;
 
-    /* All of these will fail "gracefully" so we don't need to verify them */
-    s->strict_bool = PyObject_GetAttrString(ctx, "strict");
-    if (s->strict_bool == NULL)
-        goto bail;
+    LOAD_ATTR(strict_bool, "strict");
     s->strict = PyObject_IsTrue(s->strict_bool);
     if (s->strict < 0)
         goto bail;
-    s->object_hook = PyObject_GetAttrString(ctx, "object_hook");
-    if (s->object_hook == NULL)
-        goto bail;
-    s->pairs_hook = PyObject_GetAttrString(ctx, "object_pairs_hook");
-    if (s->pairs_hook == NULL)
-        goto bail;
-    s->parse_float = PyObject_GetAttrString(ctx, "parse_float");
-    if (s->parse_float == NULL)
-        goto bail;
-    s->parse_int = PyObject_GetAttrString(ctx, "parse_int");
-    if (s->parse_int == NULL)
-        goto bail;
-    s->parse_constant = PyObject_GetAttrString(ctx, "parse_constant");
-    if (s->parse_constant == NULL)
-        goto bail;
+    LOAD_ATTR(object_hook, "object_hook");
+    LOAD_ATTR(pairs_hook, "object_pairs_hook");
+    LOAD_ATTR(parse_float, "parse_float");
+    LOAD_ATTR(parse_int, "parse_int");
+    LOAD_ATTR(parse_constant, "parse_constant");
+
+#undef LOAD_ATTR
 
     return (PyObject *)s;
 
@@ -1733,8 +1740,7 @@ static PyType_Spec PyScannerType_spec = {
     .slots = PyScannerType_slots,
 };
 #else
-static
-PyTypeObject PyScannerType = {
+static PyTypeObject PyScannerType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "simplejson._speedups.Scanner",       /* tp_name */
     sizeof(PyScannerObject), /* tp_basicsize */
@@ -1811,7 +1817,35 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyObject *ignore_nan, *Decimal;
     int is_true;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "OOOOOOOOOOOOOOOOOOOO:make_encoder", kwlist,
+    /* Build the format string from per-argument pieces so that each "O"
+     * has a comment and adding/removing an argument only touches one
+     * line instead of counting letters in a 20-char string literal. The
+     * order here must match kwlist[] above and the &var argument list
+     * to PyArg_ParseTupleAndKeywords below. */
+    static const char *const fmt =
+        "O"  /* markers */
+        "O"  /* default */
+        "O"  /* encoder */
+        "O"  /* indent */
+        "O"  /* key_separator */
+        "O"  /* item_separator */
+        "O"  /* sort_keys */
+        "O"  /* skipkeys */
+        "O"  /* allow_nan */
+        "O"  /* key_memo */
+        "O"  /* use_decimal */
+        "O"  /* namedtuple_as_object */
+        "O"  /* tuple_as_array */
+        "O"  /* int_as_string_bitcount */
+        "O"  /* item_sort_key */
+        "O"  /* encoding */
+        "O"  /* for_json */
+        "O"  /* ignore_nan */
+        "O"  /* Decimal */
+        "O"  /* iterable_as_array */
+        ":make_encoder";
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, fmt, kwlist,
         &markers, &defaultfn, &encoder, &indent, &key_separator, &item_separator,
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array,
@@ -2098,6 +2132,46 @@ _steal_accumulate(_speedups_state *state, JSON_Accu *accu, PyObject *stolen)
     return rval;
 }
 
+/* Helper for the for_json / _asdict paths in encoder_listencode_obj.
+ * Steals the reference to `newobj` (returned by _call_json_method),
+ * handles recursion-depth tracking, and dispatches to the right
+ * sub-encoder:
+ *   - if as_dict is 0, encodes newobj as a generic JSON value via
+ *     encoder_listencode_obj (for_json contract: return any JSON-
+ *     compatible value);
+ *   - if as_dict is 1, encodes newobj as a dict via
+ *     encoder_listencode_dict after a TypeError-on-mismatch check
+ *     (_asdict contract: must return a dict).
+ * Cleans up on every exit path. */
+static int
+encoder_steal_encode(PyEncoderObject *s, JSON_Accu *rval,
+                     PyObject *newobj, Py_ssize_t indent_level,
+                     int as_dict)
+{
+    int rv;
+    if (newobj == NULL)
+        return -1;
+    if (Py_EnterRecursiveCall(" while encoding a JSON object")) {
+        Py_DECREF(newobj);
+        return -1;
+    }
+    if (as_dict) {
+        if (PyDict_Check(newobj)) {
+            rv = encoder_listencode_dict(s, rval, newobj, indent_level);
+        } else {
+            PyErr_Format(PyExc_TypeError,
+                         "_asdict() must return a dict, not %.80s",
+                         Py_TYPE(newobj)->tp_name);
+            rv = -1;
+        }
+    } else {
+        rv = encoder_listencode_obj(s, rval, newobj, indent_level);
+    }
+    Py_DECREF(newobj);
+    Py_LeaveRecursiveCall();
+    return rv;
+}
+
 static int
 encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ssize_t indent_level)
 {
@@ -2147,37 +2221,10 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
                 rv = _steal_accumulate(state, rval, encoded);
         }
         else if (s->for_json && _call_json_method(obj, state->JSON_attr_for_json, &newobj)) {
-            if (newobj == NULL) {
-                return -1;
-            }
-            if (Py_EnterRecursiveCall(" while encoding a JSON object")) {
-                Py_DECREF(newobj);
-                return rv;
-            }
-            rv = encoder_listencode_obj(s, rval, newobj, indent_level);
-            Py_DECREF(newobj);
-            Py_LeaveRecursiveCall();
+            rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/0);
         }
         else if (s->namedtuple_as_object && _call_json_method(obj, state->JSON_attr_asdict, &newobj)) {
-            if (newobj == NULL) {
-                return -1;
-            }
-            if (Py_EnterRecursiveCall(" while encoding a JSON object")) {
-                Py_DECREF(newobj);
-                return rv;
-            }
-            if (PyDict_Check(newobj)) {
-                rv = encoder_listencode_dict(s, rval, newobj, indent_level);
-            } else {
-                PyErr_Format(
-                    PyExc_TypeError,
-                    "_asdict() must return a dict, not %.80s",
-                    Py_TYPE(newobj)->tp_name
-                );
-                rv = -1;
-            }
-            Py_DECREF(newobj);
-            Py_LeaveRecursiveCall();
+            rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/1);
         }
         else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
             if (Py_EnterRecursiveCall(" while encoding a JSON object"))
@@ -2580,8 +2627,7 @@ static PyType_Spec PyEncoderType_spec = {
     .slots = PyEncoderType_slots,
 };
 #else
-static
-PyTypeObject PyEncoderType = {
+static PyTypeObject PyEncoderType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "simplejson._speedups.Encoder",       /* tp_name */
     sizeof(PyEncoderObject), /* tp_basicsize */
