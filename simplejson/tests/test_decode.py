@@ -115,6 +115,26 @@ class TestDecode(TestCase):
         self.assertRaises(ValueError, j.scan_once, y, diff)
         self.assertRaises(ValueError, j.raw_decode, y, i)
 
+    def test_array_hook(self):
+        result = json.loads('[1, [2, 3], 4]', array_hook=tuple)
+        self.assertEqual(result, (1, (2, 3), 4))
+        self.assertIsInstance(result, tuple)
+
+    def test_array_hook_empty(self):
+        result = json.loads('[]', array_hook=tuple)
+        self.assertEqual(result, ())
+        self.assertIsInstance(result, tuple)
+
+    def test_array_hook_nested_in_object(self):
+        result = json.loads('{"a": [1, 2]}', array_hook=tuple)
+        self.assertEqual(result, {"a": (1, 2)})
+
+    def test_array_hook_none(self):
+        # array_hook=None should behave like no hook
+        result = json.loads('[1, 2]', array_hook=None)
+        self.assertEqual(result, [1, 2])
+        self.assertIsInstance(result, list)
+
     def test_trailing_comma_object(self):
         self.assertRaises(
             json.JSONDecodeError, json.loads, '{"a": 1,}')

@@ -401,7 +401,7 @@ _default_decoder = JSONDecoder()
 
 def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
         parse_int=None, parse_constant=None, object_pairs_hook=None,
-        use_decimal=False, allow_nan=False, **kw):
+        use_decimal=False, allow_nan=False, array_hook=None, **kw):
     """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
     a JSON document as `str` or `bytes`) to a Python object.
 
@@ -454,12 +454,13 @@ def load(fp, encoding=None, cls=None, object_hook=None, parse_float=None,
         encoding=encoding, cls=cls, object_hook=object_hook,
         parse_float=parse_float, parse_int=parse_int,
         parse_constant=parse_constant, object_pairs_hook=object_pairs_hook,
-        use_decimal=use_decimal, allow_nan=allow_nan, **kw)
+        use_decimal=use_decimal, allow_nan=allow_nan,
+        array_hook=array_hook, **kw)
 
 
 def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
         parse_int=None, parse_constant=None, object_pairs_hook=None,
-        use_decimal=False, allow_nan=False, **kw):
+        use_decimal=False, allow_nan=False, array_hook=None, **kw):
     """Deserialize ``s`` (a ``str`` or ``unicode`` instance containing a JSON
     document) to a Python object.
 
@@ -511,6 +512,7 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
     if (cls is None and encoding is None and object_hook is None and
             parse_int is None and parse_float is None and
             parse_constant is None and object_pairs_hook is None
+            and array_hook is None
             and not use_decimal and not allow_nan and not kw):
         return _default_decoder.decode(s)
     if cls is None:
@@ -519,6 +521,8 @@ def loads(s, encoding=None, cls=None, object_hook=None, parse_float=None,
         kw['object_hook'] = object_hook
     if object_pairs_hook is not None:
         kw['object_pairs_hook'] = object_pairs_hook
+    if array_hook is not None:
+        kw['array_hook'] = array_hook
     if parse_float is not None:
         kw['parse_float'] = parse_float
     if parse_int is not None:

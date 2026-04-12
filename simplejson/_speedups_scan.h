@@ -405,6 +405,15 @@ JSON_SCAN_FN(_parse_array)(PyScannerObject *s, PyObject *pystr,
         }
         goto bail;
     }
+    /* apply array_hook if set */
+    if (s->array_hook != Py_None) {
+        val = PyObject_CallOneArg(s->array_hook, rval);
+        if (val == NULL)
+            goto bail;
+        Py_DECREF(rval);
+        rval = val;
+        val = NULL;
+    }
     *next_idx_ptr = idx + 1;
     return rval;
 bail:

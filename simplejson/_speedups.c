@@ -238,6 +238,7 @@ typedef struct _PyScannerObject {
     int strict;
     PyObject *object_hook;
     PyObject *pairs_hook;
+    PyObject *array_hook;
     PyObject *parse_float;
     PyObject *parse_int;
     PyObject *parse_constant;
@@ -256,6 +257,7 @@ typedef struct _PyScannerObject {
     X(strict_bool)                    \
     X(object_hook)                    \
     X(pairs_hook)                     \
+    X(array_hook)                     \
     X(parse_float)                    \
     X(parse_int)                      \
     X(parse_constant)                 \
@@ -266,6 +268,7 @@ static PyMemberDef scanner_members[] = {
     {"strict", Py_T_OBJECT_EX, offsetof(PyScannerObject, strict_bool), READONLY, "strict"},
     {"object_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, object_hook), READONLY, "object_hook"},
     {"object_pairs_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, pairs_hook), READONLY, "object_pairs_hook"},
+    {"array_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, array_hook), READONLY, "array_hook"},
     {"parse_float", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_float), READONLY, "parse_float"},
     {"parse_int", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_int), READONLY, "parse_int"},
     {"parse_constant", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_constant), READONLY, "parse_constant"},
@@ -2167,6 +2170,7 @@ scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         goto bail;
     LOAD_ATTR(object_hook, "object_hook");
     LOAD_ATTR(pairs_hook, "object_pairs_hook");
+    LOAD_ATTR(array_hook, "array_hook");
     LOAD_ATTR(parse_float, "parse_float");
     LOAD_ATTR(parse_int, "parse_int");
     LOAD_ATTR(parse_constant, "parse_constant");

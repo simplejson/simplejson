@@ -243,7 +243,8 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
         pairs = object_hook(pairs)
     return pairs, end
 
-def JSONArray(state, scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
+def JSONArray(state, scan_once, array_hook=None,
+              _w=WHITESPACE.match, _ws=WHITESPACE_STR):
     (s, end) = state
     values = []
     nextchar = s[end:end + 1]
@@ -252,6 +253,8 @@ def JSONArray(state, scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
         nextchar = s[end:end + 1]
     # Look-ahead for trivial empty array
     if nextchar == ']':
+        if array_hook is not None:
+            values = array_hook(values)
         return values, end + 1
     elif nextchar == '':
         raise JSONDecodeError("Expecting value or ']'", s, end)
@@ -282,6 +285,8 @@ def JSONArray(state, scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
                 "Illegal trailing comma before end of array",
                 s, end - 1)
 
+    if array_hook is not None:
+        values = array_hook(values)
     return values, end
 
 class JSONDecoder(object):
@@ -317,7 +322,8 @@ class JSONDecoder(object):
 
     def __init__(self, encoding=None, object_hook=None, parse_float=None,
             parse_int=None, parse_constant=None, strict=True,
-            object_pairs_hook=None, allow_nan=False):
+            object_pairs_hook=None, allow_nan=False,
+            array_hook=None):
         """
         *encoding* determines the encoding used to interpret any
         :class:`str` objects decoded by this instance (``'utf-8'`` by
@@ -373,6 +379,7 @@ class JSONDecoder(object):
         self.parse_int = parse_int or bounded_int
         self.parse_constant = parse_constant or (allow_nan and _CONSTANTS.__getitem__ or None)
         self.strict = strict
+        self.array_hook = array_hook
         self.parse_object = JSONObject
         self.parse_array = JSONArray
         self.parse_string = scanstring
