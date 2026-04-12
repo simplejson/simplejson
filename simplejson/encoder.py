@@ -45,7 +45,7 @@ FLOAT_REPR = repr
 try:
     _dict_types = (dict, frozendict)
 except NameError:
-    _dict_types = (dict,)
+    _dict_types = dict
 
 def encode_basestring(s, _PY3=PY3, _q=u'"'):
     """Return a JSON representation of a Python string
