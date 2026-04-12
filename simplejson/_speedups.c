@@ -2980,14 +2980,25 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *obj = NULL;
-    int is_true;
     Py_ssize_t i = 0;
 
-    is_true = PyObject_IsTrue(seq);
-    if (is_true == -1)
-        return -1;
-    else if (is_true == 0)
-        return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    /* Emptiness check: use direct size for exact types to skip the
+     * __bool__/__len__ method dispatch of PyObject_IsTrue. */
+    if (PyList_CheckExact(seq)) {
+        if (PyList_GET_SIZE(seq) == 0)
+            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    }
+    else if (PyTuple_CheckExact(seq)) {
+        if (PyTuple_GET_SIZE(seq) == 0)
+            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    }
+    else {
+        int is_true = PyObject_IsTrue(seq);
+        if (is_true == -1)
+            return -1;
+        if (is_true == 0)
+            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    }
 
     if (encoder_markers_push(s, seq, &ident))
         goto bail;
