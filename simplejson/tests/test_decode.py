@@ -115,6 +115,27 @@ class TestDecode(TestCase):
         self.assertRaises(ValueError, j.scan_once, y, diff)
         self.assertRaises(ValueError, j.raw_decode, y, i)
 
+    def test_trailing_comma_object(self):
+        self.assertRaises(
+            json.JSONDecodeError, json.loads, '{"a": 1,}')
+        self.assertRaises(
+            json.JSONDecodeError, json.loads, '{"a": 1, }')
+        # Verify the error message mentions trailing comma
+        try:
+            json.loads('{"a": 1,}')
+        except json.JSONDecodeError as e:
+            self.assertIn('trailing comma', str(e).lower())
+
+    def test_trailing_comma_array(self):
+        self.assertRaises(
+            json.JSONDecodeError, json.loads, '[1,]')
+        self.assertRaises(
+            json.JSONDecodeError, json.loads, '[1, ]')
+        try:
+            json.loads('[1,]')
+        except json.JSONDecodeError as e:
+            self.assertIn('trailing comma', str(e).lower())
+
     def test_bounded_int(self):
         # SJ-PT-23-03, limit quadratic number parsing per Python 3.11
         max_str_digits = getattr(sys, 'get_int_max_str_digits', lambda: 4300)()

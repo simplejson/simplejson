@@ -227,6 +227,10 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
 
         end += 1
         if nextchar != '"':
+            if nextchar == '}':
+                raise JSONDecodeError(
+                    "Illegal trailing comma before end of object",
+                    s, end - 1)
             raise JSONDecodeError(
                 "Expecting property name enclosed in double quotes",
                 s, end - 1)
@@ -272,6 +276,11 @@ def JSONArray(state, scan_once, _w=WHITESPACE.match, _ws=WHITESPACE_STR):
                     end = _w(s, end + 1).end()
         except IndexError:
             pass
+
+        if s[end:end + 1] == ']':
+            raise JSONDecodeError(
+                "Illegal trailing comma before end of array",
+                s, end - 1)
 
     return values, end
 

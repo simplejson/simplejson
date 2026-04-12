@@ -276,8 +276,15 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
             /* skip whitespace after , delimiter */
             SKIP_WHITESPACE();
             trailing_delimiter = 1;
+
+            /* check for trailing comma before } */
+            if (idx <= end_idx && JSON_SCAN_READ(idx) == '}') {
+                raise_errmsg(state, ERR_TRAILING_COMMA_OBJECT, pystr, idx);
+                goto bail;
+            }
         }
         if (trailing_delimiter) {
+            /* Truncated input after comma (e.g. '{"a":1,') */
             raise_errmsg(state, ERR_OBJECT_PROPERTY, pystr, idx);
             goto bail;
         }
@@ -375,8 +382,15 @@ JSON_SCAN_FN(_parse_array)(PyScannerObject *s, PyObject *pystr,
             /* skip whitespace after , */
             SKIP_WHITESPACE();
             trailing_delimiter = 1;
+
+            /* check for trailing comma before ] */
+            if (idx <= end_idx && JSON_SCAN_READ(idx) == ']') {
+                raise_errmsg(state, ERR_TRAILING_COMMA_ARRAY, pystr, idx);
+                goto bail;
+            }
         }
         if (trailing_delimiter) {
+            /* Truncated input after comma (e.g. "[42,") */
             raise_errmsg(state, ERR_EXPECTING_VALUE, pystr, idx);
             goto bail;
         }

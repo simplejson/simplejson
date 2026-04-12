@@ -226,6 +226,8 @@ JSON_Accu_Destroy(JSON_Accu *acc);
 #define ERR_STRING_CONTROL "Invalid control character %r at"
 #define ERR_STRING_ESC1 "Invalid \\X escape sequence %r"
 #define ERR_STRING_ESC4 "Invalid \\uXXXX escape sequence"
+#define ERR_TRAILING_COMMA_OBJECT "Illegal trailing comma before end of object"
+#define ERR_TRAILING_COMMA_ARRAY "Illegal trailing comma before end of array"
 
 
 typedef struct _PyScannerObject {
