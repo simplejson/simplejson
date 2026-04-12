@@ -23,7 +23,6 @@ PYTHON_REQUIRES = '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, 
 CLASSIFIERS = [
     'Development Status :: 5 - Production/Stable',
     'Environment :: WebAssembly :: Emscripten',
-    'Framework :: Pyodide',
     'Intended Audience :: Developers',
     'Programming Language :: Python',
     'Programming Language :: Python :: 2',
