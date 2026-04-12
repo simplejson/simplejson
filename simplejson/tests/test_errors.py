@@ -66,3 +66,17 @@ class TestErrors(TestCase):
         self.assertEqual(err.doc, e.doc)
         self.assertEqual(err.pos, e.pos)
         self.assertEqual(err.end, e.end)
+
+    def test_add_note_on_serialization_error(self):
+        # PEP 678 add_note() adds context about where the error occurred
+        if sys.version_info < (3, 11):
+            return
+        try:
+            # Use indent to force the Python encoder
+            json.dumps({'a': [1, object(), 3]}, indent=2)
+        except TypeError as e:
+            notes = getattr(e, '__notes__', [])
+            self.assertTrue(len(notes) >= 2,
+                'Expected at least 2 notes, got %d' % len(notes))
+            self.assertIn('list item 1', notes[-2])
+            self.assertIn("dict item 'a'", notes[-1])
