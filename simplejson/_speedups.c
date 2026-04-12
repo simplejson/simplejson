@@ -2475,16 +2475,77 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
     return rv;
 }
 
+/* Stringify and encode a dict key to its JSON representation, using the
+ * key_memo cache for string keys.  Returns a new reference to the encoded
+ * key string on success, Py_None (borrowed, no new reference) for
+ * skipkeys, or NULL on error. */
+static PyObject *
+encoder_encode_dict_key(PyEncoderObject *s, PyObject *key)
+{
+    PyObject *kstr;
+    PyObject *encoded;
+    int is_string_key;
+
+    kstr = encoder_stringify_key(s, key);
+    if (kstr == NULL)
+        return NULL;
+    if (kstr == Py_None) {
+        Py_DECREF(kstr);
+        return Py_None;  /* skipkeys */
+    }
+
+    is_string_key = PyUnicode_Check(key)
+#if PY_MAJOR_VERSION < 3
+                    || PyString_Check(key)
+#endif
+                    ;
+    if (is_string_key) {
+        /*
+         * Only cache the encoding of string keys. False and True are
+         * indistinguishable from 0 and 1 in a dictionary lookup and there
+         * may be other quirks with user defined subclasses. In the
+         * string-key branch kstr is an INCREF'd alias of key, so storing
+         * under `key` finds the same entry via the `kstr` lookup on the
+         * next iteration. For non-string keys kstr is a freshly created
+         * string object, so a store under `key` would be write-only and
+         * the cache entry would never be reused — skip it entirely.
+         */
+        int cached = json_PyDict_GetItemRef(s->key_memo, kstr, &encoded);
+        if (cached < 0) {
+            Py_DECREF(kstr);
+            return NULL;
+        }
+        if (cached == 0) {
+            encoded = encoder_encode_string(s, kstr);
+            if (encoded == NULL) {
+                Py_DECREF(kstr);
+                return NULL;
+            }
+            if (PyDict_SetItem(s->key_memo, key, encoded)) {
+                Py_DECREF(kstr);
+                Py_DECREF(encoded);
+                return NULL;
+            }
+        }
+        Py_DECREF(kstr);
+    } else {
+        encoded = encoder_encode_string(s, kstr);
+        Py_DECREF(kstr);
+        if (encoded == NULL)
+            return NULL;
+    }
+    return encoded;  /* new reference */
+}
+
 static int
 encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_ssize_t indent_level)
 {
     /* Encode Python dict dct a JSON term */
     _speedups_state *state = get_speedups_state(s->module_ref);
-    PyObject *kstr = NULL;
     PyObject *ident = NULL;
+    PyObject *encoded = NULL;
     PyObject *iter = NULL;
     PyObject *item = NULL;
-    PyObject *encoded = NULL;
     Py_ssize_t idx;
 
     if (PyDict_Size(dct) == 0)
@@ -2496,91 +2557,96 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     if (JSON_Accu_Accumulate(state, rval, state->JSON_open_dict))
         goto bail;
 
-    iter = encoder_dict_iteritems(s, dct);
-    if (iter == NULL)
-        goto bail;
-
-    idx = 0;
-    while ((item = PyIter_Next(iter))) {
+    /* Fast path: when sort_keys is off and dct is an exact dict,
+     * iterate with PyDict_Next to avoid allocating an items list.
+     * Py_BEGIN_CRITICAL_SECTION prevents concurrent dict mutation
+     * on free-threaded builds; on default builds it is a no-op. */
+    if (s->item_sort_kw == Py_None && PyDict_CheckExact(dct)) {
+        Py_ssize_t pos = 0;
         PyObject *key, *value;
-        if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
-            PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
-            goto bail;
-        }
-        key = PyTuple_GET_ITEM(item, 0);
-        value = PyTuple_GET_ITEM(item, 1);
+        int err = 0;
 
-        kstr = encoder_stringify_key(s, key);
-        if (kstr == NULL)
-            goto bail;
-        else if (kstr == Py_None) {
-            /* skipkeys */
-            Py_DECREF(item);
-            Py_DECREF(kstr);
-            continue;
-        }
-        if (idx) {
-            if (JSON_Accu_Accumulate(state, rval, s->item_separator))
-                goto bail;
-        }
-        /*
-         * Only cache the encoding of string keys. False and True are
-         * indistinguishable from 0 and 1 in a dictionary lookup and there
-         * may be other quirks with user defined subclasses. In the
-         * string-key branch kstr is an INCREF'd alias of key, so storing
-         * under `key` finds the same entry via the `kstr` lookup on the
-         * next iteration. For non-string keys kstr is a freshly created
-         * string object, so a store under `key` would be write-only and
-         * the cache entry would never be reused — skip it entirely.
-         */
-        {
-            int is_string_key = PyUnicode_Check(key)
-#if PY_MAJOR_VERSION < 3
-                                || PyString_Check(key)
-#endif
-                                ;
-            if (is_string_key) {
-                /* Fetch any cached encoding for this key. json_PyDict_GetItemRef
-                 * atomically returns a strong reference (or 0/-1), avoiding the
-                 * borrowed-ref + explicit Py_INCREF dance and handling the
-                 * error sentinel path in a single check. */
-                int cached = json_PyDict_GetItemRef(s->key_memo, kstr, &encoded);
-                if (cached < 0) {
-                    goto bail;
-                }
-                if (cached == 0) {
-                    encoded = encoder_encode_string(s, kstr);
-                    if (encoded == NULL) {
-                        Py_CLEAR(kstr);
-                        goto bail;
-                    }
-                    if (PyDict_SetItem(s->key_memo, key, encoded)) {
-                        Py_CLEAR(kstr);
-                        goto bail;
-                    }
-                }
-                Py_CLEAR(kstr);
-            } else {
-                encoded = encoder_encode_string(s, kstr);
-                Py_CLEAR(kstr);
-                if (encoded == NULL)
-                    goto bail;
+        idx = 0;
+        Py_BEGIN_CRITICAL_SECTION(dct);
+        while (PyDict_Next(dct, &pos, &key, &value)) {
+            Py_INCREF(key);
+            Py_INCREF(value);
+
+            encoded = encoder_encode_dict_key(s, key);
+            Py_DECREF(key);
+            if (encoded == NULL) {
+                Py_DECREF(value); err = 1; break;
             }
+            if (encoded == Py_None) {
+                /* skipkeys */
+                encoded = NULL;
+                Py_DECREF(value);
+                continue;
+            }
+            if (idx && JSON_Accu_Accumulate(state, rval, s->item_separator)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            if (JSON_Accu_Accumulate(state, rval, encoded)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            Py_CLEAR(encoded);
+            if (JSON_Accu_Accumulate(state, rval, s->key_separator)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            if (encoder_listencode_obj(s, rval, value, indent_level)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            Py_DECREF(value);
+            idx++;
         }
-        if (JSON_Accu_Accumulate(state, rval, encoded)) {
+        Py_END_CRITICAL_SECTION();
+
+        if (err || PyErr_Occurred())
             goto bail;
-        }
-        Py_CLEAR(encoded);
-        if (JSON_Accu_Accumulate(state, rval, s->key_separator))
-            goto bail;
-        if (encoder_listencode_obj(s, rval, value, indent_level))
-            goto bail;
-        Py_CLEAR(item);
-        idx += 1;
     }
-    Py_CLEAR(iter);
-    if (PyErr_Occurred())
-        goto bail;
+    else {
+        /* Slow path: sorted iteration, dict subclasses, or non-dict
+         * mappings.  Build an items list via encoder_dict_iteritems. */
+        iter = encoder_dict_iteritems(s, dct);
+        if (iter == NULL)
+            goto bail;
+
+        idx = 0;
+        while ((item = PyIter_Next(iter))) {
+            PyObject *key, *value;
+            if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
+                PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
+                goto bail;
+            }
+            key = PyTuple_GET_ITEM(item, 0);
+            value = PyTuple_GET_ITEM(item, 1);
+
+            encoded = encoder_encode_dict_key(s, key);
+            if (encoded == NULL)
+                goto bail;
+            if (encoded == Py_None) {
+                /* skipkeys */
+                encoded = NULL;
+                Py_CLEAR(item);
+                continue;
+            }
+            if (idx && JSON_Accu_Accumulate(state, rval, s->item_separator))
+                goto bail;
+            if (JSON_Accu_Accumulate(state, rval, encoded))
+                goto bail;
+            Py_CLEAR(encoded);
+            if (JSON_Accu_Accumulate(state, rval, s->key_separator))
+                goto bail;
+            if (encoder_listencode_obj(s, rval, value, indent_level))
+                goto bail;
+            Py_CLEAR(item);
+            idx++;
+        }
+        Py_CLEAR(iter);
+        if (PyErr_Occurred())
+            goto bail;
+    }
+
     if (encoder_markers_pop(s, ident))
         goto bail;
     ident = NULL;
@@ -2592,7 +2658,6 @@ bail:
     Py_XDECREF(encoded);
     Py_XDECREF(item);
     Py_XDECREF(iter);
-    Py_XDECREF(kstr);
     Py_XDECREF(ident);
     return -1;
 }
