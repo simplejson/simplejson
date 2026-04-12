@@ -1099,9 +1099,7 @@ bail:
     return NULL;
 }
 
-/* Use JSONDecodeError exception to raise a nice looking ValueError subclass.
- * If constructing the JSONDecodeError fails (e.g. OOM), fall back to a plain
- * ValueError so the caller always sees an exception set on return. */
+/* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
 static void
 raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t end)
 {
@@ -1110,9 +1108,6 @@ raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t en
     if (exc) {
         PyErr_SetObject(JSONDecodeError, exc);
         Py_DECREF(exc);
-    }
-    else if (!PyErr_Occurred()) {
-        PyErr_SetString(PyExc_ValueError, msg);
     }
 }
 
