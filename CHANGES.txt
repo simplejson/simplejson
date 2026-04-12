@@ -66,7 +66,12 @@ Version 4.0.0 released 2026-04-12
 
 * Added Pyodide (wasm32) wheel builds with C speedups via cibuildwheel.
   Previously Pyodide users fell back to the pure-Python wheel; now they
-  get the compiled C extension cross-compiled to WebAssembly.
+  get the compiled C extension cross-compiled to WebAssembly. Thread
+  and subprocess tests are skipped on Emscripten where those APIs are
+  unavailable.
+
+* Test suite now fails (instead of skipping) when C speedups are missing
+  during cibuildwheel runs, catching broken extension builds early.
 
 Version 3.20.2 released 2025-09-24
 

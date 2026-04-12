@@ -20,6 +20,10 @@ class TestMissingSpeedups(unittest.TestCase):
             "PyPy doesn't need speedups! :)"
         elif getattr(getattr(sys, "implementation", None), "name", None) == "graalpy":
             "GraalPy doesn't need speedups! :)"
+        elif os.environ.get('CIBUILDWHEEL') == '1':
+            self.fail(
+                "C extension (_speedups) failed to load but this is a "
+                "cibuildwheel run where speedups are expected")
         elif hasattr(self, "skipTest"):
             self.skipTest("_speedups.so is missing!")
 
