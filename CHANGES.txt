@@ -1,7 +1,7 @@
 Version 4.0.0 released 2026-04-12
 
-* simplejson 4 requires Python 2.7 or Python 3.9+. Older Python
-  versions (2.5, 2.6, 3.0-3.8) are no longer supported. pip will
+* simplejson 4 requires Python 2.7 or Python 3.8+. Older Python
+  versions (2.5, 2.6, 3.0-3.7) are no longer supported. pip will
   not install simplejson 4 on unsupported versions.
 
 * The C extension now uses heap types and per-module state instead of

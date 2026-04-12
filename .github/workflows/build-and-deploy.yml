@@ -159,10 +159,9 @@ jobs:
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"
           CIBW_ARCHS: ${{ matrix.arch }}
-          # Skip CPython 3.8 (cibuildwheel v3.x includes it by default
-          # but we only support 3.9+). PyPy is disabled by default in
-          # cibuildwheel v3.x so no skip needed for it.
-          CIBW_SKIP: "cp38-*"
+          # PyPy is disabled by default in cibuildwheel v3.x, so no
+          # CIBW_SKIP needed for it (and adding one makes v3.4 error
+          # out with "Invalid skip selector: 'pp*'").
 
       - name: Build Python 2.7 wheels
         if: runner.os == 'Linux' && matrix.arch == 'x86_64'
