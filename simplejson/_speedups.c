@@ -191,10 +191,20 @@ get_speedups_state(PyObject *module)
 #define JSON_ALLOW_NAN 1
 #define JSON_IGNORE_NAN 2
 
+#if PY_VERSION_HEX >= 0x030E0000
+/* Python 3.14+: JSON_Accu is backed by a PyUnicodeWriter, building the
+ * entire output in one contiguous buffer.  The FinishAsList wrapper
+ * returns a single-element list so the Python caller's ''.join(chunks)
+ * is effectively a no-op. */
+typedef struct {
+    PyUnicodeWriter *writer;
+} JSON_Accu;
+#else
 typedef struct {
     PyObject *large_strings;  /* A list of previously accumulated large strings */
     PyObject *small_strings;  /* Pending small strings */
 } JSON_Accu;
+#endif
 
 static int
 JSON_Accu_Init(JSON_Accu *acc);
@@ -330,14 +340,18 @@ static PyMemberDef encoder_members[] = {
     {NULL}
 };
 
+#if PY_VERSION_HEX < 0x030E0000
 static PyObject *
 join_list_unicode(_speedups_state *state, PyObject *lst);
+#endif
 static PyObject *
 JSON_ParseEncoding(PyObject *encoding);
 static PyObject *
 maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj);
+#if PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3
 static Py_ssize_t
 ascii_char_size(JSON_UNICHR c);
+#endif
 static Py_ssize_t
 ascii_escape_char(JSON_UNICHR c, char *output, Py_ssize_t chars);
 static PyObject *
@@ -363,7 +377,15 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
-_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
+_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx)
+{
+    /* return (rval, idx) tuple, stealing reference to rval */
+    if (rval == NULL) {
+        assert(PyErr_Occurred());
+        return NULL;
+    }
+    return Py_BuildValue("(Nn)", rval, idx);
+}
 static PyObject *
 scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 static void
@@ -472,6 +494,57 @@ is_raw_json(_speedups_state *state, PyObject *obj)
     return r;
 }
 
+#if PY_VERSION_HEX >= 0x030E0000
+/* ---- PyUnicodeWriter-backed JSON_Accu (Python 3.14+) ---- */
+
+static int
+JSON_Accu_Init(JSON_Accu *acc)
+{
+    acc->writer = PyUnicodeWriter_Create(0);
+    if (acc->writer == NULL)
+        return -1;
+    return 0;
+}
+
+static int
+JSON_Accu_Accumulate(_speedups_state *state, JSON_Accu *acc, PyObject *unicode)
+{
+    (void)state;
+    assert(PyUnicode_Check(unicode));
+    return PyUnicodeWriter_WriteStr(acc->writer, unicode);
+}
+
+static PyObject *
+JSON_Accu_FinishAsList(_speedups_state *state, JSON_Accu *acc)
+{
+    PyObject *str;
+    PyObject *list;
+    (void)state;
+    str = PyUnicodeWriter_Finish(acc->writer);
+    acc->writer = NULL;  /* Finish consumed the writer */
+    if (str == NULL)
+        return NULL;
+    list = PyList_New(1);
+    if (list == NULL) {
+        Py_DECREF(str);
+        return NULL;
+    }
+    PyList_SET_ITEM(list, 0, str);
+    return list;
+}
+
+static void
+JSON_Accu_Destroy(JSON_Accu *acc)
+{
+    if (acc->writer != NULL) {
+        PyUnicodeWriter_Discard(acc->writer);
+        acc->writer = NULL;
+    }
+}
+
+#else /* PY_VERSION_HEX < 0x030E0000 */
+/* ---- List-backed JSON_Accu (Python < 3.14) ---- */
+
 static int
 JSON_Accu_Init(JSON_Accu *acc)
 {
@@ -567,6 +640,7 @@ JSON_Accu_Destroy(JSON_Accu *acc)
     Py_CLEAR(acc->small_strings);
     Py_CLEAR(acc->large_strings);
 }
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
 
 static int
 IS_DIGIT(JSON_UNICHR c)
@@ -695,6 +769,10 @@ ascii_escape_char(JSON_UNICHR c, char *output, Py_ssize_t chars)
     return chars;
 }
 
+#if PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3
+/* Only needed by the two-pass ascii_escape_unicode (pre-3.14) and
+ * ascii_escape_str (Python 2). The PyUnicodeWriter path on 3.14+
+ * computes sizes implicitly, so this would be unused there. */
 static Py_ssize_t
 ascii_char_size(JSON_UNICHR c)
 {
@@ -719,11 +797,60 @@ ascii_char_size(JSON_UNICHR c)
         return MIN_EXPANSION;
     }
 }
+#endif /* PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3 */
 
+#if PY_VERSION_HEX >= 0x030E0000
 static PyObject *
 ascii_escape_unicode(PyObject *pystr)
 {
-    /* Take a PyUnicode pystr and return a new ASCII-only escaped PyString */
+    /* Single-pass implementation using PyUnicodeWriter (Python 3.14+).
+     * Writes runs of safe characters via WriteSubstring and escape
+     * sequences via WriteUTF8 (all escape output is pure ASCII). */
+    Py_ssize_t i;
+    Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
+    int kind = PyUnicode_KIND(pystr);
+    void *data = PyUnicode_DATA(pystr);
+    Py_ssize_t run_start = 0;
+    PyUnicodeWriter *writer = PyUnicodeWriter_Create(input_chars + 2);
+    if (writer == NULL)
+        return NULL;
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    for (i = 0; i < input_chars; i++) {
+        JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+        if (S_CHAR(c))
+            continue;
+        /* Flush run of safe characters */
+        if (i > run_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+                goto bail;
+        }
+        /* Write escape sequence */
+        {
+            char buf[12];
+            Py_ssize_t len = ascii_escape_char(c, buf, 0);
+            if (PyUnicodeWriter_WriteUTF8(writer, buf, len) < 0)
+                goto bail;
+        }
+        run_start = i + 1;
+    }
+    /* Flush remaining safe characters */
+    if (i > run_start) {
+        if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+            goto bail;
+    }
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    return PyUnicodeWriter_Finish(writer);
+bail:
+    PyUnicodeWriter_Discard(writer);
+    return NULL;
+}
+#else /* PY_VERSION_HEX < 0x030E0000 */
+static PyObject *
+ascii_escape_unicode(PyObject *pystr)
+{
+    /* Two-pass implementation: calculate exact output size, then fill. */
     Py_ssize_t i;
     Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
     Py_ssize_t output_size = 2;
@@ -735,7 +862,12 @@ ascii_escape_unicode(PyObject *pystr)
 
     output_size = 2;
     for (i = 0; i < input_chars; i++) {
-        output_size += ascii_char_size(PyUnicode_READ(kind, data, i));
+        Py_ssize_t charsize = ascii_char_size(PyUnicode_READ(kind, data, i));
+        if (output_size > PY_SSIZE_T_MAX - charsize) {
+            PyErr_SetString(PyExc_OverflowError, "string is too long to escape");
+            return NULL;
+        }
+        output_size += charsize;
     }
 #if PY_MAJOR_VERSION >= 3
     rval = PyUnicode_New(output_size, 127);
@@ -760,6 +892,7 @@ ascii_escape_unicode(PyObject *pystr)
     assert(chars == output_size);
     return rval;
 }
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
 
 #if PY_MAJOR_VERSION >= 3
 
@@ -807,7 +940,14 @@ ascii_escape_str(PyObject *pystr)
             Py_DECREF(uni);
             return rval;
         }
-        output_size += ascii_char_size(c);
+        {
+            Py_ssize_t charsize = ascii_char_size(c);
+            if (output_size > PY_SSIZE_T_MAX - charsize) {
+                PyErr_SetString(PyExc_OverflowError, "string is too long to escape");
+                return NULL;
+            }
+            output_size += charsize;
+        }
     }
 
     rval = PyString_FromStringAndSize(NULL, output_size);
@@ -1035,12 +1175,14 @@ raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t en
     }
 }
 
+#if PY_VERSION_HEX < 0x030E0000
 static PyObject *
 join_list_unicode(_speedups_state *state, PyObject *lst)
 {
     /* return u''.join(lst) */
     return PyUnicode_Join(state->JSON_EmptyUnicode, lst);
 }
+#endif
 
 #if PY_MAJOR_VERSION < 3
 static PyObject *
@@ -1050,35 +1192,6 @@ join_list_string(_speedups_state *state, PyObject *lst)
     return PyObject_CallOneArg(state->JSON_EmptyStr_join, lst);
 }
 #endif /* PY_MAJOR_VERSION < 3 */
-
-static PyObject *
-_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx)
-{
-    /* return (rval, idx) tuple, stealing reference to rval */
-    PyObject *tpl;
-    PyObject *pyidx;
-    /*
-    steal a reference to rval, returns (rval, idx)
-    */
-    if (rval == NULL) {
-        assert(PyErr_Occurred());
-        return NULL;
-    }
-    pyidx = PyInt_FromSsize_t(idx);
-    if (pyidx == NULL) {
-        Py_DECREF(rval);
-        return NULL;
-    }
-    tpl = PyTuple_New(2);
-    if (tpl == NULL) {
-        Py_DECREF(pyidx);
-        Py_DECREF(rval);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(tpl, 0, rval);
-    PyTuple_SET_ITEM(tpl, 1, pyidx);
-    return tpl;
-}
 
 #define APPEND_OLD_CHUNK \
     if (chunk != NULL) { \
@@ -1303,6 +1416,191 @@ bail:
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
+#if PY_VERSION_HEX >= 0x030E0000
+static PyObject *
+scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
+                   int strict, Py_ssize_t *next_end_ptr)
+{
+    /* Python 3.14+: use PyUnicodeWriter instead of a chunks list.
+     * The writer is lazily created on the first escape sequence so that
+     * the common no-escape path returns a cheap PyUnicode_Substring. */
+    PyObject *rval;
+    Py_ssize_t begin = end - 1;
+    Py_ssize_t next = begin;
+    int kind = PyUnicode_KIND(pystr);
+    Py_ssize_t len = PyUnicode_GET_LENGTH(pystr);
+    void *buf = PyUnicode_DATA(pystr);
+    PyUnicodeWriter *writer = NULL;
+    Py_ssize_t literal_start;
+
+    if (len == end) {
+        raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
+        goto bail;
+    }
+    else if (end < 0 || len < end) {
+        PyErr_SetString(PyExc_ValueError, "end is out of bounds");
+        goto bail;
+    }
+
+    literal_start = end;
+    while (1) {
+        /* Find the end of the string or the next escape */
+        JSON_UNICHR c = 0;
+        for (next = end; next < len; next++) {
+            c = PyUnicode_READ(kind, buf, next);
+            if (c == '"' || c == '\\') {
+                break;
+            }
+            else if (strict && c <= 0x1f) {
+                raise_errmsg(state, ERR_STRING_CONTROL, pystr, next);
+                goto bail;
+            }
+        }
+        if (!(c == '"' || c == '\\')) {
+            raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
+            goto bail;
+        }
+        next++;
+        if (c == '"') {
+            end = next;
+            break;
+        }
+        /* Backslash escape — ensure writer exists and flush the
+         * literal span [literal_start, next-1). */
+        if (writer == NULL) {
+            writer = PyUnicodeWriter_Create(len - begin);
+            if (writer == NULL)
+                goto bail;
+        }
+        if (next - 1 > literal_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr,
+                                               literal_start, next - 1) < 0)
+                goto bail;
+        }
+        if (next == len) {
+            raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
+            goto bail;
+        }
+        c = PyUnicode_READ(kind, buf, next);
+        if (c != 'u') {
+            /* Non-unicode backslash escapes */
+            end = next + 1;
+            switch (c) {
+                case '"': break;
+                case '\\': break;
+                case '/': break;
+                case 'b': c = '\b'; break;
+                case 'f': c = '\f'; break;
+                case 'n': c = '\n'; break;
+                case 'r': c = '\r'; break;
+                case 't': c = '\t'; break;
+                default: c = 0;
+            }
+            if (c == 0) {
+                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 2);
+                goto bail;
+            }
+        }
+        else {
+            c = 0;
+            next++;
+            end = next + 4;
+            if (end >= len) {
+                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 1);
+                goto bail;
+            }
+            /* Decode 4 hex digits */
+            for (; next < end; next++) {
+                JSON_UNICHR hex_digit = PyUnicode_READ(kind, buf, next);
+                c <<= 4;
+                switch (hex_digit) {
+                    case '0': case '1': case '2': case '3': case '4':
+                    case '5': case '6': case '7': case '8': case '9':
+                        c |= (hex_digit - '0'); break;
+                    case 'a': case 'b': case 'c': case 'd': case 'e':
+                    case 'f':
+                        c |= (hex_digit - 'a' + 10); break;
+                    case 'A': case 'B': case 'C': case 'D': case 'E':
+                    case 'F':
+                        c |= (hex_digit - 'A' + 10); break;
+                    default:
+                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                        goto bail;
+                }
+            }
+            /* Surrogate pair */
+            if ((c & 0xfc00) == 0xd800) {
+                JSON_UNICHR c2 = 0;
+                if (end + 6 < len &&
+                    PyUnicode_READ(kind, buf, next) == '\\' &&
+                    PyUnicode_READ(kind, buf, next + 1) == 'u') {
+                    end += 6;
+                    /* Decode 4 hex digits */
+                    for (next += 2; next < end; next++) {
+                        JSON_UNICHR hex_digit = PyUnicode_READ(kind, buf, next);
+                        c2 <<= 4;
+                        switch (hex_digit) {
+                        case '0': case '1': case '2': case '3': case '4':
+                        case '5': case '6': case '7': case '8': case '9':
+                            c2 |= (hex_digit - '0'); break;
+                        case 'a': case 'b': case 'c': case 'd': case 'e':
+                        case 'f':
+                            c2 |= (hex_digit - 'a' + 10); break;
+                        case 'A': case 'B': case 'C': case 'D': case 'E':
+                        case 'F':
+                            c2 |= (hex_digit - 'A' + 10); break;
+                        default:
+                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                            goto bail;
+                        }
+                    }
+                    if ((c2 & 0xfc00) != 0xdc00) {
+                        /* not a low surrogate, rewind */
+                        end -= 6;
+                        next = end;
+                    }
+                    else {
+                        c = 0x10000 + (((c - 0xd800) << 10) | (c2 - 0xdc00));
+                    }
+                }
+            }
+        }
+        if (PyUnicodeWriter_WriteChar(writer, c) < 0)
+            goto bail;
+        literal_start = end;
+    }
+
+    /* Finalize */
+    if (writer == NULL) {
+        /* No escape sequences: return a substring directly. */
+        if (end - 1 > literal_start)
+            rval = PyUnicode_Substring(pystr, literal_start, end - 1);
+        else {
+            rval = state->JSON_EmptyUnicode;
+            Py_INCREF(rval);
+        }
+    }
+    else {
+        /* Flush trailing literal span after the last escape. */
+        if (end - 1 > literal_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr,
+                                               literal_start, end - 1) < 0)
+                goto bail;
+        }
+        rval = PyUnicodeWriter_Finish(writer);
+        writer = NULL;  /* Finish consumed the writer */
+        if (rval == NULL)
+            goto bail;
+    }
+    *next_end_ptr = end;
+    return rval;
+bail:
+    if (writer != NULL)
+        PyUnicodeWriter_Discard(writer);
+    *next_end_ptr = -1;
+    return NULL;
+}
+#else /* PY_VERSION_HEX < 0x030E0000 */
 static PyObject *
 scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                    int strict, Py_ssize_t *next_end_ptr)
@@ -1487,6 +1785,7 @@ bail:
     Py_XDECREF(chunks);
     return NULL;
 }
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
 
 PyDoc_STRVAR(pydoc_scanstring,
     "scanstring(basestring, end, encoding, strict=True) -> (str, end)\n"
@@ -2438,63 +2737,113 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
 {
     /* Encode Python object obj to a JSON term, rval is a PyList */
     _speedups_state *state = get_speedups_state(s->module_ref);
+    PyObject *newobj;
     int rv = -1;
-    do {
-        PyObject *newobj;
-        if (obj == Py_None || obj == Py_True || obj == Py_False) {
-            PyObject *cstr = _encoded_const(state, obj);
-            if (cstr != NULL)
-                rv = _steal_accumulate(state, rval, cstr);
-        }
-        else if ((PyBytes_Check(obj) && s->encoding != Py_None) ||
-                 PyUnicode_Check(obj))
-        {
-            PyObject *encoded = encoder_encode_string(s, obj);
+    /* Check strings first — they are the most common JSON value type. */
+    if ((PyBytes_Check(obj) && s->encoding != Py_None) ||
+        PyUnicode_Check(obj))
+    {
+        PyObject *encoded = encoder_encode_string(s, obj);
+        if (encoded != NULL)
+            rv = _steal_accumulate(state, rval, encoded);
+    }
+    else if (obj == Py_None || obj == Py_True || obj == Py_False) {
+        PyObject *cstr = _encoded_const(state, obj);
+        if (cstr != NULL)
+            rv = _steal_accumulate(state, rval, cstr);
+    }
+    else if (PyInt_Check(obj) || PyLong_Check(obj)) {
+        PyObject *encoded = encoder_long_to_str(obj);
+        if (encoded != NULL) {
+            encoded = maybe_quote_bigint(s, encoded, obj);
             if (encoded != NULL)
                 rv = _steal_accumulate(state, rval, encoded);
         }
-        else if (PyInt_Check(obj) || PyLong_Check(obj)) {
-            PyObject *encoded = encoder_long_to_str(obj);
-            if (encoded != NULL) {
-                encoded = maybe_quote_bigint(s, encoded, obj);
-                if (encoded == NULL)
-                    break;
-                rv = _steal_accumulate(state, rval, encoded);
+    }
+    else if (PyFloat_Check(obj)) {
+        PyObject *encoded = encoder_encode_float(s, obj);
+        if (encoded != NULL)
+            rv = _steal_accumulate(state, rval, encoded);
+    }
+    else if (s->for_json && _call_json_method(obj, state->JSON_attr_for_json, &newobj)) {
+        rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/0);
+    }
+    else if (s->namedtuple_as_object && _call_json_method(obj, state->JSON_attr_asdict, &newobj)) {
+        rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/1);
+    }
+    else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
+        if (Py_EnterRecursiveCall(" while encoding a JSON object"))
+            return rv;
+        rv = encoder_listencode_list(s, rval, obj, indent_level);
+        Py_LeaveRecursiveCall();
+    }
+    else if (PyDict_Check(obj)) {
+        if (Py_EnterRecursiveCall(" while encoding a JSON object"))
+            return rv;
+        rv = encoder_listencode_dict(s, rval, obj, indent_level);
+        Py_LeaveRecursiveCall();
+    }
+    else if (s->use_decimal && PyObject_TypeCheck(obj, (PyTypeObject *)s->Decimal)) {
+        PyObject *encoded = PyObject_Str(obj);
+        if (encoded != NULL)
+            rv = _steal_accumulate(state, rval, encoded);
+    }
+    else {
+        rv = encoder_listencode_default(s, rval, obj, indent_level);
+    }
+    return rv;
+}
+
+/* Stringify and encode a dict key to its JSON representation, using the
+ * key_memo cache for string keys.  Returns a new reference to the encoded
+ * key string on success, Py_None (borrowed, no new reference) for
+ * skipkeys, or NULL on error. */
+static PyObject *
+encoder_encode_dict_key(PyEncoderObject *s, PyObject *key)
+{
+    PyObject *kstr;
+    PyObject *encoded;
+
+    kstr = encoder_stringify_key(s, key);
+    if (kstr == NULL)
+        return NULL;
+    if (kstr == Py_None) {
+        Py_DECREF(kstr);
+        return Py_None;  /* skipkeys */
+    }
+
+    /* For string keys (PyUnicode on Py3, PyString on Py2),
+     * encoder_stringify_key returns Py_INCREF(key) — i.e. kstr IS key.
+     * For non-string keys it returns a freshly created string, so
+     * kstr != key.  Use this identity test to decide whether the
+     * key_memo cache applies: caching under a non-string original key
+     * would be write-only (the lookup uses kstr, not key). */
+    if (kstr == key) {
+        int cached = json_PyDict_GetItemRef(s->key_memo, kstr, &encoded);
+        if (cached < 0) {
+            Py_DECREF(kstr);
+            return NULL;
+        }
+        if (cached == 0) {
+            encoded = encoder_encode_string(s, kstr);
+            if (encoded == NULL) {
+                Py_DECREF(kstr);
+                return NULL;
+            }
+            if (PyDict_SetItem(s->key_memo, key, encoded)) {
+                Py_DECREF(kstr);
+                Py_DECREF(encoded);
+                return NULL;
             }
         }
-        else if (PyFloat_Check(obj)) {
-            PyObject *encoded = encoder_encode_float(s, obj);
-            if (encoded != NULL)
-                rv = _steal_accumulate(state, rval, encoded);
-        }
-        else if (s->for_json && _call_json_method(obj, state->JSON_attr_for_json, &newobj)) {
-            rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/0);
-        }
-        else if (s->namedtuple_as_object && _call_json_method(obj, state->JSON_attr_asdict, &newobj)) {
-            rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/1);
-        }
-        else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
-            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
-                return rv;
-            rv = encoder_listencode_list(s, rval, obj, indent_level);
-            Py_LeaveRecursiveCall();
-        }
-        else if (PyDict_Check(obj)) {
-            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
-                return rv;
-            rv = encoder_listencode_dict(s, rval, obj, indent_level);
-            Py_LeaveRecursiveCall();
-        }
-        else if (s->use_decimal && PyObject_TypeCheck(obj, (PyTypeObject *)s->Decimal)) {
-            PyObject *encoded = PyObject_Str(obj);
-            if (encoded != NULL)
-                rv = _steal_accumulate(state, rval, encoded);
-        }
-        else {
-            rv = encoder_listencode_default(s, rval, obj, indent_level);
-        }
-    } while (0);
-    return rv;
+        Py_DECREF(kstr);
+    } else {
+        encoded = encoder_encode_string(s, kstr);
+        Py_DECREF(kstr);
+        if (encoded == NULL)
+            return NULL;
+    }
+    return encoded;  /* new reference */
 }
 
 static int
@@ -2502,11 +2851,10 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 {
     /* Encode Python dict dct a JSON term */
     _speedups_state *state = get_speedups_state(s->module_ref);
-    PyObject *kstr = NULL;
     PyObject *ident = NULL;
+    PyObject *encoded = NULL;
     PyObject *iter = NULL;
     PyObject *item = NULL;
-    PyObject *encoded = NULL;
     Py_ssize_t idx;
 
     if (PyDict_Size(dct) == 0)
@@ -2518,95 +2866,96 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     if (JSON_Accu_Accumulate(state, rval, state->JSON_open_dict))
         goto bail;
 
-    iter = encoder_dict_iteritems(s, dct);
-    if (iter == NULL)
-        goto bail;
-
-    idx = 0;
-    while ((item = PyIter_Next(iter))) {
+    /* Fast path: when sort_keys is off and dct is an exact dict,
+     * iterate with PyDict_Next to avoid allocating an items list.
+     * Py_BEGIN_CRITICAL_SECTION prevents concurrent dict mutation
+     * on free-threaded builds; on default builds it is a no-op. */
+    if (s->item_sort_kw == Py_None && PyDict_CheckExact(dct)) {
+        Py_ssize_t pos = 0;
         PyObject *key, *value;
-        if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
-            PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
-            goto bail;
+        int err = 0;
+
+        idx = 0;
+        Py_BEGIN_CRITICAL_SECTION(dct);
+        while (PyDict_Next(dct, &pos, &key, &value)) {
+            Py_INCREF(key);
+            Py_INCREF(value);
+
+            encoded = encoder_encode_dict_key(s, key);
+            Py_DECREF(key);
+            if (encoded == NULL) {
+                Py_DECREF(value); err = 1; break;
+            }
+            if (encoded == Py_None) {
+                /* skipkeys */
+                encoded = NULL;
+                Py_DECREF(value);
+                continue;
+            }
+            if (idx && JSON_Accu_Accumulate(state, rval, s->item_separator)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            if (JSON_Accu_Accumulate(state, rval, encoded)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            Py_CLEAR(encoded);
+            if (JSON_Accu_Accumulate(state, rval, s->key_separator)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            if (encoder_listencode_obj(s, rval, value, indent_level)) {
+                Py_DECREF(value); err = 1; break;
+            }
+            Py_DECREF(value);
+            idx++;
         }
-        key = PyTuple_GET_ITEM(item, 0);
-        if (key == NULL)
+        Py_END_CRITICAL_SECTION();
+
+        if (err || PyErr_Occurred())
             goto bail;
-        value = PyTuple_GET_ITEM(item, 1);
-        if (value == NULL)
+    }
+    else {
+        /* Slow path: sorted iteration, dict subclasses, or non-dict
+         * mappings.  Build an items list via encoder_dict_iteritems. */
+        iter = encoder_dict_iteritems(s, dct);
+        if (iter == NULL)
             goto bail;
 
-        kstr = encoder_stringify_key(s, key);
-        if (kstr == NULL)
-            goto bail;
-        else if (kstr == Py_None) {
-            /* skipkeys */
-            Py_DECREF(item);
-            Py_DECREF(kstr);
-            continue;
-        }
-        if (idx) {
-            if (JSON_Accu_Accumulate(state, rval, s->item_separator))
+        idx = 0;
+        while ((item = PyIter_Next(iter))) {
+            PyObject *key, *value;
+            if (!PyTuple_Check(item) || Py_SIZE(item) != 2) {
+                PyErr_SetString(PyExc_ValueError, "items must return 2-tuples");
                 goto bail;
-        }
-        /*
-         * Only cache the encoding of string keys. False and True are
-         * indistinguishable from 0 and 1 in a dictionary lookup and there
-         * may be other quirks with user defined subclasses. In the
-         * string-key branch kstr is an INCREF'd alias of key, so storing
-         * under `key` finds the same entry via the `kstr` lookup on the
-         * next iteration. For non-string keys kstr is a freshly created
-         * string object, so a store under `key` would be write-only and
-         * the cache entry would never be reused — skip it entirely.
-         */
-        {
-            int is_string_key = PyUnicode_Check(key)
-#if PY_MAJOR_VERSION < 3
-                                || PyString_Check(key)
-#endif
-                                ;
-            if (is_string_key) {
-                /* Fetch any cached encoding for this key. json_PyDict_GetItemRef
-                 * atomically returns a strong reference (or 0/-1), avoiding the
-                 * borrowed-ref + explicit Py_INCREF dance and handling the
-                 * error sentinel path in a single check. */
-                int cached = json_PyDict_GetItemRef(s->key_memo, kstr, &encoded);
-                if (cached < 0) {
-                    goto bail;
-                }
-                if (cached == 0) {
-                    encoded = encoder_encode_string(s, kstr);
-                    if (encoded == NULL) {
-                        Py_CLEAR(kstr);
-                        goto bail;
-                    }
-                    if (PyDict_SetItem(s->key_memo, key, encoded)) {
-                        Py_CLEAR(kstr);
-                        goto bail;
-                    }
-                }
-                Py_CLEAR(kstr);
-            } else {
-                encoded = encoder_encode_string(s, kstr);
-                Py_CLEAR(kstr);
-                if (encoded == NULL)
-                    goto bail;
             }
+            key = PyTuple_GET_ITEM(item, 0);
+            value = PyTuple_GET_ITEM(item, 1);
+
+            encoded = encoder_encode_dict_key(s, key);
+            if (encoded == NULL)
+                goto bail;
+            if (encoded == Py_None) {
+                /* skipkeys */
+                encoded = NULL;
+                Py_CLEAR(item);
+                continue;
+            }
+            if (idx && JSON_Accu_Accumulate(state, rval, s->item_separator))
+                goto bail;
+            if (JSON_Accu_Accumulate(state, rval, encoded))
+                goto bail;
+            Py_CLEAR(encoded);
+            if (JSON_Accu_Accumulate(state, rval, s->key_separator))
+                goto bail;
+            if (encoder_listencode_obj(s, rval, value, indent_level))
+                goto bail;
+            Py_CLEAR(item);
+            idx++;
         }
-        if (JSON_Accu_Accumulate(state, rval, encoded)) {
+        Py_CLEAR(iter);
+        if (PyErr_Occurred())
             goto bail;
-        }
-        Py_CLEAR(encoded);
-        if (JSON_Accu_Accumulate(state, rval, s->key_separator))
-            goto bail;
-        if (encoder_listencode_obj(s, rval, value, indent_level))
-            goto bail;
-        Py_CLEAR(item);
-        idx += 1;
     }
-    Py_CLEAR(iter);
-    if (PyErr_Occurred())
-        goto bail;
+
     if (encoder_markers_pop(s, ident))
         goto bail;
     ident = NULL;
@@ -2618,7 +2967,6 @@ bail:
     Py_XDECREF(encoded);
     Py_XDECREF(item);
     Py_XDECREF(iter);
-    Py_XDECREF(kstr);
     Py_XDECREF(ident);
     return -1;
 }
@@ -2632,37 +2980,84 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *obj = NULL;
-    int is_true;
-    int i = 0;
+    Py_ssize_t i = 0;
 
-    is_true = PyObject_IsTrue(seq);
-    if (is_true == -1)
-        return -1;
-    else if (is_true == 0)
-        return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    /* Emptiness check: use direct size for exact types to skip the
+     * __bool__/__len__ method dispatch of PyObject_IsTrue. */
+    if (PyList_CheckExact(seq)) {
+        if (PyList_GET_SIZE(seq) == 0)
+            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    }
+    else if (PyTuple_CheckExact(seq)) {
+        if (PyTuple_GET_SIZE(seq) == 0)
+            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    }
+    else {
+        int is_true = PyObject_IsTrue(seq);
+        if (is_true == -1)
+            return -1;
+        if (is_true == 0)
+            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+    }
 
     if (encoder_markers_push(s, seq, &ident))
         goto bail;
 
-    iter = PyObject_GetIter(seq);
-    if (iter == NULL)
-        goto bail;
-
     if (JSON_Accu_Accumulate(state, rval, state->JSON_open_array))
         goto bail;
-    while ((obj = PyIter_Next(iter))) {
-        if (i) {
-            if (JSON_Accu_Accumulate(state, rval, s->item_separator))
-                goto bail;
+
+    /* Fast path: exact list or exact tuple — iterate by index to avoid
+     * allocating an iterator object.  Py_BEGIN_CRITICAL_SECTION prevents
+     * concurrent list mutation on free-threaded builds (tuples are
+     * immutable so the lock is uncontested).
+     *
+     * Uses a local `item` variable (not the outer `obj`) so that the
+     * bail handler's Py_XDECREF(obj) stays a no-op for this path. */
+    if (PyList_CheckExact(seq) || PyTuple_CheckExact(seq)) {
+        PyObject *item;
+        Py_ssize_t size;
+        int is_list = PyList_CheckExact(seq);
+        int err = 0;
+
+        Py_BEGIN_CRITICAL_SECTION(seq);
+        size = is_list ? PyList_GET_SIZE(seq) : PyTuple_GET_SIZE(seq);
+        for (i = 0; i < size; i++) {
+            item = is_list ? PyList_GET_ITEM(seq, i)
+                           : PyTuple_GET_ITEM(seq, i);
+            Py_INCREF(item);
+            if (i && JSON_Accu_Accumulate(state, rval, s->item_separator)) {
+                Py_DECREF(item); err = 1; break;
+            }
+            if (encoder_listencode_obj(s, rval, item, indent_level)) {
+                Py_DECREF(item); err = 1; break;
+            }
+            Py_DECREF(item);
         }
-        if (encoder_listencode_obj(s, rval, obj, indent_level))
+        Py_END_CRITICAL_SECTION();
+
+        if (err)
             goto bail;
-        i++;
-        Py_CLEAR(obj);
     }
-    Py_CLEAR(iter);
-    if (PyErr_Occurred())
-        goto bail;
+    else {
+        /* Slow path: list/tuple subclasses or other iterables. */
+        iter = PyObject_GetIter(seq);
+        if (iter == NULL)
+            goto bail;
+        while ((obj = PyIter_Next(iter))) {
+            if (i) {
+                if (JSON_Accu_Accumulate(state, rval, s->item_separator))
+                    goto bail;
+            }
+            if (encoder_listencode_obj(s, rval, obj, indent_level))
+                goto bail;
+            i++;
+            Py_CLEAR(obj);
+        }
+        Py_CLEAR(iter);
+        if (PyErr_Occurred())
+            goto bail;
+    }
+
     if (encoder_markers_pop(s, ident))
         goto bail;
     ident = NULL;
