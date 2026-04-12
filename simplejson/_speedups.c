@@ -2922,7 +2922,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     PyObject *iter = NULL;
     PyObject *obj = NULL;
     int is_true;
-    int i = 0;
+    Py_ssize_t i = 0;
 
     is_true = PyObject_IsTrue(seq);
     if (is_true == -1)

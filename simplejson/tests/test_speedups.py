@@ -293,3 +293,24 @@ class TestRefcountLeaks(TestCase):
         self._assert_no_leak(
             lambda: simplejson.dumps(big, int_as_string_bitcount=31))
 
+    @skip_if_speedups_missing
+    def test_dict_fast_path_no_leak(self):
+        """The PyDict_Next fast path (unsorted exact dict) must not leak
+        references compared to the iterator slow path."""
+        data = {"a": 1, "b": "two", "c": [3], "d": None, "e": True}
+        self._assert_no_leak(lambda: simplejson.dumps(data))
+
+    @skip_if_speedups_missing
+    def test_dict_slow_path_no_leak(self):
+        """The iterator slow path (sorted or dict subclass) must not leak."""
+        data = {"z": 1, "a": 2, "m": 3}
+        self._assert_no_leak(
+            lambda: simplejson.dumps(data, sort_keys=True))
+
+    @skip_if_speedups_missing
+    def test_skipkeys_fast_path_no_leak(self):
+        """skipkeys on the PyDict_Next fast path must not leak skipped keys."""
+        data = {"ok": 1, 42: 2, True: 3, None: 4}
+        self._assert_no_leak(
+            lambda: simplejson.dumps(data, skipkeys=True))
+
