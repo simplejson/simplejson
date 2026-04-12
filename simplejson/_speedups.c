@@ -3561,13 +3561,7 @@ init_speedups(void)
         Py_DECREF(state->PyEncoderType);
         return;
     }
-    if (init_speedups_state(state, m) < 0) {
-        /* CPython 2.7's import machinery checks PyErr_Occurred() after
-           the void init function returns; a pending exception causes it
-           to remove the module from sys.modules, resulting in
-           ImportError for all subsequent attempts. Clear the exception
-           so the module remains usable even if state init fails. */
-        PyErr_Clear();
-    }
+    if (init_speedups_state(state, m) < 0)
+        return;
 }
 #endif

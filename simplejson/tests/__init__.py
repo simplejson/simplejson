@@ -21,22 +21,15 @@ class TestMissingSpeedups(unittest.TestCase):
         elif getattr(getattr(sys, "implementation", None), "name", None) == "graalpy":
             "GraalPy doesn't need speedups! :)"
         elif os.environ.get('CIBUILDWHEEL') == '1':
-            # Capture the actual ImportError to diagnose load failures
-            import simplejson
-            pkg_dir = os.path.dirname(simplejson.__file__)
-            so_files = [f for f in os.listdir(pkg_dir)
-                        if f.startswith('_speedups')]
             try:
                 from simplejson._speedups import make_encoder
-                # If we get here, speedups actually work (shouldn't happen)
                 self.fail(
                     "make_encoder imported OK here but "
                     "_import_c_make_encoder() returned None earlier")
             except ImportError as e:
                 self.fail(
                     "C extension (_speedups) failed to load in "
-                    "cibuildwheel: %s; _speedups files in %s: %r"
-                    % (e, pkg_dir, so_files))
+                    "cibuildwheel: %s" % (e,))
         else:
             self.skipTest("_speedups.so is missing!")
 
