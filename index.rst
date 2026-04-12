@@ -21,7 +21,7 @@ for a serious speed boost.
 :mod:`simplejson` exposes an API familiar to users of the standard library
 :mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
 version of the :mod:`json` library, but maintains
-compatibility with the latest Python 3.8+ releases back to Python 3.3
+compatibility with the latest Python 3.14+ releases back to Python 3.4
 as well as the legacy Python 2.5 - Python 2.7 releases.
 
 Development of simplejson happens on Github:

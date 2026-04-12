@@ -2,7 +2,7 @@ simplejson
 ----------
 
 simplejson is a simple, fast, complete, correct and extensible
-JSON <http://json.org> encoder and decoder for Python 3.3+
+JSON <http://json.org> encoder and decoder for Python 3.4+
 with legacy support for Python 2.5+.  It is pure Python code
 with no dependencies, but includes an optional C extension
 for a serious speed boost.
@@ -13,7 +13,7 @@ https://simplejson.readthedocs.io/
 simplejson is the externally maintained development version of the
 json library included with Python (since 2.6). This version is tested
 with Python 3.14 (including free-threaded builds) and maintains
-backwards compatibility with Python 3.3+ and the legacy Python 2.5 -
+backwards compatibility with Python 3.4+ and the legacy Python 2.5 -
 Python 2.7 releases.
 
 The encoder can be specialized to provide serialization in any kind of
