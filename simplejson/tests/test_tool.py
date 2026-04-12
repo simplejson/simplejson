@@ -62,6 +62,8 @@ class TestTool(unittest.TestCase):
     """)
 
     def runTool(self, args=None, data=None):
+        if sys.platform == 'emscripten':
+            self.skipTest("subprocess not available on Emscripten")
         argv = [sys.executable, '-m', 'simplejson.tool']
         if args:
             argv.extend(args)
