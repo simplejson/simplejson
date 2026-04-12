@@ -215,10 +215,44 @@ jobs:
             dist/*.tar.gz
             dist/*-none-any.whl
 
+  test_pep517_build:
+    name: Test PEP 517 build (pyproject.toml)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        name: Install Python
+        with:
+          python-version: '3.14'
+
+      - name: Install build frontend
+        run: python -m pip install --upgrade pip build
+
+      - name: Build sdist and wheel via PEP 517
+        run: python -m build --outdir pep517_dist
+
+      - name: Verify PEP 517 artifacts
+        run: |
+          ls -la pep517_dist/
+          test -f pep517_dist/simplejson-*.tar.gz
+          test -f pep517_dist/simplejson-*.whl
+
+      - name: Install and smoke-test the PEP 517 wheel
+        run: |
+          python -m pip install pep517_dist/simplejson-*.whl
+          cd /tmp
+          python -c "
+          import simplejson as json
+          assert json.__version__, 'missing __version__'
+          assert json.dumps([1, 2, 3]) == '[1, 2, 3]'
+          print('PEP 517 wheel OK: simplejson', json.__version__)
+          "
+
   # Aggregate gate jobs to match branch protection rule names
   gate_ubuntu:
     name: Build wheels on ubuntu-latest
-    needs: [build_wheels, test_pure_python, test_free_threading, test_debug_build]
+    needs: [build_wheels, test_pure_python, test_free_threading, test_debug_build, test_pep517_build]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All ubuntu-latest checks passed"

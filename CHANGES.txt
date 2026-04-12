@@ -46,6 +46,24 @@ Version 4.0.0 released 2026-04-12
 * Documented RawJSON usage with examples and caveats
   https://github.com/simplejson/simplejson/pull/346
 
+* Added pyproject.toml for PEP 517 build support. setup.py is retained
+  for Python 2.7 wheel builds and backwards compatibility.
+
+* Migrated build_ext import from distutils to setuptools in setup.py.
+  The distutils.errors imports are kept since setuptools vendors
+  distutils on Python 3.12+ where stdlib distutils was removed.
+
+* Removed imp module fallback in compat.py; importlib.reload is used
+  unconditionally on Python 3. Python 3.3 is no longer supported
+  (it has been EOL since 2017).
+
+* Dropped Python 3.3, 3.4, 3.5 from setup.py classifiers and added
+  3.3 to python_requires exclusions. These versions are long EOL
+  and are not tested in CI.
+
+* CI now tests PEP 517 builds (pyproject.toml) alongside the existing
+  setup.py-based builds.
+
 Version 3.20.2 released 2025-09-24
 
 * Disable speedups on GraalPy same as on PyPy

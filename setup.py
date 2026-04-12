@@ -5,9 +5,10 @@ import os
 import sys
 try:
     from setuptools import setup, Extension, Command
+    from setuptools.command.build_ext import build_ext
 except ImportError:
     from distutils.core import setup, Extension, Command
-from distutils.command.build_ext import build_ext
+    from distutils.command.build_ext import build_ext
 from distutils.errors import CCompilerError, DistutilsExecError, \
     DistutilsPlatformError
 
@@ -19,7 +20,7 @@ DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 with open('README.rst', 'r') as f:
     LONG_DESCRIPTION = f.read()
 
-PYTHON_REQUIRES = '>=2.5, !=3.0.*, !=3.1.*, !=3.2.*'
+PYTHON_REQUIRES = '>=2.5, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*'
 
 CLASSIFIERS = [
     'Development Status :: 5 - Production/Stable',
@@ -30,9 +31,6 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 2.6',
     'Programming Language :: Python :: 2.7',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.3',
-    'Programming Language :: Python :: 3.4',
-    'Programming Language :: Python :: 3.5',
     'Programming Language :: Python :: 3.6',
     'Programming Language :: Python :: 3.7',
     'Programming Language :: Python :: 3.8',
