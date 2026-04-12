@@ -3532,11 +3532,12 @@ init_speedups(void)
         return;
     }
     if (init_speedups_state(state, m) < 0) {
-        /* Print the error to stderr for diagnostic purposes, then clear
-           it so CPython 2.7's import machinery doesn't remove the module
-           from sys.modules. */
-        fprintf(stderr, "simplejson._speedups: init_speedups_state failed:\n");
-        PyErr_Print();
+        /* CPython 2.7's import machinery checks PyErr_Occurred() after
+           the void init function returns; a pending exception causes it
+           to remove the module from sys.modules, resulting in
+           ImportError for all subsequent attempts. Clear the exception
+           so the module remains usable even if state init fails. */
+        PyErr_Clear();
     }
 }
 #endif
