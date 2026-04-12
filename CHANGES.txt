@@ -62,11 +62,9 @@ Version 4.0.0 released 2026-04-12
   The distutils.errors imports are kept since setuptools vendors
   distutils on Python 3.12+ where stdlib distutils was removed.
 
-* Minimum supported Python 3 version is now 3.4 (was 3.3). Removed
-  imp module fallback in compat.py; importlib.reload is used
-  unconditionally on Python 3. Python 3.3 has been EOL since 2017.
-  Dropped Python 3.3, 3.4, 3.5 from setup.py classifiers. Python 2.5+
-  continues to be supported.
+* Supported versions are now Python 2.7 and Python 3.9+. Wheels are
+  built for these versions only. python_requires updated to match.
+  Removed imp module fallback in compat.py (only needed for 3.3).
 
 * CI now tests PEP 517 builds (pyproject.toml) alongside the existing
   setup.py-based builds.
