@@ -336,8 +336,10 @@ static PyObject *
 JSON_ParseEncoding(PyObject *encoding);
 static PyObject *
 maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj);
+#if PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3
 static Py_ssize_t
 ascii_char_size(JSON_UNICHR c);
+#endif
 static Py_ssize_t
 ascii_escape_char(JSON_UNICHR c, char *output, Py_ssize_t chars);
 static PyObject *
@@ -703,6 +705,10 @@ ascii_escape_char(JSON_UNICHR c, char *output, Py_ssize_t chars)
     return chars;
 }
 
+#if PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3
+/* Only needed by the two-pass ascii_escape_unicode (pre-3.14) and
+ * ascii_escape_str (Python 2). The PyUnicodeWriter path on 3.14+
+ * computes sizes implicitly, so this would be unused there. */
 static Py_ssize_t
 ascii_char_size(JSON_UNICHR c)
 {
@@ -727,6 +733,7 @@ ascii_char_size(JSON_UNICHR c)
         return MIN_EXPANSION;
     }
 }
+#endif /* PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3 */
 
 #if PY_VERSION_HEX >= 0x030E0000
 static PyObject *
