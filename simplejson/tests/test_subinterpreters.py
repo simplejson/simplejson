@@ -4,8 +4,6 @@ Subinterpreters became usable for third-party C extensions in
 Python 3.12 (PEP 684). On 3.13+ the extension uses per-module state
 and heap types so that each interpreter gets its own copy.
 """
-from __future__ import with_statement
-
 import sys
 import unittest
 from unittest import TestCase

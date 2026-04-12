@@ -16,10 +16,6 @@ class MisbehavingBytesSubtype(binary_type):
         return b("bad __bytes__")
 
 class TestDecode(TestCase):
-    if not hasattr(TestCase, 'assertIs'):
-        def assertIs(self, a, b):
-            self.assertTrue(a is b, '%r is %r' % (a, b))
-
     def test_decimal(self):
         rval = json.loads('1.1', parse_float=decimal.Decimal)
         self.assertTrue(isinstance(rval, decimal.Decimal))

@@ -5,8 +5,6 @@ catch data races on free-threaded builds (PEP 703) where the GIL is
 disabled. The test_free_threading CI job runs these with
 ``PYTHON_GIL=0`` on a free-threaded interpreter.
 """
-from __future__ import with_statement
-
 import sys
 import threading
 from unittest import TestCase

@@ -8,24 +8,9 @@ try:
 except ImportError:
     mock = None
 
-try:
-    from collections import namedtuple
-except ImportError:
-    class Value(tuple):
-        def __new__(cls, *args):
-            return tuple.__new__(cls, args)
-
-        def _asdict(self):
-            return {'value': self[0]}
-    class Point(tuple):
-        def __new__(cls, *args):
-            return tuple.__new__(cls, args)
-
-        def _asdict(self):
-            return {'x': self[0], 'y': self[1]}
-else:
-    Value = namedtuple('Value', ['value'])
-    Point = namedtuple('Point', ['x', 'y'])
+from collections import namedtuple
+Value = namedtuple('Value', ['value'])
+Point = namedtuple('Point', ['x', 'y'])
 
 class DuckValue(object):
     def __init__(self, *args):
@@ -153,11 +138,7 @@ class TestNamedTuple(unittest.TestCase):
 
     def test_asdict_does_not_return_dict(self):
         if not mock:
-            if hasattr(unittest, "SkipTest"):
-                raise unittest.SkipTest("unittest.mock required")
-            else:
-                print("unittest.mock not available")
-                return
+            raise unittest.SkipTest("unittest.mock required")
         fake = mock.Mock()
         self.assertTrue(hasattr(fake, '_asdict'))
         self.assertTrue(callable(fake._asdict))

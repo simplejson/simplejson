@@ -24,7 +24,7 @@ class TestMissingSpeedups(unittest.TestCase):
             self.fail(
                 "C extension (_speedups) failed to load but this is a "
                 "cibuildwheel run where speedups are expected")
-        elif hasattr(self, "skipTest"):
+        else:
             self.skipTest("_speedups.so is missing!")
 
 
@@ -35,13 +35,7 @@ def additional_tests(suite=None, project_dir=None):
 
     if suite is None:
         suite = unittest.TestSuite()
-    try:
-        import doctest
-    except ImportError:
-        if sys.version_info < (2, 7):
-            # doctests in 2.6 depends on cStringIO
-            return suite
-        raise
+    import doctest
     for mod in (simplejson, simplejson.encoder, simplejson.decoder):
         suite.addTest(doctest.DocTestSuite(mod))
     if project_dir is not None:

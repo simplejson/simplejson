@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import with_statement
-
 import os
 import sys
 try:
@@ -24,6 +22,8 @@ PYTHON_REQUIRES = '>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, 
 
 CLASSIFIERS = [
     'Development Status :: 5 - Production/Stable',
+    'Environment :: WebAssembly :: Emscripten',
+    'Framework :: Pyodide',
     'Intended Audience :: Developers',
     'Programming Language :: Python',
     'Programming Language :: Python :: 2',
@@ -41,14 +41,7 @@ CLASSIFIERS = [
     'Topic :: Software Development :: Libraries :: Python Modules',
 ]
 
-if sys.platform == 'win32' and sys.version_info < (2, 7):
-    # 2.6's distutils.msvc9compiler can raise an IOError when failing to
-    # find the compiler
-    # It can also raise ValueError https://bugs.python.org/issue7511
-    ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError,
-                  IOError, ValueError)
-else:
-    ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError)
+ext_errors = (CCompilerError, DistutilsExecError, DistutilsPlatformError)
 
 
 class BuildFailed(Exception):
