@@ -3532,11 +3532,11 @@ init_speedups(void)
         return;
     }
     if (init_speedups_state(state, m) < 0) {
-        /* Clear the exception so CPython 2.7's import machinery doesn't
-           remove the module from sys.modules.  The essential types
-           (make_scanner, make_encoder) and module-level functions
-           (encode_basestring_ascii, scanstring) are already installed. */
-        PyErr_Clear();
+        /* Print the error to stderr for diagnostic purposes, then clear
+           it so CPython 2.7's import machinery doesn't remove the module
+           from sys.modules. */
+        fprintf(stderr, "simplejson._speedups: init_speedups_state failed:\n");
+        PyErr_Print();
     }
 }
 #endif
