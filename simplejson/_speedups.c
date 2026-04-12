@@ -728,10 +728,58 @@ ascii_char_size(JSON_UNICHR c)
     }
 }
 
+#if PY_VERSION_HEX >= 0x030E0000
 static PyObject *
 ascii_escape_unicode(PyObject *pystr)
 {
-    /* Take a PyUnicode pystr and return a new ASCII-only escaped PyString */
+    /* Single-pass implementation using PyUnicodeWriter (Python 3.14+).
+     * Writes runs of safe characters via WriteSubstring and escape
+     * sequences via WriteUTF8 (all escape output is pure ASCII). */
+    Py_ssize_t i;
+    Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
+    int kind = PyUnicode_KIND(pystr);
+    void *data = PyUnicode_DATA(pystr);
+    Py_ssize_t run_start = 0;
+    PyUnicodeWriter *writer = PyUnicodeWriter_Create(input_chars + 2);
+    if (writer == NULL)
+        return NULL;
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    for (i = 0; i < input_chars; i++) {
+        JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+        if (S_CHAR(c))
+            continue;
+        /* Flush run of safe characters */
+        if (i > run_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+                goto bail;
+        }
+        /* Write escape sequence */
+        {
+            char buf[12];
+            Py_ssize_t len = ascii_escape_char(c, buf, 0);
+            if (PyUnicodeWriter_WriteUTF8(writer, buf, len) < 0)
+                goto bail;
+        }
+        run_start = i + 1;
+    }
+    /* Flush remaining safe characters */
+    if (i > run_start) {
+        if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+            goto bail;
+    }
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    return PyUnicodeWriter_Finish(writer);
+bail:
+    PyUnicodeWriter_Discard(writer);
+    return NULL;
+}
+#else /* PY_VERSION_HEX < 0x030E0000 */
+static PyObject *
+ascii_escape_unicode(PyObject *pystr)
+{
+    /* Two-pass implementation: calculate exact output size, then fill. */
     Py_ssize_t i;
     Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
     Py_ssize_t output_size = 2;
@@ -768,6 +816,7 @@ ascii_escape_unicode(PyObject *pystr)
     assert(chars == output_size);
     return rval;
 }
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
 
 #if PY_MAJOR_VERSION >= 3
 
@@ -1284,6 +1333,191 @@ bail:
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
+#if PY_VERSION_HEX >= 0x030E0000
+static PyObject *
+scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
+                   int strict, Py_ssize_t *next_end_ptr)
+{
+    /* Python 3.14+: use PyUnicodeWriter instead of a chunks list.
+     * The writer is lazily created on the first escape sequence so that
+     * the common no-escape path returns a cheap PyUnicode_Substring. */
+    PyObject *rval;
+    Py_ssize_t begin = end - 1;
+    Py_ssize_t next = begin;
+    int kind = PyUnicode_KIND(pystr);
+    Py_ssize_t len = PyUnicode_GET_LENGTH(pystr);
+    void *buf = PyUnicode_DATA(pystr);
+    PyUnicodeWriter *writer = NULL;
+    Py_ssize_t literal_start;
+
+    if (len == end) {
+        raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
+        goto bail;
+    }
+    else if (end < 0 || len < end) {
+        PyErr_SetString(PyExc_ValueError, "end is out of bounds");
+        goto bail;
+    }
+
+    literal_start = end;
+    while (1) {
+        /* Find the end of the string or the next escape */
+        JSON_UNICHR c = 0;
+        for (next = end; next < len; next++) {
+            c = PyUnicode_READ(kind, buf, next);
+            if (c == '"' || c == '\\') {
+                break;
+            }
+            else if (strict && c <= 0x1f) {
+                raise_errmsg(state, ERR_STRING_CONTROL, pystr, next);
+                goto bail;
+            }
+        }
+        if (!(c == '"' || c == '\\')) {
+            raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
+            goto bail;
+        }
+        next++;
+        if (c == '"') {
+            end = next;
+            break;
+        }
+        /* Backslash escape — ensure writer exists and flush the
+         * literal span [literal_start, next-1). */
+        if (writer == NULL) {
+            writer = PyUnicodeWriter_Create(len - begin);
+            if (writer == NULL)
+                goto bail;
+        }
+        if (next - 1 > literal_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr,
+                                               literal_start, next - 1) < 0)
+                goto bail;
+        }
+        if (next == len) {
+            raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
+            goto bail;
+        }
+        c = PyUnicode_READ(kind, buf, next);
+        if (c != 'u') {
+            /* Non-unicode backslash escapes */
+            end = next + 1;
+            switch (c) {
+                case '"': break;
+                case '\\': break;
+                case '/': break;
+                case 'b': c = '\b'; break;
+                case 'f': c = '\f'; break;
+                case 'n': c = '\n'; break;
+                case 'r': c = '\r'; break;
+                case 't': c = '\t'; break;
+                default: c = 0;
+            }
+            if (c == 0) {
+                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 2);
+                goto bail;
+            }
+        }
+        else {
+            c = 0;
+            next++;
+            end = next + 4;
+            if (end >= len) {
+                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 1);
+                goto bail;
+            }
+            /* Decode 4 hex digits */
+            for (; next < end; next++) {
+                JSON_UNICHR hex_digit = PyUnicode_READ(kind, buf, next);
+                c <<= 4;
+                switch (hex_digit) {
+                    case '0': case '1': case '2': case '3': case '4':
+                    case '5': case '6': case '7': case '8': case '9':
+                        c |= (hex_digit - '0'); break;
+                    case 'a': case 'b': case 'c': case 'd': case 'e':
+                    case 'f':
+                        c |= (hex_digit - 'a' + 10); break;
+                    case 'A': case 'B': case 'C': case 'D': case 'E':
+                    case 'F':
+                        c |= (hex_digit - 'A' + 10); break;
+                    default:
+                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                        goto bail;
+                }
+            }
+            /* Surrogate pair */
+            if ((c & 0xfc00) == 0xd800) {
+                JSON_UNICHR c2 = 0;
+                if (end + 6 < len &&
+                    PyUnicode_READ(kind, buf, next) == '\\' &&
+                    PyUnicode_READ(kind, buf, next + 1) == 'u') {
+                    end += 6;
+                    /* Decode 4 hex digits */
+                    for (next += 2; next < end; next++) {
+                        JSON_UNICHR hex_digit = PyUnicode_READ(kind, buf, next);
+                        c2 <<= 4;
+                        switch (hex_digit) {
+                        case '0': case '1': case '2': case '3': case '4':
+                        case '5': case '6': case '7': case '8': case '9':
+                            c2 |= (hex_digit - '0'); break;
+                        case 'a': case 'b': case 'c': case 'd': case 'e':
+                        case 'f':
+                            c2 |= (hex_digit - 'a' + 10); break;
+                        case 'A': case 'B': case 'C': case 'D': case 'E':
+                        case 'F':
+                            c2 |= (hex_digit - 'A' + 10); break;
+                        default:
+                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                            goto bail;
+                        }
+                    }
+                    if ((c2 & 0xfc00) != 0xdc00) {
+                        /* not a low surrogate, rewind */
+                        end -= 6;
+                        next = end;
+                    }
+                    else {
+                        c = 0x10000 + (((c - 0xd800) << 10) | (c2 - 0xdc00));
+                    }
+                }
+            }
+        }
+        if (PyUnicodeWriter_WriteChar(writer, c) < 0)
+            goto bail;
+        literal_start = end;
+    }
+
+    /* Finalize */
+    if (writer == NULL) {
+        /* No escape sequences: return a substring directly. */
+        if (end - 1 > literal_start)
+            rval = PyUnicode_Substring(pystr, literal_start, end - 1);
+        else {
+            rval = state->JSON_EmptyUnicode;
+            Py_INCREF(rval);
+        }
+    }
+    else {
+        /* Flush trailing literal span after the last escape. */
+        if (end - 1 > literal_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr,
+                                               literal_start, end - 1) < 0)
+                goto bail;
+        }
+        rval = PyUnicodeWriter_Finish(writer);
+        writer = NULL;  /* Finish consumed the writer */
+        if (rval == NULL)
+            goto bail;
+    }
+    *next_end_ptr = end;
+    return rval;
+bail:
+    if (writer != NULL)
+        PyUnicodeWriter_Discard(writer);
+    *next_end_ptr = -1;
+    return NULL;
+}
+#else /* PY_VERSION_HEX < 0x030E0000 */
 static PyObject *
 scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                    int strict, Py_ssize_t *next_end_ptr)
@@ -1468,6 +1702,7 @@ bail:
     Py_XDECREF(chunks);
     return NULL;
 }
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
 
 PyDoc_STRVAR(pydoc_scanstring,
     "scanstring(basestring, end, encoding, strict=True) -> (str, end)\n"
