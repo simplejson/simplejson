@@ -472,8 +472,8 @@ json_memo_intern_key(PyObject *memo, PyObject **key_ptr)
     Py_DECREF(old);
     *key_ptr = canonical;
     return 0;
-#else
-    /* PyDict_SetDefault has been in the C API since Python 2.6 and
+#elif PY_VERSION_HEX >= 0x03040000
+    /* PyDict_SetDefault has been in the C API since Python 3.4 and
      * returns a borrowed reference to the canonical entry. */
     PyObject *canonical = PyDict_SetDefault(memo, old, old);
     if (canonical == NULL)
@@ -481,6 +481,22 @@ json_memo_intern_key(PyObject *memo, PyObject **key_ptr)
     Py_INCREF(canonical);
     Py_DECREF(old);
     *key_ptr = canonical;
+    return 0;
+#else
+    /* Python 2.7: PyDict_SetDefault does not exist in the C API.
+     * Fall back to separate Get + Set calls. */
+    PyObject *canonical = PyDict_GetItem(memo, old);
+    if (canonical != NULL) {
+        /* Key already interned; use the existing entry. */
+        Py_INCREF(canonical);
+        Py_DECREF(old);
+        *key_ptr = canonical;
+        return 0;
+    }
+    /* Not yet interned; insert old as both key and value. */
+    if (PyDict_SetItem(memo, old, old) < 0)
+        return -1;
+    /* old is already the canonical key; reference is unchanged. */
     return 0;
 #endif
 }

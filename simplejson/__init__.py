@@ -148,6 +148,12 @@ def _import_c_make_encoder():
         from ._speedups import make_encoder
         return make_encoder
     except ImportError:
+        import os, sys
+        if os.environ.get('CIBUILDWHEEL') == '1':
+            import traceback
+            traceback.print_exc()
+            sys.stderr.write(
+                'WARNING: C speedups failed to import in cibuildwheel\n')
         return None
 
 _default_encoder = JSONEncoder()
