@@ -179,6 +179,30 @@ jobs:
           name: wheels-${{ matrix.os }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
+  build_pyodide_wheel:
+    name: Build Pyodide wheel (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        name: Install Python
+        with:
+          python-version: '3.12'
+
+      - name: Build Pyodide wheel with C speedups
+        uses: pypa/cibuildwheel@v3.4.1
+        env:
+          CIBW_PLATFORM: pyodide
+          CIBW_TEST_COMMAND: >-
+            python -m simplejson.tests._cibw_runner "{project}"
+
+      - uses: actions/upload-artifact@v7
+        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
+        with:
+          name: wheels-pyodide
+          path: ./wheelhouse/*.whl
+
   build_sdist:
     name: Build source distribution
     runs-on: ubuntu-latest
@@ -252,7 +276,7 @@ jobs:
   # Aggregate gate jobs to match branch protection rule names
   gate_ubuntu:
     name: Build wheels on ubuntu-latest
-    needs: [build_wheels, test_pure_python, test_free_threading, test_debug_build, test_pep517_build]
+    needs: [build_wheels, build_pyodide_wheel, test_pure_python, test_free_threading, test_debug_build, test_pep517_build]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All ubuntu-latest checks passed"
@@ -272,7 +296,7 @@ jobs:
       - run: echo "All macos-latest checks passed"
 
   upload_pypi:
-    needs: [build_wheels, build_sdist]
+    needs: [build_wheels, build_pyodide_wheel, build_sdist]
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -292,7 +316,7 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   upload_pypi_test:
-    needs: [build_wheels, build_sdist]
+    needs: [build_wheels, build_pyodide_wheel, build_sdist]
     runs-on: ubuntu-latest
     environment:
       name: "testpypi"
