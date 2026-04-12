@@ -768,4 +768,18 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     if markers is not None:
                         del markers[markerid]
 
+    if _PY3:
+        def _iterencode_once(o, _current_indent_level):
+            """Wrapper that breaks the reference cycle between the mutually
+            recursive closures after the top-level call completes.  Without
+            this, the closures prevent prompt garbage collection."""
+            nonlocal _iterencode, _iterencode_dict, _iterencode_list
+            try:
+                for chunk in _iterencode(o, _current_indent_level):
+                    yield chunk
+            finally:
+                del _iterencode, _iterencode_dict, _iterencode_list
+
+        return _iterencode_once
+
     return _iterencode
