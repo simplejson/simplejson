@@ -31,8 +31,17 @@ Version 4.0.0 released 2026-04-12
   https://github.com/simplejson/simplejson/pull/359
   https://github.com/simplejson/simplejson/pull/360
 
-* C extension: dead code cleanup, fast paths for dict/list/string
-  encoding, and additional correctness fixes.
+* C extension performance and correctness improvements:
+  - Add PyDict_Next fast path for unsorted exact-dict encoding,
+    avoiding intermediate items list and N tuple allocations
+  - Add indexed fast path for exact list/tuple encoding, avoiding
+    iterator allocation and per-item PyIter_Next overhead
+  - Use PyUnicodeWriter as JSON_Accu backend on Python 3.14+,
+    eliminating intermediate string objects and ''.join calls
+  - Fix integer overflow in ascii_escape output_size calculation
+    that could cause buffer overwrite on pathologically large strings
+  - Fix list encoder separator counter overflow (int to Py_ssize_t)
+  - Dead code cleanup (unreachable NULL checks, do-while wrappers)
   https://github.com/simplejson/simplejson/pull/370
 
 * Added Python 3.14 support and updated to cibuildwheel 3.2.1. CI now
