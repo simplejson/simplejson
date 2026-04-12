@@ -36,6 +36,13 @@ del i
 
 FLOAT_REPR = repr
 
+# dict-like types that should be encoded as JSON objects.
+# frozendict is a builtin added in CPython 3.15 (PEP 814).
+try:
+    _dict_types = (dict, frozendict)
+except NameError:
+    _dict_types = (dict,)
+
 def encode_basestring(s, _PY3=PY3, _q=u'"'):
     """Return a JSON representation of a Python string
 
@@ -428,6 +435,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         string_types=string_types,
         Decimal=None,
         dict=dict,
+        _dict_types=_dict_types,
         float=float,
         id=id,
         integer_types=integer_types,
@@ -535,7 +543,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                                                   _current_indent_level)
                     elif _tuple_as_array and isinstance(value, tuple):
                         chunks = _iterencode_list(value, _current_indent_level)
-                    elif isinstance(value, dict):
+                    elif isinstance(value, _dict_types):
                         chunks = _iterencode_dict(value, _current_indent_level)
                     else:
                         chunks = _iterencode(value, _current_indent_level)
@@ -659,7 +667,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                                                   _current_indent_level)
                     elif _tuple_as_array and isinstance(value, tuple):
                         chunks = _iterencode_list(value, _current_indent_level)
-                    elif isinstance(value, dict):
+                    elif isinstance(value, _dict_types):
                         chunks = _iterencode_dict(value, _current_indent_level)
                     else:
                         chunks = _iterencode(value, _current_indent_level)
@@ -708,7 +716,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 elif (_tuple_as_array and isinstance(o, tuple)):
                     for chunk in _iterencode_list(o, _current_indent_level):
                         yield chunk
-                elif isinstance(o, dict):
+                elif isinstance(o, _dict_types):
                     for chunk in _iterencode_dict(o, _current_indent_level):
                         yield chunk
                 elif _use_decimal and isinstance(o, Decimal):
