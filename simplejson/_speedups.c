@@ -1193,8 +1193,6 @@ join_list_string(_speedups_state *state, PyObject *lst)
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
-/* _build_rval_index_tuple is now defined inline near the forward declarations */
-
 #define APPEND_OLD_CHUNK \
     if (chunk != NULL) { \
         if (chunks == NULL) { \
