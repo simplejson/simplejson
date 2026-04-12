@@ -2933,25 +2933,61 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     if (encoder_markers_push(s, seq, &ident))
         goto bail;
 
-    iter = PyObject_GetIter(seq);
-    if (iter == NULL)
-        goto bail;
-
     if (JSON_Accu_Accumulate(state, rval, state->JSON_open_array))
         goto bail;
-    while ((obj = PyIter_Next(iter))) {
-        if (i) {
-            if (JSON_Accu_Accumulate(state, rval, s->item_separator))
-                goto bail;
+
+    /* Fast path: exact list or exact tuple — iterate by index to avoid
+     * allocating an iterator object.  Py_BEGIN_CRITICAL_SECTION prevents
+     * concurrent list mutation on free-threaded builds (tuples are
+     * immutable so the lock is uncontested).
+     *
+     * Uses a local `item` variable (not the outer `obj`) so that the
+     * bail handler's Py_XDECREF(obj) stays a no-op for this path. */
+    if (PyList_CheckExact(seq) || PyTuple_CheckExact(seq)) {
+        PyObject *item;
+        Py_ssize_t size;
+        int is_list = PyList_CheckExact(seq);
+        int err = 0;
+
+        Py_BEGIN_CRITICAL_SECTION(seq);
+        size = is_list ? PyList_GET_SIZE(seq) : PyTuple_GET_SIZE(seq);
+        for (i = 0; i < size; i++) {
+            item = is_list ? PyList_GET_ITEM(seq, i)
+                           : PyTuple_GET_ITEM(seq, i);
+            Py_INCREF(item);
+            if (i && JSON_Accu_Accumulate(state, rval, s->item_separator)) {
+                Py_DECREF(item); err = 1; break;
+            }
+            if (encoder_listencode_obj(s, rval, item, indent_level)) {
+                Py_DECREF(item); err = 1; break;
+            }
+            Py_DECREF(item);
         }
-        if (encoder_listencode_obj(s, rval, obj, indent_level))
+        Py_END_CRITICAL_SECTION();
+
+        if (err)
             goto bail;
-        i++;
-        Py_CLEAR(obj);
     }
-    Py_CLEAR(iter);
-    if (PyErr_Occurred())
-        goto bail;
+    else {
+        /* Slow path: list/tuple subclasses or other iterables. */
+        iter = PyObject_GetIter(seq);
+        if (iter == NULL)
+            goto bail;
+        while ((obj = PyIter_Next(iter))) {
+            if (i) {
+                if (JSON_Accu_Accumulate(state, rval, s->item_separator))
+                    goto bail;
+            }
+            if (encoder_listencode_obj(s, rval, obj, indent_level))
+                goto bail;
+            i++;
+            Py_CLEAR(obj);
+        }
+        Py_CLEAR(iter);
+        if (PyErr_Occurred())
+            goto bail;
+    }
+
     if (encoder_markers_pop(s, ident))
         goto bail;
     ident = NULL;

@@ -314,3 +314,16 @@ class TestRefcountLeaks(TestCase):
         self._assert_no_leak(
             lambda: simplejson.dumps(data, skipkeys=True))
 
+    @skip_if_speedups_missing
+    def test_list_fast_path_no_leak(self):
+        """The indexed fast path for exact lists must not leak."""
+        data = [1, "two", 3.0, True, None, [4], {"k": "v"}]
+        self._assert_no_leak(lambda: simplejson.dumps(data))
+
+    @skip_if_speedups_missing
+    def test_tuple_fast_path_no_leak(self):
+        """The indexed fast path for exact tuples must not leak."""
+        data = (1, "two", 3.0, True, None)
+        self._assert_no_leak(
+            lambda: simplejson.dumps(data, tuple_as_array=True))
+

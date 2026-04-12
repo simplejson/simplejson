@@ -369,3 +369,56 @@ class TestDictEncodingPaths(TestCase):
         d = {"key_%d" % i: i for i in range(1000)}
         result = json.loads(json.dumps(d))
         self.assertEqual(result, d)
+
+
+class TestListEncodingPaths(TestCase):
+    """Verify that the indexed fast path (exact list/tuple) and the
+    iterator slow path (subclasses, other iterables) produce identical
+    output."""
+
+    def test_exact_list(self):
+        """Fast path: exact list iterates by index."""
+        data = [1, "two", 3.0, True, None, [4, 5], {"k": "v"}]
+        self.assertEqual(json.loads(json.dumps(data)), data)
+
+    def test_exact_tuple(self):
+        """Fast path: exact tuple when tuple_as_array=True."""
+        data = (1, "two", 3.0, True, None)
+        self.assertEqual(
+            json.dumps(data, tuple_as_array=True),
+            '[1, "two", 3.0, true, null]')
+
+    def test_list_subclass(self):
+        """Slow path: list subclass uses iterator."""
+        class MyList(list):
+            pass
+        data = MyList([1, 2, 3])
+        self.assertEqual(json.dumps(data), '[1, 2, 3]')
+
+    def test_tuple_subclass(self):
+        """Slow path: tuple subclass uses iterator."""
+        class MyTuple(tuple):
+            pass
+        data = MyTuple((1, 2, 3))
+        self.assertEqual(
+            json.dumps(data, tuple_as_array=True),
+            '[1, 2, 3]')
+
+    def test_empty_list(self):
+        self.assertEqual(json.dumps([]), '[]')
+
+    def test_empty_tuple(self):
+        self.assertEqual(
+            json.dumps((), tuple_as_array=True), '[]')
+
+    def test_single_element(self):
+        self.assertEqual(json.dumps([42]), '[42]')
+
+    def test_nested_lists(self):
+        data = [[1, 2], [3, [4, 5]]]
+        self.assertEqual(json.loads(json.dumps(data)), data)
+
+    def test_large_list(self):
+        """Large list stresses the indexed fast path."""
+        data = list(range(1000))
+        self.assertEqual(json.loads(json.dumps(data)), data)
