@@ -191,10 +191,20 @@ get_speedups_state(PyObject *module)
 #define JSON_ALLOW_NAN 1
 #define JSON_IGNORE_NAN 2
 
+#if PY_VERSION_HEX >= 0x030E0000
+/* Python 3.14+: JSON_Accu is backed by a PyUnicodeWriter, building the
+ * entire output in one contiguous buffer.  The FinishAsList wrapper
+ * returns a single-element list so the Python caller's ''.join(chunks)
+ * is effectively a no-op. */
+typedef struct {
+    PyUnicodeWriter *writer;
+} JSON_Accu;
+#else
 typedef struct {
     PyObject *large_strings;  /* A list of previously accumulated large strings */
     PyObject *small_strings;  /* Pending small strings */
 } JSON_Accu;
+#endif
 
 static int
 JSON_Accu_Init(JSON_Accu *acc);
@@ -330,8 +340,10 @@ static PyMemberDef encoder_members[] = {
     {NULL}
 };
 
+#if PY_VERSION_HEX < 0x030E0000
 static PyObject *
 join_list_unicode(_speedups_state *state, PyObject *lst);
+#endif
 static PyObject *
 JSON_ParseEncoding(PyObject *encoding);
 static PyObject *
@@ -482,6 +494,57 @@ is_raw_json(_speedups_state *state, PyObject *obj)
     return r;
 }
 
+#if PY_VERSION_HEX >= 0x030E0000
+/* ---- PyUnicodeWriter-backed JSON_Accu (Python 3.14+) ---- */
+
+static int
+JSON_Accu_Init(JSON_Accu *acc)
+{
+    acc->writer = PyUnicodeWriter_Create(0);
+    if (acc->writer == NULL)
+        return -1;
+    return 0;
+}
+
+static int
+JSON_Accu_Accumulate(_speedups_state *state, JSON_Accu *acc, PyObject *unicode)
+{
+    (void)state;
+    assert(PyUnicode_Check(unicode));
+    return PyUnicodeWriter_WriteStr(acc->writer, unicode);
+}
+
+static PyObject *
+JSON_Accu_FinishAsList(_speedups_state *state, JSON_Accu *acc)
+{
+    PyObject *str;
+    PyObject *list;
+    (void)state;
+    str = PyUnicodeWriter_Finish(acc->writer);
+    acc->writer = NULL;  /* Finish consumed the writer */
+    if (str == NULL)
+        return NULL;
+    list = PyList_New(1);
+    if (list == NULL) {
+        Py_DECREF(str);
+        return NULL;
+    }
+    PyList_SET_ITEM(list, 0, str);
+    return list;
+}
+
+static void
+JSON_Accu_Destroy(JSON_Accu *acc)
+{
+    if (acc->writer != NULL) {
+        PyUnicodeWriter_Discard(acc->writer);
+        acc->writer = NULL;
+    }
+}
+
+#else /* PY_VERSION_HEX < 0x030E0000 */
+/* ---- List-backed JSON_Accu (Python < 3.14) ---- */
+
 static int
 JSON_Accu_Init(JSON_Accu *acc)
 {
@@ -577,6 +640,7 @@ JSON_Accu_Destroy(JSON_Accu *acc)
     Py_CLEAR(acc->small_strings);
     Py_CLEAR(acc->large_strings);
 }
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
 
 static int
 IS_DIGIT(JSON_UNICHR c)
@@ -1111,12 +1175,14 @@ raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t en
     }
 }
 
+#if PY_VERSION_HEX < 0x030E0000
 static PyObject *
 join_list_unicode(_speedups_state *state, PyObject *lst)
 {
     /* return u''.join(lst) */
     return PyUnicode_Join(state->JSON_EmptyUnicode, lst);
 }
+#endif
 
 #if PY_MAJOR_VERSION < 3
 static PyObject *
