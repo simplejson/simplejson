@@ -363,7 +363,15 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
 static PyObject *
 scan_once_unicode(PyScannerObject *s, PyObject *pystr, Py_ssize_t idx, Py_ssize_t *next_idx_ptr);
 static PyObject *
-_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx);
+_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx)
+{
+    /* return (rval, idx) tuple, stealing reference to rval */
+    if (rval == NULL) {
+        assert(PyErr_Occurred());
+        return NULL;
+    }
+    return Py_BuildValue("(Nn)", rval, idx);
+}
 static PyObject *
 scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 static void
@@ -1051,34 +1059,7 @@ join_list_string(_speedups_state *state, PyObject *lst)
 }
 #endif /* PY_MAJOR_VERSION < 3 */
 
-static PyObject *
-_build_rval_index_tuple(PyObject *rval, Py_ssize_t idx)
-{
-    /* return (rval, idx) tuple, stealing reference to rval */
-    PyObject *tpl;
-    PyObject *pyidx;
-    /*
-    steal a reference to rval, returns (rval, idx)
-    */
-    if (rval == NULL) {
-        assert(PyErr_Occurred());
-        return NULL;
-    }
-    pyidx = PyInt_FromSsize_t(idx);
-    if (pyidx == NULL) {
-        Py_DECREF(rval);
-        return NULL;
-    }
-    tpl = PyTuple_New(2);
-    if (tpl == NULL) {
-        Py_DECREF(pyidx);
-        Py_DECREF(rval);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(tpl, 0, rval);
-    PyTuple_SET_ITEM(tpl, 1, pyidx);
-    return tpl;
-}
+/* _build_rval_index_tuple is now defined inline near the forward declarations */
 
 #define APPEND_OLD_CHUNK \
     if (chunk != NULL) { \
@@ -2438,62 +2419,59 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
 {
     /* Encode Python object obj to a JSON term, rval is a PyList */
     _speedups_state *state = get_speedups_state(s->module_ref);
+    PyObject *newobj;
     int rv = -1;
-    do {
-        PyObject *newobj;
-        if (obj == Py_None || obj == Py_True || obj == Py_False) {
-            PyObject *cstr = _encoded_const(state, obj);
-            if (cstr != NULL)
-                rv = _steal_accumulate(state, rval, cstr);
-        }
-        else if ((PyBytes_Check(obj) && s->encoding != Py_None) ||
-                 PyUnicode_Check(obj))
-        {
-            PyObject *encoded = encoder_encode_string(s, obj);
+    if (obj == Py_None || obj == Py_True || obj == Py_False) {
+        PyObject *cstr = _encoded_const(state, obj);
+        if (cstr != NULL)
+            rv = _steal_accumulate(state, rval, cstr);
+    }
+    else if ((PyBytes_Check(obj) && s->encoding != Py_None) ||
+             PyUnicode_Check(obj))
+    {
+        PyObject *encoded = encoder_encode_string(s, obj);
+        if (encoded != NULL)
+            rv = _steal_accumulate(state, rval, encoded);
+    }
+    else if (PyInt_Check(obj) || PyLong_Check(obj)) {
+        PyObject *encoded = encoder_long_to_str(obj);
+        if (encoded != NULL) {
+            encoded = maybe_quote_bigint(s, encoded, obj);
             if (encoded != NULL)
                 rv = _steal_accumulate(state, rval, encoded);
         }
-        else if (PyInt_Check(obj) || PyLong_Check(obj)) {
-            PyObject *encoded = encoder_long_to_str(obj);
-            if (encoded != NULL) {
-                encoded = maybe_quote_bigint(s, encoded, obj);
-                if (encoded == NULL)
-                    break;
-                rv = _steal_accumulate(state, rval, encoded);
-            }
-        }
-        else if (PyFloat_Check(obj)) {
-            PyObject *encoded = encoder_encode_float(s, obj);
-            if (encoded != NULL)
-                rv = _steal_accumulate(state, rval, encoded);
-        }
-        else if (s->for_json && _call_json_method(obj, state->JSON_attr_for_json, &newobj)) {
-            rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/0);
-        }
-        else if (s->namedtuple_as_object && _call_json_method(obj, state->JSON_attr_asdict, &newobj)) {
-            rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/1);
-        }
-        else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
-            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
-                return rv;
-            rv = encoder_listencode_list(s, rval, obj, indent_level);
-            Py_LeaveRecursiveCall();
-        }
-        else if (PyDict_Check(obj)) {
-            if (Py_EnterRecursiveCall(" while encoding a JSON object"))
-                return rv;
-            rv = encoder_listencode_dict(s, rval, obj, indent_level);
-            Py_LeaveRecursiveCall();
-        }
-        else if (s->use_decimal && PyObject_TypeCheck(obj, (PyTypeObject *)s->Decimal)) {
-            PyObject *encoded = PyObject_Str(obj);
-            if (encoded != NULL)
-                rv = _steal_accumulate(state, rval, encoded);
-        }
-        else {
-            rv = encoder_listencode_default(s, rval, obj, indent_level);
-        }
-    } while (0);
+    }
+    else if (PyFloat_Check(obj)) {
+        PyObject *encoded = encoder_encode_float(s, obj);
+        if (encoded != NULL)
+            rv = _steal_accumulate(state, rval, encoded);
+    }
+    else if (s->for_json && _call_json_method(obj, state->JSON_attr_for_json, &newobj)) {
+        rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/0);
+    }
+    else if (s->namedtuple_as_object && _call_json_method(obj, state->JSON_attr_asdict, &newobj)) {
+        rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/1);
+    }
+    else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
+        if (Py_EnterRecursiveCall(" while encoding a JSON object"))
+            return rv;
+        rv = encoder_listencode_list(s, rval, obj, indent_level);
+        Py_LeaveRecursiveCall();
+    }
+    else if (PyDict_Check(obj)) {
+        if (Py_EnterRecursiveCall(" while encoding a JSON object"))
+            return rv;
+        rv = encoder_listencode_dict(s, rval, obj, indent_level);
+        Py_LeaveRecursiveCall();
+    }
+    else if (s->use_decimal && PyObject_TypeCheck(obj, (PyTypeObject *)s->Decimal)) {
+        PyObject *encoded = PyObject_Str(obj);
+        if (encoded != NULL)
+            rv = _steal_accumulate(state, rval, encoded);
+    }
+    else {
+        rv = encoder_listencode_default(s, rval, obj, indent_level);
+    }
     return rv;
 }
 
@@ -2530,11 +2508,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             goto bail;
         }
         key = PyTuple_GET_ITEM(item, 0);
-        if (key == NULL)
-            goto bail;
         value = PyTuple_GET_ITEM(item, 1);
-        if (value == NULL)
-            goto bail;
 
         kstr = encoder_stringify_key(s, key);
         if (kstr == NULL)
