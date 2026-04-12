@@ -1,6 +1,54 @@
+Version 4.0.0 released 2026-04-12
+
+* BACKWARDS INCOMPATIBLE: The C extension now uses heap types and
+  per-module state instead of static types and global state. This is
+  required for free-threading support and sub-interpreter isolation
+  but changes the internal C API. The Python-level API is unchanged.
+
+* Full support for Python 3.13+ free-threading (PEP 703). The C
+  extension is now safe to use with the GIL disabled (python3.14t):
+  - Converted all static types to heap types with per-module state
+  - Added per-object critical sections to scanner and encoder
+  - Added free-threading-safe dict operations for Python 3.13+
+  - Unified per-module state management and templated parser
+  https://github.com/simplejson/simplejson/pull/363
+  https://github.com/simplejson/simplejson/pull/364
+  https://github.com/simplejson/simplejson/pull/365
+  https://github.com/simplejson/simplejson/pull/367
+  https://github.com/simplejson/simplejson/pull/369
+
+* Numerous C extension memory safety fixes:
+  - Fix use-after-free and leak in encoder ident handling
+  - Fix NULL dereferences on OOM in module init and static string init
+  - Fix reference leaks in dict encoder (skipkeys item, variable shadowing)
+  - Fix member table copy-paste, exception clobbering, missing Py_VISIT
+  - Fix error-as-truthy bugs in maybe_quote_bigint and is_raw_json
+  - Fix iterable_as_array swallowing MemoryError and KeyboardInterrupt
+  https://github.com/simplejson/simplejson/pull/355
+  https://github.com/simplejson/simplejson/pull/356
+  https://github.com/simplejson/simplejson/pull/357
+  https://github.com/simplejson/simplejson/pull/358
+  https://github.com/simplejson/simplejson/pull/359
+  https://github.com/simplejson/simplejson/pull/360
+
+* C extension: dead code cleanup, fast paths for dict/list/string
+  encoding, and additional correctness fixes.
+  https://github.com/simplejson/simplejson/pull/370
+
+* Added Python 3.14 support and updated to cibuildwheel 3.2.1. CI now
+  tests free-threaded (3.14t) and debug builds with -Werror, refcount
+  leak detection, and GIL-disabled mode.
+  https://github.com/simplejson/simplejson/pull/343
+
+* Replace deprecated license classifiers with SPDX license expression
+  https://github.com/simplejson/simplejson/pull/347
+
+* Documented RawJSON usage with examples and caveats
+  https://github.com/simplejson/simplejson/pull/346
+
 Version 3.20.2 released 2025-09-24
 
-* Disable speedups on GraalPy smae as on PyPy
+* Disable speedups on GraalPy same as on PyPy
   https://github.com/simplejson/simplejson/pull/339
 
 Version 3.20.1 released 2025-02-14

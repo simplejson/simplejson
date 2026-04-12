@@ -13,7 +13,7 @@ from distutils.errors import CCompilerError, DistutilsExecError, \
 
 IS_PYPY = hasattr(sys, 'pypy_translation_info')
 IS_GRAALPY = getattr(getattr(sys, "implementation", None), "name", None) == "graalpy"
-VERSION = '3.20.2'
+VERSION = '4.0.0'
 DESCRIPTION = "Simple, fast, extensible JSON encoder/decoder for Python"
 
 with open('README.rst', 'r') as f:
@@ -43,6 +43,7 @@ CLASSIFIERS = [
     'Programming Language :: Python :: 3.13',
     'Programming Language :: Python :: 3.14',
     'Programming Language :: Python :: Implementation :: CPython',
+    'Programming Language :: Python :: Implementation :: GraalPy',
     'Programming Language :: Python :: Implementation :: PyPy',
     'Topic :: Software Development :: Libraries :: Python Modules',
 ]
