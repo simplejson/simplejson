@@ -1,5 +1,9 @@
 Version 4.0.0 released 2026-04-12
 
+* simplejson 4 requires Python 2.7 or Python 3.9+. Older Python
+  versions (2.5, 2.6, 3.0-3.8) are no longer supported. pip will
+  not install simplejson 4 on unsupported versions.
+
 * The C extension now uses heap types and per-module state instead of
   static types and global state. This is required for free-threading
   support and sub-interpreter isolation. The Python-level API is
@@ -61,10 +65,6 @@ Version 4.0.0 released 2026-04-12
 * Migrated build_ext import from distutils to setuptools in setup.py.
   The distutils.errors imports are kept since setuptools vendors
   distutils on Python 3.12+ where stdlib distutils was removed.
-
-* Supported versions are now Python 2.7 and Python 3.9+. Wheels are
-  built for these versions only. python_requires updated to match.
-  Removed imp module fallback in compat.py (only needed for 3.3).
 
 * CI now tests PEP 517 builds (pyproject.toml) alongside the existing
   setup.py-based builds.
