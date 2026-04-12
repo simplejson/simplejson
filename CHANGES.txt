@@ -78,6 +78,35 @@ Version 4.0.0 released 2026-04-12
 * Test suite now fails (instead of skipping) when C speedups are missing
   during cibuildwheel runs, catching broken extension builds early.
 
+* New ``array_hook`` parameter for ``loads()``, ``load()``, and
+  ``JSONDecoder``. Called with each decoded JSON array (as a list),
+  its return value replaces the list. Analogous to ``object_hook``
+  for dicts. Works with both the Python decoder and C scanner.
+  (Matches CPython 3.15 json module.)
+
+* Trailing comma detection: the decoder now raises ``JSONDecodeError``
+  with "Illegal trailing comma before end of object/array" for inputs
+  like ``[1,]`` and ``{"a": 1,}`` instead of generic error messages.
+  Both the Python decoder and C scanner are updated.
+  (Matches CPython 3.13+ json module.)
+
+* ``frozendict`` encoding support: when ``frozendict`` is available
+  (CPython 3.15+ PEP 814), it is encoded as a JSON object just like
+  ``dict``. No effect on older Python versions.
+
+* Serialization errors now include ``add_note()`` context on Python
+  3.11+ (PEP 678), annotating exceptions with the path to the error,
+  e.g. "when serializing list item 1" / "when serializing dict item
+  'key'". Only applies to the Python encoder.
+
+* Fixed Python 2.7 C extension failing to load (``undefined symbol:
+  PyDict_SetDefault`` and ``PyDict_GetItemWithError``). These C API
+  functions are Python 3.4+ only; added proper version guards with
+  fallbacks for Python 2.7.
+
+* Python 2.7 wheel build is now a separate parallel CI job for faster
+  feedback.
+
 Version 3.20.2 released 2025-09-24
 
 * Disable speedups on GraalPy same as on PyPy
