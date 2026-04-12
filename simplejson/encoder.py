@@ -47,15 +47,6 @@ try:
 except NameError:
     _dict_types = (dict,)
 
-# Break the reference cycle between mutually recursive closures in
-# _make_iterencode after encoding completes (CPython 3.15 json module).
-# _wrap_iterencode_once uses nonlocal (Python 3-only syntax), so it
-# lives in a separate module to avoid SyntaxError on Python 2.
-if PY3:
-    from ._cycle_breaker import _wrap_iterencode_once
-else:
-    _wrap_iterencode_once = None
-
 def encode_basestring(s, _PY3=PY3, _q=u'"'):
     """Return a JSON representation of a Python string
 
@@ -777,7 +768,4 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     if markers is not None:
                         del markers[markerid]
 
-    if _wrap_iterencode_once is not None:
-        return _wrap_iterencode_once(
-            _iterencode, _iterencode_dict, _iterencode_list)
     return _iterencode
