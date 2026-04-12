@@ -444,7 +444,8 @@ json_PyDict_GetItemRef(PyObject *dict, PyObject *key, PyObject **result)
      * found (with *result set to NULL), -1 on error. */
 #if PY_VERSION_HEX >= 0x030D0000
     return PyDict_GetItemRef(dict, key, result);
-#else
+#elif PY_VERSION_HEX >= 0x03040000
+    /* PyDict_GetItemWithError was added in Python 3.4. */
     PyObject *obj = PyDict_GetItemWithError(dict, key);
     if (obj != NULL) {
         Py_INCREF(obj);
@@ -453,6 +454,17 @@ json_PyDict_GetItemRef(PyObject *dict, PyObject *key, PyObject **result)
     }
     *result = NULL;
     return PyErr_Occurred() ? -1 : 0;
+#else
+    /* Python 2.7: PyDict_GetItem returns NULL without setting an
+     * exception on missing keys and suppresses errors during lookup. */
+    PyObject *obj = PyDict_GetItem(dict, key);  /* borrowed, no error */
+    if (obj != NULL) {
+        Py_INCREF(obj);
+        *result = obj;
+        return 1;
+    }
+    *result = NULL;
+    return 0;
 #endif
 }
 
