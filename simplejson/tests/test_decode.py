@@ -129,32 +129,41 @@ class TestDecode(TestCase):
         result = json.loads('{"a": [1, 2]}', array_hook=tuple)
         self.assertEqual(result, {"a": (1, 2)})
 
+    def test_array_hook_with_object_hook(self):
+        # Both hooks applied together: array_hook on arrays,
+        # object_hook on objects
+        def freeze_dict(d):
+            return tuple(sorted(d.items()))
+        s = '{"xkd": [[1], [2], [3]]}'
+        result = json.loads(s, object_hook=freeze_dict, array_hook=tuple)
+        self.assertIsInstance(result, tuple)
+        # object_hook converts dict to sorted tuple of items
+        xkd_value = dict(result)['xkd']
+        self.assertIsInstance(xkd_value, tuple)
+        for item in xkd_value:
+            self.assertIsInstance(item, tuple)
+
     def test_array_hook_none(self):
         # array_hook=None should behave like no hook
         result = json.loads('[1, 2]', array_hook=None)
         self.assertEqual(result, [1, 2])
         self.assertIsInstance(result, list)
 
-    def test_trailing_comma_object(self):
-        self.assertRaises(
-            json.JSONDecodeError, json.loads, '{"a": 1,}')
-        self.assertRaises(
-            json.JSONDecodeError, json.loads, '{"a": 1, }')
-        # Verify the error message mentions trailing comma
-        try:
-            json.loads('{"a": 1,}')
-        except json.JSONDecodeError as e:
-            self.assertIn('trailing comma', str(e).lower())
-
-    def test_trailing_comma_array(self):
-        self.assertRaises(
-            json.JSONDecodeError, json.loads, '[1,]')
-        self.assertRaises(
-            json.JSONDecodeError, json.loads, '[1, ]')
-        try:
-            json.loads('[1,]')
-        except json.JSONDecodeError as e:
-            self.assertIn('trailing comma', str(e).lower())
+    def test_trailing_comma_unexpected_data(self):
+        # Matches CPython's test_unexpected_data for trailing commas
+        test_cases = [
+            ('[42,]', 'Illegal trailing comma before end of array'),
+            ('{"spam":42,}', 'Illegal trailing comma before end of object'),
+            ('{"spam":42 , }', 'Illegal trailing comma before end of object'),
+            ('[123  , ]', 'Illegal trailing comma before end of array'),
+        ]
+        for doc, expected_msg in test_cases:
+            try:
+                json.loads(doc)
+                self.fail("Expected JSONDecodeError for %r" % (doc,))
+            except json.JSONDecodeError as e:
+                self.assertIn(expected_msg, str(e),
+                    "Wrong error for %r: %s" % (doc, e))
 
     def test_bounded_int(self):
         # SJ-PT-23-03, limit quadratic number parsing per Python 3.11

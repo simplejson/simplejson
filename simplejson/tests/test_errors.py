@@ -67,16 +67,46 @@ class TestErrors(TestCase):
         self.assertEqual(err.pos, e.pos)
         self.assertEqual(err.end, e.end)
 
-    def test_add_note_on_serialization_error(self):
-        # PEP 678 add_note() adds context about where the error occurred
+    def test_add_note_list_recursion(self):
+        # PEP 678 add_note() on circular list reference
+        if sys.version_info < (3, 11):
+            return
+        x = []
+        x.append(x)
+        try:
+            # Use indent to force the Python encoder
+            json.dumps(x, indent=2)
+        except ValueError as exc:
+            self.assertEqual(
+                exc.__notes__, ['when serializing list item 0'])
+        else:
+            self.fail('Expected ValueError')
+
+    def test_add_note_dict_recursion(self):
+        if sys.version_info < (3, 11):
+            return
+        x = {}
+        x['test'] = x
+        try:
+            json.dumps(x, indent=2)
+        except ValueError as exc:
+            self.assertEqual(
+                exc.__notes__, ["when serializing dict item 'test'"])
+        else:
+            self.fail('Expected ValueError')
+
+    def test_add_note_nested_error(self):
         if sys.version_info < (3, 11):
             return
         try:
-            # Use indent to force the Python encoder
             json.dumps({'a': [1, object(), 3]}, indent=2)
-        except TypeError as e:
-            notes = getattr(e, '__notes__', [])
-            self.assertTrue(len(notes) >= 2,
-                'Expected at least 2 notes, got %d' % len(notes))
-            self.assertIn('list item 1', notes[-2])
-            self.assertIn("dict item 'a'", notes[-1])
+        except TypeError as exc:
+            self.assertEqual(len(exc.__notes__), 3)
+            self.assertEqual(exc.__notes__[0],
+                'when serializing object object')
+            self.assertEqual(exc.__notes__[1],
+                'when serializing list item 1')
+            self.assertEqual(exc.__notes__[2],
+                "when serializing dict item 'a'")
+        else:
+            self.fail('Expected TypeError')
