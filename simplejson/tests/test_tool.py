@@ -8,7 +8,7 @@ import tempfile
 
 def strip_python_stderr(stderr):
     """Strip debug-build refcount output from stderr."""
-    return re.sub(rb"\[\d+ refs\]\r?\n?$", b"", stderr).strip()
+    return re.sub(b"\\[\\d+ refs\\]\\r?\\n?$", b"", stderr).strip()
 
 def open_temp_file():
     file = tempfile.NamedTemporaryFile(delete=False)
