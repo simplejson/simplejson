@@ -798,7 +798,12 @@ ascii_escape_unicode(PyObject *pystr)
 
     output_size = 2;
     for (i = 0; i < input_chars; i++) {
-        output_size += ascii_char_size(PyUnicode_READ(kind, data, i));
+        Py_ssize_t charsize = ascii_char_size(PyUnicode_READ(kind, data, i));
+        if (output_size > PY_SSIZE_T_MAX - charsize) {
+            PyErr_SetString(PyExc_OverflowError, "string is too long to escape");
+            return NULL;
+        }
+        output_size += charsize;
     }
 #if PY_MAJOR_VERSION >= 3
     rval = PyUnicode_New(output_size, 127);
@@ -871,7 +876,14 @@ ascii_escape_str(PyObject *pystr)
             Py_DECREF(uni);
             return rval;
         }
-        output_size += ascii_char_size(c);
+        {
+            Py_ssize_t charsize = ascii_char_size(c);
+            if (output_size > PY_SSIZE_T_MAX - charsize) {
+                PyErr_SetString(PyExc_OverflowError, "string is too long to escape");
+                return NULL;
+            }
+            output_size += charsize;
+        }
     }
 
     rval = PyString_FromStringAndSize(NULL, output_size);
@@ -1087,7 +1099,9 @@ bail:
     return NULL;
 }
 
-/* Use JSONDecodeError exception to raise a nice looking ValueError subclass */
+/* Use JSONDecodeError exception to raise a nice looking ValueError subclass.
+ * If constructing the JSONDecodeError fails (e.g. OOM), fall back to a plain
+ * ValueError so the caller always sees an exception set on return. */
 static void
 raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t end)
 {
@@ -1096,6 +1110,9 @@ raise_errmsg(_speedups_state *state, const char *msg, PyObject *s, Py_ssize_t en
     if (exc) {
         PyErr_SetObject(JSONDecodeError, exc);
         Py_DECREF(exc);
+    }
+    else if (!PyErr_Occurred()) {
+        PyErr_SetString(PyExc_ValueError, msg);
     }
 }
 
@@ -2663,17 +2680,18 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
     _speedups_state *state = get_speedups_state(s->module_ref);
     PyObject *newobj;
     int rv = -1;
-    if (obj == Py_None || obj == Py_True || obj == Py_False) {
-        PyObject *cstr = _encoded_const(state, obj);
-        if (cstr != NULL)
-            rv = _steal_accumulate(state, rval, cstr);
-    }
-    else if ((PyBytes_Check(obj) && s->encoding != Py_None) ||
-             PyUnicode_Check(obj))
+    /* Check strings first — they are the most common JSON value type. */
+    if ((PyBytes_Check(obj) && s->encoding != Py_None) ||
+        PyUnicode_Check(obj))
     {
         PyObject *encoded = encoder_encode_string(s, obj);
         if (encoded != NULL)
             rv = _steal_accumulate(state, rval, encoded);
+    }
+    else if (obj == Py_None || obj == Py_True || obj == Py_False) {
+        PyObject *cstr = _encoded_const(state, obj);
+        if (cstr != NULL)
+            rv = _steal_accumulate(state, rval, cstr);
     }
     else if (PyInt_Check(obj) || PyLong_Check(obj)) {
         PyObject *encoded = encoder_long_to_str(obj);
@@ -2726,7 +2744,6 @@ encoder_encode_dict_key(PyEncoderObject *s, PyObject *key)
 {
     PyObject *kstr;
     PyObject *encoded;
-    int is_string_key;
 
     kstr = encoder_stringify_key(s, key);
     if (kstr == NULL)
@@ -2736,22 +2753,13 @@ encoder_encode_dict_key(PyEncoderObject *s, PyObject *key)
         return Py_None;  /* skipkeys */
     }
 
-    is_string_key = PyUnicode_Check(key)
-#if PY_MAJOR_VERSION < 3
-                    || PyString_Check(key)
-#endif
-                    ;
-    if (is_string_key) {
-        /*
-         * Only cache the encoding of string keys. False and True are
-         * indistinguishable from 0 and 1 in a dictionary lookup and there
-         * may be other quirks with user defined subclasses. In the
-         * string-key branch kstr is an INCREF'd alias of key, so storing
-         * under `key` finds the same entry via the `kstr` lookup on the
-         * next iteration. For non-string keys kstr is a freshly created
-         * string object, so a store under `key` would be write-only and
-         * the cache entry would never be reused — skip it entirely.
-         */
+    /* For string keys (PyUnicode on Py3, PyString on Py2),
+     * encoder_stringify_key returns Py_INCREF(key) — i.e. kstr IS key.
+     * For non-string keys it returns a freshly created string, so
+     * kstr != key.  Use this identity test to decide whether the
+     * key_memo cache applies: caching under a non-string original key
+     * would be write-only (the lookup uses kstr, not key). */
+    if (kstr == key) {
         int cached = json_PyDict_GetItemRef(s->key_memo, kstr, &encoded);
         if (cached < 0) {
             Py_DECREF(kstr);
