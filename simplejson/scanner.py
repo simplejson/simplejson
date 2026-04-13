@@ -14,7 +14,7 @@ c_make_scanner = _import_c_make_scanner()
 __all__ = ['make_scanner', 'JSONDecodeError']
 
 NUMBER_RE = re.compile(
-    r'(-?(?:0|[1-9]\d*))(\.\d+)?([eE][-+]?\d+)?',
+    r'(-?(?:0|[1-9][0-9]*))(\.[0-9]+)?([eE][-+]?[0-9]+)?',
     (re.VERBOSE | re.MULTILINE | re.DOTALL))
 
 

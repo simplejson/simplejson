@@ -165,6 +165,12 @@ class TestDecode(TestCase):
                 self.assertIn(expected_msg, str(e),
                     "Wrong error for %r: %s" % (doc, e))
 
+    def test_nonascii_digits_rejected(self):
+        # Non-ASCII digits (e.g. fullwidth digits) must not be accepted
+        # as JSON numbers. Matches CPython gh-125687.
+        for num in [u"1\uff10", u"0.\uff10", u"0e\uff10"]:
+            self.assertRaises(json.JSONDecodeError, json.loads, num)
+
     def test_bounded_int(self):
         # SJ-PT-23-03, limit quadratic number parsing per Python 3.11
         max_str_digits = getattr(sys, 'get_int_max_str_digits', lambda: 4300)()
