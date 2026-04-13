@@ -168,7 +168,7 @@ class TestRefcountLeaks(TestCase):
         # Stabilize caches, specializer, intern pools, etc.
         for _ in range(self.WARMUP):
             func()
-        gc.collect()
+            gc.collect()
 
         # Collect every iteration so cyclic garbage doesn't accumulate
         # across GC generations and cause noisy refcount deltas.
