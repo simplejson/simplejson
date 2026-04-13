@@ -45,9 +45,10 @@ FLOAT_REPR = repr
 
 # dict-like types that should be encoded as JSON objects.
 # frozendict is a builtin added in CPython 3.15 (PEP 814).
-try:
+import sys as _sys
+if _sys.version_info >= (3, 15):
     _dict_types = (dict, frozendict)
-except NameError:
+else:
     _dict_types = dict
 
 def py_encode_basestring(s, _PY3=PY3, _q=u'"'):

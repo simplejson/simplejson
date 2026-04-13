@@ -3582,21 +3582,22 @@ init_speedups_state(_speedups_state *state, PyObject *module)
         return -1;
 
     /* frozendict is a builtin added in CPython 3.15 (PEP 814).
-     * If it doesn't exist, FrozenDictType stays NULL and the encoder
-     * simply won't recognize it (same as pre-3.15 behavior). */
+     * On 3.15+ its absence is a hard error (something is very wrong).
+     * On older Pythons, FrozenDictType stays NULL and the encoder
+     * simply won't recognize it. */
+#if PY_VERSION_HEX >= 0x030F0000
     {
         PyObject *builtins = PyImport_ImportModule("builtins");
-        if (builtins == NULL) {
-            /* Python 2.7: builtins is __builtin__ */
-            PyErr_Clear();
-            state->FrozenDictType = NULL;
-        } else {
-            state->FrozenDictType = PyObject_GetAttrString(builtins, "frozendict");
-            Py_DECREF(builtins);
-            if (state->FrozenDictType == NULL)
-                PyErr_Clear();  /* not available, that's fine */
-        }
+        if (builtins == NULL)
+            return -1;
+        state->FrozenDictType = PyObject_GetAttrString(builtins, "frozendict");
+        Py_DECREF(builtins);
+        if (state->FrozenDictType == NULL)
+            return -1;
     }
+#else
+    state->FrozenDictType = NULL;
+#endif
 
     {
         PyObject *operator_mod = PyImport_ImportModule("operator");
