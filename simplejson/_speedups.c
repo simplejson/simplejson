@@ -138,7 +138,6 @@ typedef struct {
     PyObject *JSON_attr_encoded_json; /* "encoded_json" */
     PyObject *RawJSONType;
     PyObject *JSONDecodeError;
-    PyObject *FrozenDictType;   /* builtins.frozendict or NULL (Python < 3.15) */
 } _speedups_state;
 
 #if PY_VERSION_HEX >= 0x030D0000
@@ -520,16 +519,14 @@ json_memo_intern_key(PyObject *memo, PyObject **key_ptr)
 #endif
 }
 
-/* Check if obj is a dict or frozendict (Python 3.15+). */
-static int
-is_dict_or_frozendict(_speedups_state *state, PyObject *obj)
-{
-    if (PyDict_Check(obj))
-        return 1;
-    if (state->FrozenDictType != NULL)
-        return PyObject_IsInstance(obj, state->FrozenDictType);
-    return 0;
-}
+/* Check if obj is a dict or frozendict (Python 3.15+).
+ * PyAnyDict_Check is provided by CPython 3.15; on older versions
+ * fall back to plain PyDict_Check. */
+#if PY_VERSION_HEX >= 0x030F0000
+#define JSON_AnyDict_Check(obj) PyAnyDict_Check(obj)
+#else
+#define JSON_AnyDict_Check(obj) PyDict_Check(obj)
+#endif
 
 static int
 is_raw_json(_speedups_state *state, PyObject *obj)
@@ -2912,8 +2909,7 @@ encoder_steal_encode(PyEncoderObject *s, JSON_Accu *rval,
         return -1;
     }
     if (as_dict) {
-        _speedups_state *state = get_speedups_state(s->module_ref);
-        if (is_dict_or_frozendict(state, newobj)) {
+        if (JSON_AnyDict_Check(newobj)) {
             rv = encoder_listencode_dict(s, rval, newobj, indent_level);
         } else {
             PyErr_Format(PyExc_TypeError,
@@ -3040,7 +3036,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         rv = encoder_listencode_list(s, rval, obj, indent_level);
         Py_LeaveRecursiveCall();
     }
-    else if (is_dict_or_frozendict(state, obj)) {
+    else if (JSON_AnyDict_Check(obj)) {
         if (Py_EnterRecursiveCall(" while encoding a JSON object"))
             return rv;
         rv = encoder_listencode_dict(s, rval, obj, indent_level);
@@ -3506,7 +3502,6 @@ reset_speedups_state_constants(_speedups_state *state)
     Py_CLEAR(state->JSON_attr_encoded_json);
     Py_CLEAR(state->RawJSONType);
     Py_CLEAR(state->JSONDecodeError);
-    Py_CLEAR(state->FrozenDictType);
 }
 
 /* Shared initializer for per-module state. Called from module_exec
@@ -3580,24 +3575,6 @@ init_speedups_state(_speedups_state *state, PyObject *module)
     state->JSONDecodeError = import_dependency("simplejson.errors", "JSONDecodeError");
     if (state->JSONDecodeError == NULL)
         return -1;
-
-    /* frozendict is a builtin added in CPython 3.15 (PEP 814).
-     * On 3.15+ its absence is a hard error (something is very wrong).
-     * On older Pythons, FrozenDictType stays NULL and the encoder
-     * simply won't recognize it. */
-#if PY_VERSION_HEX >= 0x030F0000
-    {
-        PyObject *builtins = PyImport_ImportModule("builtins");
-        if (builtins == NULL)
-            return -1;
-        state->FrozenDictType = PyObject_GetAttrString(builtins, "frozendict");
-        Py_DECREF(builtins);
-        if (state->FrozenDictType == NULL)
-            return -1;
-    }
-#else
-    state->FrozenDictType = NULL;
-#endif
 
     {
         PyObject *operator_mod = PyImport_ImportModule("operator");
