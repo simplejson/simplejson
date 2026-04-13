@@ -4,9 +4,9 @@ interchange format.
 
 :mod:`simplejson` exposes an API familiar to users of the standard library
 :mod:`marshal` and :mod:`pickle` modules. It is the externally maintained
-version of the :mod:`json` library contained in Python 2.6, but maintains
-compatibility back to Python 2.5 and (currently) has significant performance
-advantages, even without using the optional C extension for speedups.
+version of the :mod:`json` library contained in Python 2.6+, supporting
+Python 2.7 and Python 3.8+, and has significant performance advantages,
+even without using the optional C extension for speedups.
 
 Encoding basic Python object hierarchies::
 

@@ -3402,7 +3402,6 @@ init_speedups_state(_speedups_state *state, PyObject *module)
     return 0;
 }
 
-#if PY_VERSION_HEX >= 0x03050000
 /* Multi-phase initialization (PEP 489) for Python 3.5+. On 3.13+ this
  * path creates heap types and allocates per-module state so that each
  * interpreter gets its own copy; on 3.5-3.12 the type fields just point
@@ -3508,8 +3507,6 @@ static PyModuleDef_Slot module_slots[] = {
 #endif
     {0, NULL}
 };
-#endif /* PY_VERSION_HEX >= 0x03050000 */
-
 #if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
@@ -3521,11 +3518,7 @@ static struct PyModuleDef moduledef = {
     0,                  /* m_size: no per-module state on <3.13 */
 #endif
     speedups_methods,   /* m_methods */
-#if PY_VERSION_HEX >= 0x03050000
-    module_slots,       /* m_slots (multi-phase init) */
-#else
-    NULL,               /* m_slots (3.3/3.4: single-phase) */
-#endif
+    module_slots,       /* m_slots (multi-phase init, PEP 489) */
 #if PY_VERSION_HEX >= 0x030D0000
     speedups_traverse,  /* m_traverse */
     speedups_clear,     /* m_clear */
@@ -3553,20 +3546,8 @@ import_dependency(const char *module_name, const char *attr_name)
 PyMODINIT_FUNC
 PyInit__speedups(void)
 {
-#if PY_VERSION_HEX >= 0x03050000
-    /* Multi-phase init: Python runs module_exec via the Py_mod_exec slot */
+    /* Multi-phase init (PEP 489): Python runs module_exec via Py_mod_exec slot */
     return PyModuleDef_Init(&moduledef);
-#else
-    /* Python 3.3/3.4: fall back to single-phase init */
-    PyObject *m = PyModule_Create(&moduledef);
-    if (m == NULL)
-        return NULL;
-    if (module_exec(m) < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    return m;
-#endif
 }
 #else
 /* Python 2.7: single-phase init via Py_InitModule3 */
