@@ -548,11 +548,14 @@ def _toggle_speedups(enabled):
         enc.c_make_encoder = c_make_encoder
         enc.encode_basestring_ascii = (enc.c_encode_basestring_ascii or
             enc.py_encode_basestring_ascii)
+        enc.encode_basestring = (enc.c_encode_basestring or
+            enc.py_encode_basestring)
         scan.make_scanner = scan.c_make_scanner or scan.py_make_scanner
     else:
         dec.scanstring = dec.py_scanstring
         enc.c_make_encoder = None
         enc.encode_basestring_ascii = enc.py_encode_basestring_ascii
+        enc.encode_basestring = enc.py_encode_basestring
         scan.make_scanner = scan.py_make_scanner
     dec.make_scanner = scan.make_scanner
     global _default_decoder

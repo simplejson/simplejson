@@ -14,10 +14,13 @@ _HAS_ADD_NOTE = sys.version_info >= (3, 11)
 def _import_speedups():
     try:
         from . import _speedups
-        return _speedups.encode_basestring_ascii, _speedups.make_encoder
+        return (_speedups.encode_basestring_ascii,
+                _speedups.encode_basestring,
+                _speedups.make_encoder)
     except ImportError:
-        return None, None
-c_encode_basestring_ascii, c_make_encoder = _import_speedups()
+        return None, None, None
+c_encode_basestring_ascii, c_encode_basestring, c_make_encoder = (
+    _import_speedups())
 
 from .decoder import PosInf
 from .raw_json import RawJSON
@@ -47,7 +50,7 @@ try:
 except NameError:
     _dict_types = dict
 
-def encode_basestring(s, _PY3=PY3, _q=u'"'):
+def py_encode_basestring(s, _PY3=PY3, _q=u'"'):
     """Return a JSON representation of a Python string
 
     """
@@ -115,6 +118,9 @@ def py_encode_basestring_ascii(s, _PY3=PY3):
 
 encode_basestring_ascii = (
     c_encode_basestring_ascii or py_encode_basestring_ascii)
+
+encode_basestring = (
+    c_encode_basestring or py_encode_basestring)
 
 class JSONEncoder(object):
     """Extensible JSON <http://json.org> encoder for Python data structures.

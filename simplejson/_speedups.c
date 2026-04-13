@@ -366,6 +366,8 @@ static PyObject *
 ascii_escape_str(PyObject *pystr);
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
+static PyObject *
+py_encode_basestring(PyObject* self UNUSED, PyObject *pystr);
 #if PY_MAJOR_VERSION < 3
 static PyObject *
 join_list_string(_speedups_state *state, PyObject *lst);
@@ -432,6 +434,9 @@ static PyObject *
 import_dependency(const char *module_name, const char *attr_name);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
+/* NON_ASCII_ESCAPE: character needs escaping in ensure_ascii=False mode.
+ * Only control characters (0x00-0x1f), backslash and double-quote. */
+#define NEEDS_ESCAPE(c) ((c) <= 0x1f || (c) == '\\' || (c) == '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
 
 #define MIN_EXPANSION 6
@@ -1885,6 +1890,12 @@ PyDoc_STRVAR(pydoc_encode_basestring_ascii,
     "Return an ASCII-only JSON representation of a Python string"
 );
 
+PyDoc_STRVAR(pydoc_encode_basestring,
+    "encode_basestring(basestring) -> str\n"
+    "\n"
+    "Return a JSON representation of a Python string"
+);
+
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
 {
@@ -1897,6 +1908,211 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
         if (PyUnicode_READY(pystr))
             return NULL;
         return ascii_escape_unicode(pystr);
+    }
+    else {
+        PyErr_Format(PyExc_TypeError,
+                     "first argument must be a string, not %.80s",
+                     Py_TYPE(pystr)->tp_name);
+        return NULL;
+    }
+}
+
+/* encode_basestring: escape only control chars, backslash, and quote.
+ * Non-ASCII characters pass through unchanged (ensure_ascii=False). */
+
+static Py_ssize_t
+escape_char_noascii(JSON_UNICHR c, JSON_UNICHR *output, Py_ssize_t chars)
+{
+    if (!NEEDS_ESCAPE(c)) {
+        output[chars++] = c;
+    }
+    else {
+        output[chars++] = '\\';
+        switch (c) {
+            case '\\': output[chars++] = '\\'; break;
+            case '"':  output[chars++] = '"'; break;
+            case '\b': output[chars++] = 'b'; break;
+            case '\f': output[chars++] = 'f'; break;
+            case '\n': output[chars++] = 'n'; break;
+            case '\r': output[chars++] = 'r'; break;
+            case '\t': output[chars++] = 't'; break;
+            default:
+                /* Control character: \u00XX */
+                output[chars++] = 'u';
+                output[chars++] = '0';
+                output[chars++] = '0';
+                output[chars++] = "0123456789abcdef"[(c >> 4) & 0xf];
+                output[chars++] = "0123456789abcdef"[(c     ) & 0xf];
+        }
+    }
+    return chars;
+}
+
+static Py_ssize_t
+escape_char_noascii_size(JSON_UNICHR c)
+{
+    if (!NEEDS_ESCAPE(c))
+        return 1;
+    switch (c) {
+        case '\\': case '"': case '\b': case '\f':
+        case '\n': case '\r': case '\t':
+            return 2;
+        default:
+            return 6;  /* \u00XX */
+    }
+}
+
+#if PY_VERSION_HEX >= 0x030E0000
+static PyObject *
+escape_unicode_noascii(PyObject *pystr)
+{
+    /* Single-pass using PyUnicodeWriter (Python 3.14+). */
+    Py_ssize_t i;
+    Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
+    int kind = PyUnicode_KIND(pystr);
+    void *data = PyUnicode_DATA(pystr);
+    Py_ssize_t run_start = 0;
+    PyUnicodeWriter *writer = PyUnicodeWriter_Create(input_chars + 2);
+    if (writer == NULL)
+        return NULL;
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    for (i = 0; i < input_chars; i++) {
+        JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+        if (!NEEDS_ESCAPE(c))
+            continue;
+        /* Flush run of safe characters */
+        if (i > run_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+                goto bail;
+        }
+        {
+            char buf[6]; /* longest escape: \u00XX */
+            Py_ssize_t len = 0;
+            buf[len++] = '\\';
+            switch (c) {
+                case '\\': buf[len++] = '\\'; break;
+                case '"':  buf[len++] = '"'; break;
+                case '\b': buf[len++] = 'b'; break;
+                case '\f': buf[len++] = 'f'; break;
+                case '\n': buf[len++] = 'n'; break;
+                case '\r': buf[len++] = 'r'; break;
+                case '\t': buf[len++] = 't'; break;
+                default:
+                    buf[len++] = 'u';
+                    buf[len++] = '0';
+                    buf[len++] = '0';
+                    buf[len++] = "0123456789abcdef"[(c >> 4) & 0xf];
+                    buf[len++] = "0123456789abcdef"[(c     ) & 0xf];
+            }
+            if (PyUnicodeWriter_WriteUTF8(writer, buf, len) < 0)
+                goto bail;
+        }
+        run_start = i + 1;
+    }
+    if (i > run_start) {
+        if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+            goto bail;
+    }
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    return PyUnicodeWriter_Finish(writer);
+bail:
+    PyUnicodeWriter_Discard(writer);
+    return NULL;
+}
+#else /* PY_VERSION_HEX < 0x030E0000 */
+static PyObject *
+escape_unicode_noascii(PyObject *pystr)
+{
+    /* Two-pass: compute size, then fill. */
+    Py_ssize_t i;
+    Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
+    PY2_UNUSED int kind = PyUnicode_KIND(pystr);
+    void *data = PyUnicode_DATA(pystr);
+    Py_ssize_t output_size = 2; /* opening and closing quotes */
+    PyObject *rval;
+
+    for (i = 0; i < input_chars; i++) {
+        JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+        Py_ssize_t charsize = escape_char_noascii_size(c);
+        if (output_size > PY_SSIZE_T_MAX - charsize) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "string is too long to escape");
+            return NULL;
+        }
+        output_size += charsize;
+    }
+
+#if PY_MAJOR_VERSION >= 3
+    {
+        /* Escapes are all ASCII, so maxchar doesn't increase */
+        Py_UCS4 maxchar = PyUnicode_MAX_CHAR_VALUE(pystr);
+        if (maxchar < 127)
+            maxchar = 127;
+        rval = PyUnicode_New(output_size, maxchar);
+        if (rval == NULL)
+            return NULL;
+    }
+    {
+        int out_kind = PyUnicode_KIND(rval);
+        void *out_data = PyUnicode_DATA(rval);
+        Py_ssize_t chars = 0;
+        PyUnicode_WRITE(out_kind, out_data, chars++, '"');
+        for (i = 0; i < input_chars; i++) {
+            JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+            if (!NEEDS_ESCAPE(c)) {
+                PyUnicode_WRITE(out_kind, out_data, chars++, c);
+            }
+            else {
+                JSON_UNICHR buf[6];
+                Py_ssize_t j, n = escape_char_noascii(c, buf, 0);
+                for (j = 0; j < n; j++)
+                    PyUnicode_WRITE(out_kind, out_data, chars++, buf[j]);
+            }
+        }
+        PyUnicode_WRITE(out_kind, out_data, chars++, '"');
+        assert(chars == output_size);
+    }
+#else
+    /* Python 2: return a unicode object */
+    rval = PyUnicode_FromUnicode(NULL, output_size);
+    if (rval == NULL)
+        return NULL;
+    {
+        Py_UNICODE *output = PyUnicode_AS_UNICODE(rval);
+        Py_ssize_t chars = 0;
+        output[chars++] = '"';
+        for (i = 0; i < input_chars; i++) {
+            chars = escape_char_noascii(
+                PyUnicode_READ(kind, data, i), output, chars);
+        }
+        output[chars++] = '"';
+        assert(chars == output_size);
+    }
+#endif
+    return rval;
+}
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
+
+static PyObject *
+py_encode_basestring(PyObject* self UNUSED, PyObject *pystr)
+{
+    /* Return a JSON representation of a Python string (ensure_ascii=False) */
+    /* METH_O */
+    if (PyBytes_Check(pystr)) {
+        PyObject *uni = PyUnicode_DecodeUTF8(
+            PyBytes_AS_STRING(pystr), PyBytes_GET_SIZE(pystr), NULL);
+        if (uni == NULL)
+            return NULL;
+        PyObject *rval = escape_unicode_noascii(uni);
+        Py_DECREF(uni);
+        return rval;
+    }
+    else if (PyUnicode_Check(pystr)) {
+        if (PyUnicode_READY(pystr))
+            return NULL;
+        return escape_unicode_noascii(pystr);
     }
     else {
         PyErr_Format(PyExc_TypeError,
@@ -3236,6 +3452,10 @@ static PyMethodDef speedups_methods[] = {
         (PyCFunction)py_encode_basestring_ascii,
         METH_O,
         pydoc_encode_basestring_ascii},
+    {"encode_basestring",
+        (PyCFunction)py_encode_basestring,
+        METH_O,
+        pydoc_encode_basestring},
     {"scanstring",
         (PyCFunction)py_scanstring,
         METH_VARARGS,
