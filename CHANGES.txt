@@ -1,6 +1,120 @@
+Version 4.0.0 released 2026-04-12
+
+* simplejson 4 requires Python 2.7 or Python 3.8+. Older Python
+  versions (2.5, 2.6, 3.0-3.7) are no longer supported. pip will
+  not install simplejson 4 on unsupported versions.
+
+* The C extension now uses heap types and per-module state instead of
+  static types and global state. This is required for free-threading
+  support and sub-interpreter isolation. The Python-level API is
+  unchanged.
+
+* Full support for Python 3.13+ free-threading (PEP 703). The C
+  extension is now safe to use with the GIL disabled (python3.14t):
+  - Converted all static types to heap types with per-module state
+  - Added per-object critical sections to scanner and encoder
+  - Added free-threading-safe dict operations for Python 3.13+
+  - Unified per-module state management and templated parser
+  https://github.com/simplejson/simplejson/pull/363
+  https://github.com/simplejson/simplejson/pull/364
+  https://github.com/simplejson/simplejson/pull/365
+  https://github.com/simplejson/simplejson/pull/367
+  https://github.com/simplejson/simplejson/pull/369
+
+* Numerous C extension memory safety fixes:
+  - Fix use-after-free and leak in encoder ident handling
+  - Fix NULL dereferences on OOM in module init and static string init
+  - Fix reference leaks in dict encoder (skipkeys item, variable shadowing)
+  - Fix member table copy-paste, exception clobbering, missing Py_VISIT
+  - Fix error-as-truthy bugs in maybe_quote_bigint and is_raw_json
+  - Fix iterable_as_array swallowing MemoryError and KeyboardInterrupt
+  https://github.com/simplejson/simplejson/pull/355
+  https://github.com/simplejson/simplejson/pull/356
+  https://github.com/simplejson/simplejson/pull/357
+  https://github.com/simplejson/simplejson/pull/358
+  https://github.com/simplejson/simplejson/pull/359
+  https://github.com/simplejson/simplejson/pull/360
+
+* C extension performance and correctness improvements:
+  - Add PyDict_Next fast path for unsorted exact-dict encoding,
+    avoiding intermediate items list and N tuple allocations
+  - Add indexed fast path for exact list/tuple encoding, avoiding
+    iterator allocation and per-item PyIter_Next overhead
+  - Use PyUnicodeWriter as JSON_Accu backend on Python 3.14+,
+    eliminating intermediate string objects and ''.join calls
+  - Fix integer overflow in ascii_escape output_size calculation
+    that could cause buffer overwrite on pathologically large strings
+  - Fix list encoder separator counter overflow (int to Py_ssize_t)
+  - Dead code cleanup (unreachable NULL checks, do-while wrappers)
+  https://github.com/simplejson/simplejson/pull/370
+
+* Added Python 3.14 support and updated to cibuildwheel 3.2.1. CI now
+  tests free-threaded (3.14t) and debug builds with -Werror, refcount
+  leak detection, and GIL-disabled mode.
+  https://github.com/simplejson/simplejson/pull/343
+
+* Replace deprecated license classifiers with SPDX license expression
+  https://github.com/simplejson/simplejson/pull/347
+
+* Documented RawJSON usage with examples and caveats
+  https://github.com/simplejson/simplejson/pull/346
+
+* Added pyproject.toml for PEP 517 build support. setup.py is retained
+  for Python 2.7 wheel builds and backwards compatibility.
+
+* Migrated build_ext import from distutils to setuptools in setup.py.
+  The distutils.errors imports are kept since setuptools vendors
+  distutils on Python 3.12+ where stdlib distutils was removed.
+
+* CI now tests PEP 517 builds (pyproject.toml) alongside the existing
+  setup.py-based builds.
+
+* Added Pyodide (wasm32) wheel builds with C speedups via cibuildwheel.
+  Previously Pyodide users fell back to the pure-Python wheel; now they
+  get the compiled C extension cross-compiled to WebAssembly. Thread
+  and subprocess tests are skipped on Emscripten where those APIs are
+  unavailable.
+
+* Test suite now fails (instead of skipping) when C speedups are missing
+  during cibuildwheel runs, catching broken extension builds early.
+
+* New ``array_hook`` parameter for ``loads()``, ``load()``, and
+  ``JSONDecoder``. Called with each decoded JSON array (as a list),
+  its return value replaces the list. Analogous to ``object_hook``
+  for dicts. Works with both the Python decoder and C scanner.
+  (Matches CPython 3.15 json module.)
+
+* Trailing comma detection: the decoder now raises ``JSONDecodeError``
+  with "Illegal trailing comma before end of object/array" for inputs
+  like ``[1,]`` and ``{"a": 1,}`` instead of generic error messages.
+  Both the Python decoder and C scanner are updated.
+  (Matches CPython 3.13+ json module.)
+
+* ``frozendict`` encoding support: when ``frozendict`` is available
+  (CPython 3.15+ PEP 814), it is encoded as a JSON object just like
+  ``dict``. No effect on older Python versions.
+
+* Serialization errors now include ``add_note()`` context on Python
+  3.11+ (PEP 678), annotating exceptions with the path to the error,
+  e.g. "when serializing list item 1" / "when serializing dict item
+  'key'". Only applies to the Python encoder.
+
+* New C fast path for ``encode_basestring`` (``ensure_ascii=False``).
+  Previously the non-ASCII string encoder fell back to pure Python;
+  now it has a C implementation matching the existing
+  ``encode_basestring_ascii`` fast path.
+  https://github.com/simplejson/simplejson/issues/207
+
+* The Python decoder now rejects non-ASCII digits (e.g. fullwidth
+  ``\uff10``) in JSON numbers, matching the C scanner behavior.
+  The ``NUMBER_RE`` regex was changed from ``\d`` to ``[0-9]``.
+
+* Removed dead single-phase init code for Python 3.3/3.4 from the
+  C extension (these versions are no longer supported).
+
 Version 3.20.2 released 2025-09-24
 
-* Disable speedups on GraalPy smae as on PyPy
+* Disable speedups on GraalPy same as on PyPy
   https://github.com/simplejson/simplejson/pull/339
 
 Version 3.20.1 released 2025-02-14

@@ -1,33 +1,18 @@
-from __future__ import with_statement
 import os
+import re
 import sys
 import textwrap
 import unittest
 import subprocess
 import tempfile
-try:
-    # Python 3.x
-    from test.support import strip_python_stderr
-except ImportError:
-    # Python 2.6+
-    try:
-        from test.test_support import strip_python_stderr
-    except ImportError:
-        # Python 2.5
-        import re
-        def strip_python_stderr(stderr):
-            return re.sub(
-                r"\[\d+ refs\]\r?\n?$".encode(),
-                "".encode(),
-                stderr).strip()
+
+def strip_python_stderr(stderr):
+    """Strip debug-build refcount output from stderr."""
+    return re.sub(b"\\[\\d+ refs\\]\\r?\\n?$", b"", stderr).strip()
 
 def open_temp_file():
-    if sys.version_info >= (2, 6):
-        file = tempfile.NamedTemporaryFile(delete=False)
-        filename = file.name
-    else:
-        fd, filename = tempfile.mkstemp()
-        file = os.fdopen(fd, 'w+b')
+    file = tempfile.NamedTemporaryFile(delete=False)
+    filename = file.name
     return file, filename
 
 class TestTool(unittest.TestCase):
@@ -62,6 +47,8 @@ class TestTool(unittest.TestCase):
     """)
 
     def runTool(self, args=None, data=None):
+        if sys.platform == 'emscripten':
+            self.skipTest("subprocess not available on Emscripten")
         argv = [sys.executable, '-m', 'simplejson.tool']
         if args:
             argv.extend(args)

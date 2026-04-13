@@ -1,3 +1,4 @@
+import sys
 from unittest import TestCase
 from simplejson.compat import StringIO, long_type, b, binary_type, text_type, PY3
 import simplejson as json
@@ -253,6 +254,34 @@ class TestDump(TestCase):
                               encoding=None, default=decode_iso_8859_15)
             self.assertRaises(UnicodeDecodeError, json.dumps, {b('\xa4'): 42},
                               encoding=None, skipkeys=True)
+
+
+class TestFrozenDict(TestCase):
+    """Test encoding of frozendict (CPython 3.15+ PEP 814)."""
+
+    def setUp(self):
+        # Skip on Python versions without frozendict
+        try:
+            frozendict  # noqa: F821
+        except NameError:
+            if sys.version_info >= (3, 15):
+                self.fail("frozendict should be available on Python 3.15+")
+            self.skipTest("frozendict not available")
+
+    def test_frozendict_toplevel(self):
+        self.assertEqual(
+            json.dumps(frozendict(x=1, y=2), sort_keys=True),
+            '{"x": 1, "y": 2}')
+
+    def test_frozendict_in_list(self):
+        lst = [{'x': 1}, frozendict(y=2)]
+        self.assertEqual(json.dumps(lst), '[{"x": 1}, {"y": 2}]')
+
+    def test_frozendict_nested(self):
+        data = {'x': dict(a=1), 'y': frozendict(b=2)}
+        self.assertEqual(
+            json.dumps(data, sort_keys=True),
+            '{"x": {"a": 1}, "y": {"b": 2}}')
 
 
 class TestDictEncodingPaths(TestCase):

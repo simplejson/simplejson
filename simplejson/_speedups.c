@@ -226,6 +226,8 @@ JSON_Accu_Destroy(JSON_Accu *acc);
 #define ERR_STRING_CONTROL "Invalid control character %r at"
 #define ERR_STRING_ESC1 "Invalid \\X escape sequence %r"
 #define ERR_STRING_ESC4 "Invalid \\uXXXX escape sequence"
+#define ERR_TRAILING_COMMA_OBJECT "Illegal trailing comma before end of object"
+#define ERR_TRAILING_COMMA_ARRAY "Illegal trailing comma before end of array"
 
 
 typedef struct _PyScannerObject {
@@ -236,6 +238,7 @@ typedef struct _PyScannerObject {
     int strict;
     PyObject *object_hook;
     PyObject *pairs_hook;
+    PyObject *array_hook;
     PyObject *parse_float;
     PyObject *parse_int;
     PyObject *parse_constant;
@@ -254,6 +257,7 @@ typedef struct _PyScannerObject {
     X(strict_bool)                    \
     X(object_hook)                    \
     X(pairs_hook)                     \
+    X(array_hook)                     \
     X(parse_float)                    \
     X(parse_int)                      \
     X(parse_constant)                 \
@@ -264,6 +268,7 @@ static PyMemberDef scanner_members[] = {
     {"strict", Py_T_OBJECT_EX, offsetof(PyScannerObject, strict_bool), READONLY, "strict"},
     {"object_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, object_hook), READONLY, "object_hook"},
     {"object_pairs_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, pairs_hook), READONLY, "object_pairs_hook"},
+    {"array_hook", Py_T_OBJECT_EX, offsetof(PyScannerObject, array_hook), READONLY, "array_hook"},
     {"parse_float", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_float), READONLY, "parse_float"},
     {"parse_int", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_int), READONLY, "parse_int"},
     {"parse_constant", Py_T_OBJECT_EX, offsetof(PyScannerObject, parse_constant), READONLY, "parse_constant"},
@@ -360,6 +365,8 @@ static PyObject *
 ascii_escape_str(PyObject *pystr);
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr);
+static PyObject *
+py_encode_basestring(PyObject* self UNUSED, PyObject *pystr);
 #if PY_MAJOR_VERSION < 3
 static PyObject *
 join_list_string(_speedups_state *state, PyObject *lst);
@@ -426,6 +433,9 @@ static PyObject *
 import_dependency(const char *module_name, const char *attr_name);
 
 #define S_CHAR(c) (c >= ' ' && c <= '~' && c != '\\' && c != '"')
+/* NON_ASCII_ESCAPE: character needs escaping in ensure_ascii=False mode.
+ * Only control characters (0x00-0x1f), backslash and double-quote. */
+#define NEEDS_ESCAPE(c) ((c) <= 0x1f || (c) == '\\' || (c) == '"')
 #define IS_WHITESPACE(c) (((c) == ' ') || ((c) == '\t') || ((c) == '\n') || ((c) == '\r'))
 
 #define MIN_EXPANSION 6
@@ -444,7 +454,8 @@ json_PyDict_GetItemRef(PyObject *dict, PyObject *key, PyObject **result)
      * found (with *result set to NULL), -1 on error. */
 #if PY_VERSION_HEX >= 0x030D0000
     return PyDict_GetItemRef(dict, key, result);
-#else
+#elif PY_VERSION_HEX >= 0x03040000
+    /* PyDict_GetItemWithError was added in Python 3.4. */
     PyObject *obj = PyDict_GetItemWithError(dict, key);
     if (obj != NULL) {
         Py_INCREF(obj);
@@ -453,6 +464,17 @@ json_PyDict_GetItemRef(PyObject *dict, PyObject *key, PyObject **result)
     }
     *result = NULL;
     return PyErr_Occurred() ? -1 : 0;
+#else
+    /* Python 2.7: PyDict_GetItem returns NULL without setting an
+     * exception on missing keys and suppresses errors during lookup. */
+    PyObject *obj = PyDict_GetItem(dict, key);  /* borrowed, no error */
+    if (obj != NULL) {
+        Py_INCREF(obj);
+        *result = obj;
+        return 1;
+    }
+    *result = NULL;
+    return 0;
 #endif
 }
 
@@ -472,9 +494,9 @@ json_memo_intern_key(PyObject *memo, PyObject **key_ptr)
     Py_DECREF(old);
     *key_ptr = canonical;
     return 0;
-#else
-    /* PyDict_SetDefault has been in the C API since Python 2.6 and
-     * returns a borrowed reference to the canonical entry. */
+#elif PY_VERSION_HEX >= 0x03040000
+    /* PyDict_SetDefault was added in Python 3.4 and returns a borrowed
+     * reference to the canonical entry. */
     PyObject *canonical = PyDict_SetDefault(memo, old, old);
     if (canonical == NULL)
         return -1;
@@ -482,8 +504,29 @@ json_memo_intern_key(PyObject *memo, PyObject **key_ptr)
     Py_DECREF(old);
     *key_ptr = canonical;
     return 0;
+#else
+    /* Python 2.7: no PyDict_SetDefault, use GetItem + SetItem. */
+    PyObject *canonical = PyDict_GetItem(memo, old);  /* borrowed, no error */
+    if (canonical == NULL) {
+        if (PyDict_SetItem(memo, old, old) < 0)
+            return -1;
+        canonical = old;
+    }
+    Py_INCREF(canonical);
+    Py_DECREF(old);
+    *key_ptr = canonical;
+    return 0;
 #endif
 }
+
+/* Check if obj is a dict or frozendict (Python 3.15+).
+ * PyAnyDict_Check is provided by CPython 3.15; on older versions
+ * fall back to plain PyDict_Check. */
+#if PY_VERSION_HEX >= 0x030F0000
+#define JSON_AnyDict_Check(obj) PyAnyDict_Check(obj)
+#else
+#define JSON_AnyDict_Check(obj) PyDict_Check(obj)
+#endif
 
 static int
 is_raw_json(_speedups_state *state, PyObject *obj)
@@ -1844,6 +1887,12 @@ PyDoc_STRVAR(pydoc_encode_basestring_ascii,
     "Return an ASCII-only JSON representation of a Python string"
 );
 
+PyDoc_STRVAR(pydoc_encode_basestring,
+    "encode_basestring(basestring) -> str\n"
+    "\n"
+    "Return a JSON representation of a Python string"
+);
+
 static PyObject *
 py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
 {
@@ -1856,6 +1905,215 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
         if (PyUnicode_READY(pystr))
             return NULL;
         return ascii_escape_unicode(pystr);
+    }
+    else {
+        PyErr_Format(PyExc_TypeError,
+                     "first argument must be a string, not %.80s",
+                     Py_TYPE(pystr)->tp_name);
+        return NULL;
+    }
+}
+
+/* encode_basestring: escape only control chars, backslash, and quote.
+ * Non-ASCII characters pass through unchanged (ensure_ascii=False). */
+
+#if PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3
+/* Only needed by the two-pass escape_unicode_noascii (pre-3.14 and
+ * Python 2). The PyUnicodeWriter path on 3.14+ writes escapes inline. */
+static Py_ssize_t
+escape_char_noascii(JSON_UNICHR c, JSON_UNICHR *output, Py_ssize_t chars)
+{
+    if (!NEEDS_ESCAPE(c)) {
+        output[chars++] = c;
+    }
+    else {
+        output[chars++] = '\\';
+        switch (c) {
+            case '\\': output[chars++] = '\\'; break;
+            case '"':  output[chars++] = '"'; break;
+            case '\b': output[chars++] = 'b'; break;
+            case '\f': output[chars++] = 'f'; break;
+            case '\n': output[chars++] = 'n'; break;
+            case '\r': output[chars++] = 'r'; break;
+            case '\t': output[chars++] = 't'; break;
+            default:
+                /* Control character: \u00XX */
+                output[chars++] = 'u';
+                output[chars++] = '0';
+                output[chars++] = '0';
+                output[chars++] = "0123456789abcdef"[(c >> 4) & 0xf];
+                output[chars++] = "0123456789abcdef"[(c     ) & 0xf];
+        }
+    }
+    return chars;
+}
+
+static Py_ssize_t
+escape_char_noascii_size(JSON_UNICHR c)
+{
+    if (!NEEDS_ESCAPE(c))
+        return 1;
+    switch (c) {
+        case '\\': case '"': case '\b': case '\f':
+        case '\n': case '\r': case '\t':
+            return 2;
+        default:
+            return 6;  /* \u00XX */
+    }
+}
+#endif /* PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3 */
+
+#if PY_VERSION_HEX >= 0x030E0000
+static PyObject *
+escape_unicode_noascii(PyObject *pystr)
+{
+    /* Single-pass using PyUnicodeWriter (Python 3.14+). */
+    Py_ssize_t i;
+    Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
+    int kind = PyUnicode_KIND(pystr);
+    void *data = PyUnicode_DATA(pystr);
+    Py_ssize_t run_start = 0;
+    PyUnicodeWriter *writer = PyUnicodeWriter_Create(input_chars + 2);
+    if (writer == NULL)
+        return NULL;
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    for (i = 0; i < input_chars; i++) {
+        JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+        if (!NEEDS_ESCAPE(c))
+            continue;
+        /* Flush run of safe characters */
+        if (i > run_start) {
+            if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+                goto bail;
+        }
+        {
+            char buf[6]; /* longest escape: \u00XX */
+            Py_ssize_t len = 0;
+            buf[len++] = '\\';
+            switch (c) {
+                case '\\': buf[len++] = '\\'; break;
+                case '"':  buf[len++] = '"'; break;
+                case '\b': buf[len++] = 'b'; break;
+                case '\f': buf[len++] = 'f'; break;
+                case '\n': buf[len++] = 'n'; break;
+                case '\r': buf[len++] = 'r'; break;
+                case '\t': buf[len++] = 't'; break;
+                default:
+                    buf[len++] = 'u';
+                    buf[len++] = '0';
+                    buf[len++] = '0';
+                    buf[len++] = "0123456789abcdef"[(c >> 4) & 0xf];
+                    buf[len++] = "0123456789abcdef"[(c     ) & 0xf];
+            }
+            if (PyUnicodeWriter_WriteUTF8(writer, buf, len) < 0)
+                goto bail;
+        }
+        run_start = i + 1;
+    }
+    if (i > run_start) {
+        if (PyUnicodeWriter_WriteSubstring(writer, pystr, run_start, i) < 0)
+            goto bail;
+    }
+    if (PyUnicodeWriter_WriteChar(writer, '"') < 0)
+        goto bail;
+    return PyUnicodeWriter_Finish(writer);
+bail:
+    PyUnicodeWriter_Discard(writer);
+    return NULL;
+}
+#else /* PY_VERSION_HEX < 0x030E0000 */
+static PyObject *
+escape_unicode_noascii(PyObject *pystr)
+{
+    /* Two-pass: compute size, then fill. */
+    Py_ssize_t i;
+    Py_ssize_t input_chars = PyUnicode_GET_LENGTH(pystr);
+    PY2_UNUSED int kind = PyUnicode_KIND(pystr);
+    void *data = PyUnicode_DATA(pystr);
+    Py_ssize_t output_size = 2; /* opening and closing quotes */
+    PyObject *rval;
+
+    for (i = 0; i < input_chars; i++) {
+        JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+        Py_ssize_t charsize = escape_char_noascii_size(c);
+        if (output_size > PY_SSIZE_T_MAX - charsize) {
+            PyErr_SetString(PyExc_OverflowError,
+                            "string is too long to escape");
+            return NULL;
+        }
+        output_size += charsize;
+    }
+
+#if PY_MAJOR_VERSION >= 3
+    {
+        /* Escapes are all ASCII, so maxchar doesn't increase */
+        Py_UCS4 maxchar = PyUnicode_MAX_CHAR_VALUE(pystr);
+        if (maxchar < 127)
+            maxchar = 127;
+        rval = PyUnicode_New(output_size, maxchar);
+        if (rval == NULL)
+            return NULL;
+    }
+    {
+        int out_kind = PyUnicode_KIND(rval);
+        void *out_data = PyUnicode_DATA(rval);
+        Py_ssize_t chars = 0;
+        PyUnicode_WRITE(out_kind, out_data, chars++, '"');
+        for (i = 0; i < input_chars; i++) {
+            JSON_UNICHR c = PyUnicode_READ(kind, data, i);
+            if (!NEEDS_ESCAPE(c)) {
+                PyUnicode_WRITE(out_kind, out_data, chars++, c);
+            }
+            else {
+                JSON_UNICHR buf[6];
+                Py_ssize_t j, n = escape_char_noascii(c, buf, 0);
+                for (j = 0; j < n; j++)
+                    PyUnicode_WRITE(out_kind, out_data, chars++, buf[j]);
+            }
+        }
+        PyUnicode_WRITE(out_kind, out_data, chars++, '"');
+        assert(chars == output_size);
+    }
+#else
+    /* Python 2: return a unicode object */
+    rval = PyUnicode_FromUnicode(NULL, output_size);
+    if (rval == NULL)
+        return NULL;
+    {
+        Py_UNICODE *output = PyUnicode_AS_UNICODE(rval);
+        Py_ssize_t chars = 0;
+        output[chars++] = '"';
+        for (i = 0; i < input_chars; i++) {
+            chars = escape_char_noascii(
+                PyUnicode_READ(kind, data, i), output, chars);
+        }
+        output[chars++] = '"';
+        assert(chars == output_size);
+    }
+#endif
+    return rval;
+}
+#endif /* PY_VERSION_HEX >= 0x030E0000 */
+
+static PyObject *
+py_encode_basestring(PyObject* self UNUSED, PyObject *pystr)
+{
+    /* Return a JSON representation of a Python string (ensure_ascii=False) */
+    /* METH_O */
+    if (PyBytes_Check(pystr)) {
+        PyObject *uni = PyUnicode_DecodeUTF8(
+            PyBytes_AS_STRING(pystr), PyBytes_GET_SIZE(pystr), NULL);
+        if (uni == NULL)
+            return NULL;
+        PyObject *rval = escape_unicode_noascii(uni);
+        Py_DECREF(uni);
+        return rval;
+    }
+    else if (PyUnicode_Check(pystr)) {
+        if (PyUnicode_READY(pystr))
+            return NULL;
+        return escape_unicode_noascii(pystr);
     }
     else {
         PyErr_Format(PyExc_TypeError,
@@ -2141,6 +2399,7 @@ scanner_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         goto bail;
     LOAD_ATTR(object_hook, "object_hook");
     LOAD_ATTR(pairs_hook, "object_pairs_hook");
+    LOAD_ATTR(array_hook, "array_hook");
     LOAD_ATTR(parse_float, "parse_float");
     LOAD_ATTR(parse_int, "parse_int");
     LOAD_ATTR(parse_constant, "parse_constant");
@@ -2650,7 +2909,7 @@ encoder_steal_encode(PyEncoderObject *s, JSON_Accu *rval,
         return -1;
     }
     if (as_dict) {
-        if (PyDict_Check(newobj)) {
+        if (JSON_AnyDict_Check(newobj)) {
             rv = encoder_listencode_dict(s, rval, newobj, indent_level);
         } else {
             PyErr_Format(PyExc_TypeError,
@@ -2777,7 +3036,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         rv = encoder_listencode_list(s, rval, obj, indent_level);
         Py_LeaveRecursiveCall();
     }
-    else if (PyDict_Check(obj)) {
+    else if (JSON_AnyDict_Check(obj)) {
         if (Py_EnterRecursiveCall(" while encoding a JSON object"))
             return rv;
         rv = encoder_listencode_dict(s, rval, obj, indent_level);
@@ -2857,8 +3116,14 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *item = NULL;
     Py_ssize_t idx;
 
-    if (PyDict_Size(dct) == 0)
-        return JSON_Accu_Accumulate(state, rval, state->JSON_empty_dict);
+    {
+        Py_ssize_t dct_size = PyDict_Check(dct) ? PyDict_Size(dct)
+                                                : PyObject_Length(dct);
+        if (dct_size == 0)
+            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_dict);
+        if (dct_size < 0)
+            return -1;
+    }
 
     if (encoder_markers_push(s, dct, &ident))
         goto bail;
@@ -3187,6 +3452,10 @@ static PyMethodDef speedups_methods[] = {
         (PyCFunction)py_encode_basestring_ascii,
         METH_O,
         pydoc_encode_basestring_ascii},
+    {"encode_basestring",
+        (PyCFunction)py_encode_basestring,
+        METH_O,
+        pydoc_encode_basestring},
     {"scanstring",
         (PyCFunction)py_scanstring,
         METH_VARARGS,
@@ -3335,7 +3604,6 @@ init_speedups_state(_speedups_state *state, PyObject *module)
     return 0;
 }
 
-#if PY_VERSION_HEX >= 0x03050000
 /* Multi-phase initialization (PEP 489) for Python 3.5+. On 3.13+ this
  * path creates heap types and allocates per-module state so that each
  * interpreter gets its own copy; on 3.5-3.12 the type fields just point
@@ -3434,6 +3702,7 @@ speedups_clear(PyObject *m)
 }
 #endif /* PY_VERSION_HEX >= 0x030D0000 */
 
+#if PY_MAJOR_VERSION >= 3
 static PyModuleDef_Slot module_slots[] = {
     {Py_mod_exec, module_exec},
 #if PY_VERSION_HEX >= 0x030D0000
@@ -3441,9 +3710,7 @@ static PyModuleDef_Slot module_slots[] = {
 #endif
     {0, NULL}
 };
-#endif /* PY_VERSION_HEX >= 0x03050000 */
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "_speedups",        /* m_name */
@@ -3454,11 +3721,7 @@ static struct PyModuleDef moduledef = {
     0,                  /* m_size: no per-module state on <3.13 */
 #endif
     speedups_methods,   /* m_methods */
-#if PY_VERSION_HEX >= 0x03050000
-    module_slots,       /* m_slots (multi-phase init) */
-#else
-    NULL,               /* m_slots (3.3/3.4: single-phase) */
-#endif
+    module_slots,       /* m_slots (multi-phase init, PEP 489) */
 #if PY_VERSION_HEX >= 0x030D0000
     speedups_traverse,  /* m_traverse */
     speedups_clear,     /* m_clear */
@@ -3486,20 +3749,8 @@ import_dependency(const char *module_name, const char *attr_name)
 PyMODINIT_FUNC
 PyInit__speedups(void)
 {
-#if PY_VERSION_HEX >= 0x03050000
-    /* Multi-phase init: Python runs module_exec via the Py_mod_exec slot */
+    /* Multi-phase init (PEP 489): Python runs module_exec via Py_mod_exec slot */
     return PyModuleDef_Init(&moduledef);
-#else
-    /* Python 3.3/3.4: fall back to single-phase init */
-    PyObject *m = PyModule_Create(&moduledef);
-    if (m == NULL)
-        return NULL;
-    if (module_exec(m) < 0) {
-        Py_DECREF(m);
-        return NULL;
-    }
-    return m;
-#endif
 }
 #else
 /* Python 2.7: single-phase init via Py_InitModule3 */
@@ -3531,6 +3782,7 @@ init_speedups(void)
         Py_DECREF(state->PyEncoderType);
         return;
     }
-    (void)init_speedups_state(state, m);
+    if (init_speedups_state(state, m) < 0)
+        return;
 }
 #endif

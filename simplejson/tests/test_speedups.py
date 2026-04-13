@@ -1,5 +1,3 @@
-from __future__ import with_statement
-
 import sys
 import unittest
 from unittest import TestCase
@@ -170,16 +168,18 @@ class TestRefcountLeaks(TestCase):
         # Stabilize caches, specializer, intern pools, etc.
         for _ in range(self.WARMUP):
             func()
-        gc.collect()
+            gc.collect()
 
+        # Collect every iteration so cyclic garbage doesn't accumulate
+        # across GC generations and cause noisy refcount deltas.
         start = sys.gettotalrefcount()
         for _ in range(self.ITER):
             func()
-        gc.collect()
+            gc.collect()
         mid = sys.gettotalrefcount()
         for _ in range(self.ITER):
             func()
-        gc.collect()
+            gc.collect()
         end = sys.gettotalrefcount()
 
         phase1 = mid - start
@@ -188,7 +188,7 @@ class TestRefcountLeaks(TestCase):
                "leak would make phase2 grow linearly with iterations."
                % (phase1, phase2, self.ITER))
         # phase2 observed as 1-24 on CPython 3.14 debug when clean;
-        # 100 is a generous ceiling that still fails on any leak
+        # 100 is a generous ceiling that still catches any leak
         # producing more than ~0.05 refs/call.
         self.assertLess(abs(phase2), 100, msg)
 
