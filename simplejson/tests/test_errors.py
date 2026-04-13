@@ -1,4 +1,5 @@
 import sys, pickle
+import unittest
 from unittest import TestCase
 
 import simplejson as json
@@ -67,10 +68,8 @@ class TestErrors(TestCase):
         self.assertEqual(err.pos, e.pos)
         self.assertEqual(err.end, e.end)
 
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_list_recursion(self):
-        # PEP 678 add_note() on circular list reference
-        if sys.version_info < (3, 11):
-            return
         x = []
         x.append(x)
         try:
@@ -82,9 +81,8 @@ class TestErrors(TestCase):
         else:
             self.fail('Expected ValueError')
 
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_dict_recursion(self):
-        if sys.version_info < (3, 11):
-            return
         x = {}
         x['test'] = x
         try:
@@ -95,9 +93,8 @@ class TestErrors(TestCase):
         else:
             self.fail('Expected ValueError')
 
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_nested_error(self):
-        if sys.version_info < (3, 11):
-            return
         try:
             json.dumps({'a': [1, object(), 3]}, indent=2)
         except TypeError as exc:
