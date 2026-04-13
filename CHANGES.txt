@@ -99,6 +99,19 @@ Version 4.0.0 released 2026-04-12
   e.g. "when serializing list item 1" / "when serializing dict item
   'key'". Only applies to the Python encoder.
 
+* New C fast path for ``encode_basestring`` (``ensure_ascii=False``).
+  Previously the non-ASCII string encoder fell back to pure Python;
+  now it has a C implementation matching the existing
+  ``encode_basestring_ascii`` fast path.
+  https://github.com/simplejson/simplejson/issues/207
+
+* The Python decoder now rejects non-ASCII digits (e.g. fullwidth
+  ``\uff10``) in JSON numbers, matching the C scanner behavior.
+  The ``NUMBER_RE`` regex was changed from ``\d`` to ``[0-9]``.
+
+* Removed dead single-phase init code for Python 3.3/3.4 from the
+  C extension (these versions are no longer supported).
+
 Version 3.20.2 released 2025-09-24
 
 * Disable speedups on GraalPy same as on PyPy
