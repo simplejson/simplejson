@@ -31,6 +31,30 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m simplejson.tests._cibw_runner .
 
+  test_prerelease:
+    name: Tests with C speedups on Python 3.15-dev
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.15-dev'
+      - name: Build extension
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          REQUIRE_SPEEDUPS=1 python setup.py build_ext -i
+      - name: Verify C speedups loaded
+        run: |
+          python -c "
+          import sys, simplejson, simplejson.encoder, simplejson.scanner
+          from simplejson._speedups import make_encoder, make_scanner
+          assert simplejson.encoder.c_make_encoder is make_encoder, 'c_make_encoder not wired'
+          assert simplejson.scanner.c_make_scanner is make_scanner, 'c_make_scanner not wired'
+          print('OK: C speedups loaded and wired in, Python', sys.version)
+          "
+      - name: Run tests
+        run: python -m simplejson.tests._cibw_runner .
+
   test_free_threading:
     name: Tests with free-threading on Python 3.14t
     runs-on: ubuntu-latest
@@ -290,7 +314,7 @@ jobs:
   # Aggregate gate jobs to match branch protection rule names
   gate_ubuntu:
     name: Build wheels on ubuntu-latest
-    needs: [build_wheels, build_wheels_py27, build_pyodide_wheel, test_pure_python, test_free_threading, test_debug_build, test_pep517_build]
+    needs: [build_wheels, build_wheels_py27, build_pyodide_wheel, test_pure_python, test_prerelease, test_free_threading, test_debug_build, test_pep517_build]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All ubuntu-latest checks passed"
