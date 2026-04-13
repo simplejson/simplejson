@@ -1920,6 +1920,9 @@ py_encode_basestring_ascii(PyObject* self UNUSED, PyObject *pystr)
 /* encode_basestring: escape only control chars, backslash, and quote.
  * Non-ASCII characters pass through unchanged (ensure_ascii=False). */
 
+#if PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3
+/* Only needed by the two-pass escape_unicode_noascii (pre-3.14 and
+ * Python 2). The PyUnicodeWriter path on 3.14+ writes escapes inline. */
 static Py_ssize_t
 escape_char_noascii(JSON_UNICHR c, JSON_UNICHR *output, Py_ssize_t chars)
 {
@@ -1961,6 +1964,7 @@ escape_char_noascii_size(JSON_UNICHR c)
             return 6;  /* \u00XX */
     }
 }
+#endif /* PY_VERSION_HEX < 0x030E0000 || PY_MAJOR_VERSION < 3 */
 
 #if PY_VERSION_HEX >= 0x030E0000
 static PyObject *
@@ -3720,6 +3724,7 @@ speedups_clear(PyObject *m)
 }
 #endif /* PY_VERSION_HEX >= 0x030D0000 */
 
+#if PY_MAJOR_VERSION >= 3
 static PyModuleDef_Slot module_slots[] = {
     {Py_mod_exec, module_exec},
 #if PY_VERSION_HEX >= 0x030D0000
@@ -3727,7 +3732,7 @@ static PyModuleDef_Slot module_slots[] = {
 #endif
     {0, NULL}
 };
-#if PY_MAJOR_VERSION >= 3
+
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "_speedups",        /* m_name */
