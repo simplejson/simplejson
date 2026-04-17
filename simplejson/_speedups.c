@@ -1353,8 +1353,8 @@ scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
             c = 0;
             next++;
             end = next + 4;
-            if (end >= len) {
-                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 1);
+            if (end > len) {
+                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 2);
                 goto bail;
             }
             /* Decode 4 hex digits */
@@ -1372,14 +1372,14 @@ scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                     case 'F':
                         c |= (hex_digit - 'A' + 10); break;
                     default:
-                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 6);
                         goto bail;
                 }
             }
 #if defined(Py_UNICODE_WIDE)
             /* Surrogate pair */
             if ((c & 0xfc00) == 0xd800) {
-                if (end + 6 < len && buf[next] == '\\' && buf[next+1] == 'u') {
+                if (end + 6 <= len && buf[next] == '\\' && buf[next+1] == 'u') {
                     JSON_UNICHR c2 = 0;
                     end += 6;
                     /* Decode 4 hex digits */
@@ -1397,7 +1397,7 @@ scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                         case 'F':
                             c2 |= (hex_digit - 'A' + 10); break;
                         default:
-                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 6);
                             goto bail;
                         }
                     }
@@ -1548,8 +1548,8 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
             c = 0;
             next++;
             end = next + 4;
-            if (end >= len) {
-                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 1);
+            if (end > len) {
+                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 2);
                 goto bail;
             }
             /* Decode 4 hex digits */
@@ -1567,14 +1567,14 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                     case 'F':
                         c |= (hex_digit - 'A' + 10); break;
                     default:
-                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 6);
                         goto bail;
                 }
             }
             /* Surrogate pair */
             if ((c & 0xfc00) == 0xd800) {
                 JSON_UNICHR c2 = 0;
-                if (end + 6 < len &&
+                if (end + 6 <= len &&
                     PyUnicode_READ(kind, buf, next) == '\\' &&
                     PyUnicode_READ(kind, buf, next + 1) == 'u') {
                     end += 6;
@@ -1593,7 +1593,7 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                         case 'F':
                             c2 |= (hex_digit - 'A' + 10); break;
                         default:
-                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 6);
                             goto bail;
                         }
                     }
@@ -1735,8 +1735,8 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
             c = 0;
             next++;
             end = next + 4;
-            if (end >= len) {
-                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 1);
+            if (end > len) {
+                raise_errmsg(state, ERR_STRING_ESC4, pystr, next - 2);
                 goto bail;
             }
             /* Decode 4 hex digits */
@@ -1754,7 +1754,7 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                     case 'F':
                         c |= (hex_digit - 'A' + 10); break;
                     default:
-                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                        raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 6);
                         goto bail;
                 }
             }
@@ -1762,7 +1762,7 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
             /* Surrogate pair */
             if ((c & 0xfc00) == 0xd800) {
                 JSON_UNICHR c2 = 0;
-                if (end + 6 < len &&
+                if (end + 6 <= len &&
                     PyUnicode_READ(kind, buf, next) == '\\' &&
                     PyUnicode_READ(kind, buf, next + 1) == 'u') {
                     end += 6;
@@ -1781,7 +1781,7 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                         case 'F':
                             c2 |= (hex_digit - 'A' + 10); break;
                         default:
-                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 5);
+                            raise_errmsg(state, ERR_STRING_ESC4, pystr, end - 6);
                             goto bail;
                         }
                     }
