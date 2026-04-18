@@ -1286,7 +1286,11 @@ scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
         goto bail;
     }
     else if (end < 0 || len < end) {
-        PyErr_SetString(PyExc_ValueError, "end is out of bounds");
+        /* Out-of-range end: match py_scanstring, which raises
+         * JSONDecodeError("Unterminated string starting at") so that
+         * user code using `except JSONDecodeError` catches the C path
+         * the same way it catches the pure-Python path. */
+        raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
         goto bail;
     }
     while (1) {
@@ -1488,7 +1492,11 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
         goto bail;
     }
     else if (end < 0 || len < end) {
-        PyErr_SetString(PyExc_ValueError, "end is out of bounds");
+        /* Out-of-range end: match py_scanstring, which raises
+         * JSONDecodeError("Unterminated string starting at") so that
+         * user code using `except JSONDecodeError` catches the C path
+         * the same way it catches the pure-Python path. */
+        raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
         goto bail;
     }
 
@@ -1677,7 +1685,11 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
         goto bail;
     }
     else if (end < 0 || len < end) {
-        PyErr_SetString(PyExc_ValueError, "end is out of bounds");
+        /* Out-of-range end: match py_scanstring, which raises
+         * JSONDecodeError("Unterminated string starting at") so that
+         * user code using `except JSONDecodeError` catches the C path
+         * the same way it catches the pure-Python path. */
+        raise_errmsg(state, ERR_STRING_UNTERMINATED, pystr, begin);
         goto bail;
     }
     while (1) {

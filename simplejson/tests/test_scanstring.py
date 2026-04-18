@@ -149,6 +149,26 @@ class TestScanString(TestCase):
         self.assertRaises(OverflowError, json.decoder.scanstring, "xxx",
                           maxsize + 1)
 
+    def test_end_out_of_bounds_is_jsondecodeerror(self):
+        # Regression: C scanstring used to raise a plain ValueError for
+        # out-of-range end indices, while py_scanstring raises
+        # JSONDecodeError. User code with `except JSONDecodeError:` missed
+        # the C path. Both backends now raise JSONDecodeError with the
+        # "Unterminated string starting at" message at pos = end - 1.
+        for s, end in (
+            (u'"abc"', 100),
+            (u'abc', 100),
+            (u'', 100),
+            (u'abc', -1),
+            (u'', -1),
+        ):
+            with self.assertRaises(json.JSONDecodeError) as cm:
+                json.decoder.scanstring(s, end, None, True)
+            self.assertEqual(cm.exception.pos, end - 1,
+                             'scanstring(%r, %r) pos=%r, expected %r' %
+                             (s, end, cm.exception.pos, end - 1))
+            self.assertIn('Unterminated string', str(cm.exception))
+
     def test_surrogates(self):
         scanstring = json.decoder.scanstring
 
