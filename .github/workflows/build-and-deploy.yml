@@ -152,11 +152,12 @@ jobs:
         run: PYTHON_GIL=0 .venv/bin/python -m simplejson.tests._cibw_runner .
 
   test_tsan:
-    name: TSan stress (CPython ${{ env.CPYTHON_REF }} free-threaded)
+    name: TSan stress (CPython v3.14.0 free-threaded)
     runs-on: ubuntu-latest
     env:
-      # Pinned so the cache key is stable; bump when moving to a newer
-      # CPython (cache is keyed on this + clang version + script hash).
+      # Keep in sync with the name above. Pinned so the cache key is stable;
+      # bump when moving to a newer CPython (cache is keyed on this + clang
+      # version + script hash).
       CPYTHON_REF: v3.14.0
       TSAN_ROOT: /home/runner/.cache/py-tsan-ft
     steps:
