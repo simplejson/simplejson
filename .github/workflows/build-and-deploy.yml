@@ -403,6 +403,11 @@ jobs:
           merge-multiple: true
           path: dist
 
+      # PyPI rejects Pyodide/wasm wheels (unsupported platform tag). Drop them
+      # from the upload set; they're still kept as workflow artifacts.
+      - name: Remove Pyodide wheels before upload
+        run: rm -f dist/*pyodide*.whl
+
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   upload_pypi_test:
@@ -422,6 +427,11 @@ jobs:
         with:
           merge-multiple: true
           path: dist
+
+      # PyPI rejects Pyodide/wasm wheels (unsupported platform tag). Drop them
+      # from the upload set; they're still kept as workflow artifacts.
+      - name: Remove Pyodide wheels before upload
+        run: rm -f dist/*pyodide*.whl
 
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
