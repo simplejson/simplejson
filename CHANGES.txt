@@ -71,6 +71,12 @@ Version 4.0.0
   leak detection, and GIL-disabled mode.
   https://github.com/simplejson/simplejson/pull/343
 
+* Added a ThreadSanitizer (TSan) stress test CI job. Builds a
+  TSan-instrumented free-threaded CPython (cached between runs) and
+  runs a concurrent stress test script against the C extension to
+  catch data races under free-threading.
+  https://github.com/simplejson/simplejson/pull/373
+
 * Replace deprecated license classifiers with SPDX license expression
   https://github.com/simplejson/simplejson/pull/347
 
