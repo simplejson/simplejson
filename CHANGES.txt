@@ -1,3 +1,10 @@
+Version 4.0.1 released 2026-04-18
+
+* Skip uploading Pyodide/wasm wheels to PyPI, which rejects them with
+  "unsupported platform tag 'pyodide_2024_0_wasm32'". The wheels are
+  still built in CI and preserved as workflow artifacts.
+  https://github.com/simplejson/simplejson/pull/375
+
 Version 4.0.0 released 2026-04-18
 
 * simplejson 4 requires Python 2.7 or Python 3.8+. Older Python
