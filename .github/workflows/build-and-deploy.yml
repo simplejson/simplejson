@@ -151,6 +151,57 @@ jobs:
         if: matrix.variant == 'free-threaded'
         run: PYTHON_GIL=0 .venv/bin/python -m simplejson.tests._cibw_runner .
 
+  test_tsan:
+    name: TSan stress (CPython ${{ env.CPYTHON_REF }} free-threaded)
+    runs-on: ubuntu-latest
+    env:
+      # Pinned so the cache key is stable; bump when moving to a newer
+      # CPython (cache is keyed on this + clang version + script hash).
+      CPYTHON_REF: v3.14.0
+      TSAN_ROOT: /home/runner/.cache/py-tsan-ft
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang lld \
+            libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
+            libsqlite3-dev libffi-dev liblzma-dev
+      - name: Record clang version (for cache key)
+        id: clang
+        run: |
+          version=$(clang --version | head -1 | awk '{print $NF}')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+      - name: Restore TSan CPython build
+        id: cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.TSAN_ROOT }}
+          key: tsan-cpython-${{ env.CPYTHON_REF }}-${{ runner.os }}-clang${{ steps.clang.outputs.version }}-${{ hashFiles('scripts/run_tsan_stress.sh') }}
+      - name: Build TSan CPython (cache miss only, ~15 min)
+        id: build
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: ./scripts/run_tsan_stress.sh build
+      - name: Save TSan CPython build
+        # Save the built CPython whether the later stress test passes or
+        # fails, so a regression doesn't force a 15-min rebuild next run.
+        # Skip save on cache hit (nothing new) or if the build itself failed
+        # (would cache a broken install).
+        if: always() && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.TSAN_ROOT }}
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+      - name: Install simplejson and run stress test
+        run: ./scripts/run_tsan_stress.sh test
+      - name: Upload TSan report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: tsan-report
+          path: tsan_report.txt
+
   build_wheels_py27:
     name: Build Python 2.7 wheels (linux x86_64)
     runs-on: ubuntu-latest
@@ -314,7 +365,7 @@ jobs:
   # Aggregate gate jobs to match branch protection rule names
   gate_ubuntu:
     name: Build wheels on ubuntu-latest
-    needs: [build_wheels, build_wheels_py27, build_pyodide_wheel, test_pure_python, test_prerelease, test_free_threading, test_debug_build, test_pep517_build]
+    needs: [build_wheels, build_wheels_py27, build_pyodide_wheel, test_pure_python, test_prerelease, test_free_threading, test_debug_build, test_pep517_build, test_tsan]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All ubuntu-latest checks passed"
