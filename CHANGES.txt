@@ -1,4 +1,4 @@
-Version 4.0.0
+Version 4.0.0 released 2026-04-18
 
 * simplejson 4 requires Python 2.7 or Python 3.8+. Older Python
   versions (2.5, 2.6, 3.0-3.7) are no longer supported. pip will
@@ -51,6 +51,10 @@ Version 4.0.0
     under the Python encoder and as the _asdict() return value under
     the C encoder; both now check _asdict() before list/tuple/dict.
     for_json() continues to outrank _asdict() in both.
+  - Fix C scanstring raising a plain ValueError ("end is out of
+    bounds") instead of JSONDecodeError for out-of-range end indices.
+    User code with `except JSONDecodeError:` now catches both the
+    C and pure-Python paths consistently.
   https://github.com/simplejson/simplejson/pull/372
 
 * C extension performance and correctness improvements:

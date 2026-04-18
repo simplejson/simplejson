@@ -209,3 +209,17 @@ CFLAGS="-Wall -Wextra -Wshadow -Wstrict-prototypes -Wdeclaration-after-statement
 `-Wno-unused-parameter` and `-Wno-missing-field-initializers` are
 necessary because Python's own headers trigger them — removing them
 causes a build failure that's not your fault. Keep them suppressed.
+
+## simplejson does not target the stable ABI (`Py_LIMITED_API` / abi3)
+
+This comes up periodically ("can you ship abi3 wheels?"). The answer
+is no, and it's intentional. The hot decode and encode loops use
+`PyUnicode_READ`, `PyUnicode_KIND`, `PyUnicode_DATA`, `PyList_GET_ITEM`,
+`PyTuple_GET_ITEM`, and direct `tp_` slot access — none of which are
+in the limited API. Converting the scanner and encoder to
+limited-API-only calls would measurably regress the fast path that is
+the entire point of the C extension. The move to heap types and
+per-module state in 4.0 was driven by free-threading and
+subinterpreter isolation, not by abi3 readiness. If you're adding a
+new feature, don't feel obligated to stay limited-API-compatible —
+performance-sensitive code wins.
