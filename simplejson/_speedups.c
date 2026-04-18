@@ -750,8 +750,15 @@ _call_json_method(PyObject *obj, PyObject *method_name, PyObject **result)
      * avoids the char-to-interned-unicode conversion on every call. */
     PyObject *method = PyObject_GetAttr(obj, method_name);
     if (method == NULL) {
-        PyErr_Clear();
-        return 0;
+        if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+            PyErr_Clear();
+            return 0;
+        }
+        /* Non-AttributeError from __getattr__ (e.g. MemoryError,
+         * KeyboardInterrupt): propagate via NULL result so the caller
+         * forwards the pending exception to encoder_steal_encode. */
+        *result = NULL;
+        return 1;
     }
     if (PyCallable_Check(method)) {
         PyObject *tmp = PyObject_CallNoArgs(method);

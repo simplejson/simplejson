@@ -1,4 +1,4 @@
-Version 4.0.0 released 2026-04-12
+Version 4.0.0
 
 * simplejson 4 requires Python 2.7 or Python 3.8+. Older Python
   versions (2.5, 2.6, 3.0-3.7) are no longer supported. pip will
@@ -28,12 +28,30 @@ Version 4.0.0 released 2026-04-12
   - Fix member table copy-paste, exception clobbering, missing Py_VISIT
   - Fix error-as-truthy bugs in maybe_quote_bigint and is_raw_json
   - Fix iterable_as_array swallowing MemoryError and KeyboardInterrupt
+  - Fix for_json and _asdict swallowing MemoryError, KeyboardInterrupt,
+    and other non-AttributeError exceptions raised by user __getattr__
   https://github.com/simplejson/simplejson/pull/355
   https://github.com/simplejson/simplejson/pull/356
   https://github.com/simplejson/simplejson/pull/357
   https://github.com/simplejson/simplejson/pull/358
   https://github.com/simplejson/simplejson/pull/359
   https://github.com/simplejson/simplejson/pull/360
+  https://github.com/simplejson/simplejson/pull/373
+
+* C/Python parity fixes:
+  - Fix C scanstring off-by-one bounds checks that caused truncated
+    or boundary \uXXXX escapes to raise "Invalid \\uXXXX escape
+    sequence" instead of "Unterminated string", and report error
+    position at the 'u' instead of the leading backslash. The C and
+    Python decoders now agree on exception class, message, and
+    position across all tested edge cases.
+  - Align the Python encoder's dispatch order with the C encoder for
+    objects that define _asdict(). Previously a list/tuple/dict
+    subclass with an _asdict() method encoded as its container type
+    under the Python encoder and as the _asdict() return value under
+    the C encoder; both now check _asdict() before list/tuple/dict.
+    for_json() continues to outrank _asdict() in both.
+  https://github.com/simplejson/simplejson/pull/372
 
 * C extension performance and correctness improvements:
   - Add PyDict_Next fast path for unsorted exact-dict encoding,
@@ -52,6 +70,12 @@ Version 4.0.0 released 2026-04-12
   tests free-threaded (3.14t) and debug builds with -Werror, refcount
   leak detection, and GIL-disabled mode.
   https://github.com/simplejson/simplejson/pull/343
+
+* Added a ThreadSanitizer (TSan) stress test CI job. Builds a
+  TSan-instrumented free-threaded CPython (cached between runs) and
+  runs a concurrent stress test script against the C extension to
+  catch data races under free-threading.
+  https://github.com/simplejson/simplejson/pull/373
 
 * Replace deprecated license classifiers with SPDX license expression
   https://github.com/simplejson/simplejson/pull/347

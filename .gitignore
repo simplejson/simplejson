@@ -12,3 +12,4 @@
 /build
 /dist
 /docs
+/tsan_report.txt
