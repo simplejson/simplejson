@@ -427,6 +427,8 @@ static PyObject *
 encoder_long_to_str(PyObject *obj);
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
+static PyObject *
+encoder_build_indent_string(PyEncoderObject *s, Py_ssize_t indent_level);
 static int
 init_speedups_state(_speedups_state *state, PyObject *module);
 static PyObject *
@@ -2121,11 +2123,13 @@ py_encode_basestring(PyObject* self UNUSED, PyObject *pystr)
     /* Return a JSON representation of a Python string (ensure_ascii=False) */
     /* METH_O */
     if (PyBytes_Check(pystr)) {
-        PyObject *uni = PyUnicode_DecodeUTF8(
+        PyObject *uni;
+        PyObject *rval;
+        uni = PyUnicode_DecodeUTF8(
             PyBytes_AS_STRING(pystr), PyBytes_GET_SIZE(pystr), NULL);
         if (uni == NULL)
             return NULL;
-        PyObject *rval = escape_unicode_noascii(uni);
+        rval = escape_unicode_noascii(uni);
         Py_DECREF(uni);
         return rval;
     }
@@ -3124,6 +3128,42 @@ encoder_encode_dict_key(PyEncoderObject *s, PyObject *key)
     return encoded;  /* new reference */
 }
 
+/* Build a new string equal to '\n' + (s->indent * indent_level), the
+ * newline-plus-indent prefix emitted before each item of an indented
+ * array or object and before the matching closing bracket. Returns a
+ * new reference, or NULL on error. Only called when s->indent is not
+ * Py_None. */
+static PyObject *
+encoder_build_indent_string(PyEncoderObject *s, Py_ssize_t indent_level)
+{
+    PyObject *nl;
+    PyObject *rep;
+    PyObject *result;
+
+#if PY_MAJOR_VERSION >= 3
+    nl = PyUnicode_FromStringAndSize("\n", 1);
+#else
+    if (PyUnicode_Check(s->indent))
+        nl = PyUnicode_FromStringAndSize("\n", 1);
+    else
+        nl = PyString_FromStringAndSize("\n", 1);
+#endif
+    if (nl == NULL)
+        return NULL;
+    if (indent_level <= 0)
+        return nl;
+
+    rep = PySequence_Repeat(s->indent, indent_level);
+    if (rep == NULL) {
+        Py_DECREF(nl);
+        return NULL;
+    }
+    result = PyNumber_Add(nl, rep);
+    Py_DECREF(nl);
+    Py_DECREF(rep);
+    return result;
+}
+
 static int
 encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_ssize_t indent_level)
 {
@@ -3133,6 +3173,15 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     PyObject *encoded = NULL;
     PyObject *iter = NULL;
     PyObject *item = NULL;
+    /* When s->indent is not Py_None, newline_indent holds '\n' + indent *
+     * (indent_level + 1), and separator_with_indent holds s->item_separator
+     * + newline_indent.  The borrowed `separator` points at whichever of
+     * s->item_separator or separator_with_indent is in effect for this
+     * container.  All three stay NULL on the indent=None path. */
+    PyObject *newline_indent = NULL;
+    PyObject *separator_with_indent = NULL;
+    PyObject *separator;
+    Py_ssize_t inner_indent_level = indent_level;
     Py_ssize_t idx;
 
     {
@@ -3149,6 +3198,22 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 
     if (JSON_Accu_Accumulate(state, rval, state->JSON_open_dict))
         goto bail;
+
+    if (s->indent != Py_None) {
+        inner_indent_level = indent_level + 1;
+        newline_indent = encoder_build_indent_string(s, inner_indent_level);
+        if (newline_indent == NULL)
+            goto bail;
+        separator_with_indent = PyNumber_Add(s->item_separator, newline_indent);
+        if (separator_with_indent == NULL)
+            goto bail;
+        if (JSON_Accu_Accumulate(state, rval, newline_indent))
+            goto bail;
+        separator = separator_with_indent;
+    }
+    else {
+        separator = s->item_separator;
+    }
 
     /* Fast path: when sort_keys is off and dct is an exact dict,
      * iterate with PyDict_Next to avoid allocating an items list.
@@ -3176,7 +3241,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
                 Py_DECREF(value);
                 continue;
             }
-            if (idx && JSON_Accu_Accumulate(state, rval, s->item_separator)) {
+            if (idx && JSON_Accu_Accumulate(state, rval, separator)) {
                 Py_DECREF(value); err = 1; break;
             }
             if (JSON_Accu_Accumulate(state, rval, encoded)) {
@@ -3186,7 +3251,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             if (JSON_Accu_Accumulate(state, rval, s->key_separator)) {
                 Py_DECREF(value); err = 1; break;
             }
-            if (encoder_listencode_obj(s, rval, value, indent_level)) {
+            if (encoder_listencode_obj(s, rval, value, inner_indent_level)) {
                 Py_DECREF(value); err = 1; break;
             }
             Py_DECREF(value);
@@ -3223,14 +3288,14 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
                 Py_CLEAR(item);
                 continue;
             }
-            if (idx && JSON_Accu_Accumulate(state, rval, s->item_separator))
+            if (idx && JSON_Accu_Accumulate(state, rval, separator))
                 goto bail;
             if (JSON_Accu_Accumulate(state, rval, encoded))
                 goto bail;
             Py_CLEAR(encoded);
             if (JSON_Accu_Accumulate(state, rval, s->key_separator))
                 goto bail;
-            if (encoder_listencode_obj(s, rval, value, indent_level))
+            if (encoder_listencode_obj(s, rval, value, inner_indent_level))
                 goto bail;
             Py_CLEAR(item);
             idx++;
@@ -3243,8 +3308,22 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     if (encoder_markers_pop(s, ident))
         goto bail;
     ident = NULL;
+    if (s->indent != Py_None) {
+        /* Reuse the storage in newline_indent for the pre-close prefix
+         * at indent_level rather than allocating a fresh string.  Skip
+         * the rebuild when indent_level == inner_indent_level, which
+         * only happens if someone passes a negative starting level. */
+        Py_CLEAR(newline_indent);
+        newline_indent = encoder_build_indent_string(s, indent_level);
+        if (newline_indent == NULL)
+            goto bail;
+        if (JSON_Accu_Accumulate(state, rval, newline_indent))
+            goto bail;
+    }
     if (JSON_Accu_Accumulate(state, rval, state->JSON_close_dict))
         goto bail;
+    Py_XDECREF(newline_indent);
+    Py_XDECREF(separator_with_indent);
     return 0;
 
 bail:
@@ -3252,6 +3331,8 @@ bail:
     Py_XDECREF(item);
     Py_XDECREF(iter);
     Py_XDECREF(ident);
+    Py_XDECREF(newline_indent);
+    Py_XDECREF(separator_with_indent);
     return -1;
 }
 
@@ -3264,44 +3345,77 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
     PyObject *ident = NULL;
     PyObject *iter = NULL;
     PyObject *obj = NULL;
+    /* See encoder_listencode_dict for the indent-prefix variable
+     * conventions; they are identical here. */
+    PyObject *newline_indent = NULL;
+    PyObject *separator_with_indent = NULL;
+    PyObject *separator;
+    Py_ssize_t inner_indent_level = indent_level;
     Py_ssize_t i = 0;
+    int is_exact_fast;
 
     /* Emptiness check: use direct size for exact types to skip the
      * __bool__/__len__ method dispatch of PyObject_IsTrue. */
     if (PyList_CheckExact(seq)) {
         if (PyList_GET_SIZE(seq) == 0)
             return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+        is_exact_fast = 1;
     }
     else if (PyTuple_CheckExact(seq)) {
         if (PyTuple_GET_SIZE(seq) == 0)
             return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+        is_exact_fast = 1;
     }
     else {
-        int is_true = PyObject_IsTrue(seq);
-        if (is_true == -1)
-            return -1;
-        if (is_true == 0)
-            return JSON_Accu_Accumulate(state, rval, state->JSON_empty_array);
+        /* For non-exact types (list/tuple subclasses or other iterables)
+         * we cannot short-circuit on emptiness without consuming the
+         * iterator. iterable_as_array in particular reaches us with a
+         * bare iterator whose PyObject_IsTrue always returns 1, so the
+         * emptiness is only discovered on the first PyIter_Next call
+         * inside the slow path below. */
+        is_exact_fast = 0;
     }
 
     if (encoder_markers_push(s, seq, &ident))
         goto bail;
 
-    if (JSON_Accu_Accumulate(state, rval, state->JSON_open_array))
-        goto bail;
+    if (s->indent != Py_None)
+        inner_indent_level = indent_level + 1;
 
-    /* Fast path: exact list or exact tuple — iterate by index to avoid
-     * allocating an iterator object.  Py_BEGIN_CRITICAL_SECTION prevents
-     * concurrent list mutation on free-threaded builds (tuples are
-     * immutable so the lock is uncontested).
-     *
-     * Uses a local `item` variable (not the outer `obj`) so that the
-     * bail handler's Py_XDECREF(obj) stays a no-op for this path. */
-    if (PyList_CheckExact(seq) || PyTuple_CheckExact(seq)) {
+    if (is_exact_fast) {
+        /* Fast path: exact list or exact tuple — iterate by index to
+         * avoid allocating an iterator object.  Known non-empty from
+         * the size check above, so the opening bracket and the first
+         * newline_indent can be emitted unconditionally.
+         * Py_BEGIN_CRITICAL_SECTION prevents concurrent list mutation
+         * on free-threaded builds (tuples are immutable so the lock is
+         * uncontested).
+         *
+         * Uses a local `item` variable (not the outer `obj`) so that
+         * the bail handler's Py_XDECREF(obj) stays a no-op for this
+         * path. */
         PyObject *item;
         Py_ssize_t size;
         int is_list = PyList_CheckExact(seq);
         int err = 0;
+
+        if (JSON_Accu_Accumulate(state, rval, state->JSON_open_array))
+            goto bail;
+
+        if (s->indent != Py_None) {
+            newline_indent = encoder_build_indent_string(s, inner_indent_level);
+            if (newline_indent == NULL)
+                goto bail;
+            separator_with_indent = PyNumber_Add(s->item_separator, newline_indent);
+            if (separator_with_indent == NULL)
+                goto bail;
+            if (JSON_Accu_Accumulate(state, rval, newline_indent))
+                goto bail;
+            separator = separator_with_indent;
+        }
+        else {
+            separator = s->item_separator;
+        }
 
         Py_BEGIN_CRITICAL_SECTION(seq);
         size = is_list ? PyList_GET_SIZE(seq) : PyTuple_GET_SIZE(seq);
@@ -3309,10 +3423,10 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
             item = is_list ? PyList_GET_ITEM(seq, i)
                            : PyTuple_GET_ITEM(seq, i);
             Py_INCREF(item);
-            if (i && JSON_Accu_Accumulate(state, rval, s->item_separator)) {
+            if (i && JSON_Accu_Accumulate(state, rval, separator)) {
                 Py_DECREF(item); err = 1; break;
             }
-            if (encoder_listencode_obj(s, rval, item, indent_level)) {
+            if (encoder_listencode_obj(s, rval, item, inner_indent_level)) {
                 Py_DECREF(item); err = 1; break;
             }
             Py_DECREF(item);
@@ -3321,18 +3435,51 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
 
         if (err)
             goto bail;
+
+        if (s->indent != Py_None) {
+            Py_CLEAR(newline_indent);
+            newline_indent = encoder_build_indent_string(s, indent_level);
+            if (newline_indent == NULL)
+                goto bail;
+            if (JSON_Accu_Accumulate(state, rval, newline_indent))
+                goto bail;
+        }
+        if (JSON_Accu_Accumulate(state, rval, state->JSON_close_array))
+            goto bail;
     }
     else {
-        /* Slow path: list/tuple subclasses or other iterables. */
+        /* Slow path: list/tuple subclasses or arbitrary iterables.
+         * The opening '[' and newline_indent are deferred until we
+         * know there is at least one item, so an empty iterable still
+         * emits a compact "[]" under an indent= setting. */
+        int emitted_open = 0;
+
+        separator = s->item_separator;  /* overwritten once open is emitted */
         iter = PyObject_GetIter(seq);
         if (iter == NULL)
             goto bail;
         while ((obj = PyIter_Next(iter))) {
-            if (i) {
-                if (JSON_Accu_Accumulate(state, rval, s->item_separator))
+            if (!emitted_open) {
+                if (JSON_Accu_Accumulate(state, rval, state->JSON_open_array))
+                    goto bail;
+                if (s->indent != Py_None) {
+                    newline_indent = encoder_build_indent_string(s, inner_indent_level);
+                    if (newline_indent == NULL)
+                        goto bail;
+                    separator_with_indent = PyNumber_Add(s->item_separator, newline_indent);
+                    if (separator_with_indent == NULL)
+                        goto bail;
+                    if (JSON_Accu_Accumulate(state, rval, newline_indent))
+                        goto bail;
+                    separator = separator_with_indent;
+                }
+                emitted_open = 1;
+            }
+            else {
+                if (JSON_Accu_Accumulate(state, rval, separator))
                     goto bail;
             }
-            if (encoder_listencode_obj(s, rval, obj, indent_level))
+            if (encoder_listencode_obj(s, rval, obj, inner_indent_level))
                 goto bail;
             i++;
             Py_CLEAR(obj);
@@ -3340,19 +3487,38 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
         Py_CLEAR(iter);
         if (PyErr_Occurred())
             goto bail;
+
+        if (!emitted_open) {
+            if (JSON_Accu_Accumulate(state, rval, state->JSON_empty_array))
+                goto bail;
+        }
+        else {
+            if (s->indent != Py_None) {
+                Py_CLEAR(newline_indent);
+                newline_indent = encoder_build_indent_string(s, indent_level);
+                if (newline_indent == NULL)
+                    goto bail;
+                if (JSON_Accu_Accumulate(state, rval, newline_indent))
+                    goto bail;
+            }
+            if (JSON_Accu_Accumulate(state, rval, state->JSON_close_array))
+                goto bail;
+        }
     }
 
     if (encoder_markers_pop(s, ident))
         goto bail;
     ident = NULL;
-    if (JSON_Accu_Accumulate(state, rval, state->JSON_close_array))
-        goto bail;
+    Py_XDECREF(newline_indent);
+    Py_XDECREF(separator_with_indent);
     return 0;
 
 bail:
     Py_XDECREF(obj);
     Py_XDECREF(iter);
     Py_XDECREF(ident);
+    Py_XDECREF(newline_indent);
+    Py_XDECREF(separator_with_indent);
     return -1;
 }
 

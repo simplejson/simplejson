@@ -372,7 +372,7 @@ class JSONEncoder(object):
         key_memo = {}
         int_as_string_bitcount = (
             53 if self.bigint_as_string else self.int_as_string_bitcount)
-        if (c_make_encoder is not None and self.indent is None):
+        if c_make_encoder is not None:
             _iterencode = c_make_encoder(
                 markers, self.default, _encoder, self.indent,
                 self.key_separator, self.item_separator, self.sort_keys,
