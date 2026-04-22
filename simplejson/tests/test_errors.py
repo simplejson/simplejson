@@ -73,8 +73,7 @@ class TestErrors(TestCase):
         x = []
         x.append(x)
         try:
-            # Use indent to force the Python encoder
-            json.dumps(x, indent=2)
+            json.dumps(x)
         except ValueError as exc:
             self.assertEqual(
                 exc.__notes__, ['when serializing list item 0'])
@@ -86,7 +85,7 @@ class TestErrors(TestCase):
         x = {}
         x['test'] = x
         try:
-            json.dumps(x, indent=2)
+            json.dumps(x)
         except ValueError as exc:
             self.assertEqual(
                 exc.__notes__, ["when serializing dict item 'test'"])
@@ -96,7 +95,7 @@ class TestErrors(TestCase):
     @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_nested_error(self):
         try:
-            json.dumps({'a': [1, object(), 3]}, indent=2)
+            json.dumps({'a': [1, object(), 3]})
         except TypeError as exc:
             self.assertEqual(len(exc.__notes__), 3)
             self.assertEqual(exc.__notes__[0],
