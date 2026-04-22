@@ -70,54 +70,39 @@ class TestErrors(TestCase):
 
     @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_list_recursion(self):
-        # add_note is only emitted by the pure-Python encoder; the C
-        # encoder re-raises without annotating. Force Python for the
-        # assertion.
-        json._toggle_speedups(False)
+        x = []
+        x.append(x)
         try:
-            x = []
-            x.append(x)
-            try:
-                json.dumps(x, indent=2)
-            except ValueError as exc:
-                self.assertEqual(
-                    exc.__notes__, ['when serializing list item 0'])
-            else:
-                self.fail('Expected ValueError')
-        finally:
-            json._toggle_speedups(True)
+            json.dumps(x)
+        except ValueError as exc:
+            self.assertEqual(
+                exc.__notes__, ['when serializing list item 0'])
+        else:
+            self.fail('Expected ValueError')
 
     @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_dict_recursion(self):
-        json._toggle_speedups(False)
+        x = {}
+        x['test'] = x
         try:
-            x = {}
-            x['test'] = x
-            try:
-                json.dumps(x, indent=2)
-            except ValueError as exc:
-                self.assertEqual(
-                    exc.__notes__, ["when serializing dict item 'test'"])
-            else:
-                self.fail('Expected ValueError')
-        finally:
-            json._toggle_speedups(True)
+            json.dumps(x)
+        except ValueError as exc:
+            self.assertEqual(
+                exc.__notes__, ["when serializing dict item 'test'"])
+        else:
+            self.fail('Expected ValueError')
 
     @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_nested_error(self):
-        json._toggle_speedups(False)
         try:
-            try:
-                json.dumps({'a': [1, object(), 3]}, indent=2)
-            except TypeError as exc:
-                self.assertEqual(len(exc.__notes__), 3)
-                self.assertEqual(exc.__notes__[0],
-                    'when serializing object object')
-                self.assertEqual(exc.__notes__[1],
-                    'when serializing list item 1')
-                self.assertEqual(exc.__notes__[2],
-                    "when serializing dict item 'a'")
-            else:
-                self.fail('Expected TypeError')
-        finally:
-            json._toggle_speedups(True)
+            json.dumps({'a': [1, object(), 3]})
+        except TypeError as exc:
+            self.assertEqual(len(exc.__notes__), 3)
+            self.assertEqual(exc.__notes__[0],
+                'when serializing object object')
+            self.assertEqual(exc.__notes__[1],
+                'when serializing list item 1')
+            self.assertEqual(exc.__notes__[2],
+                "when serializing dict item 'a'")
+        else:
+            self.fail('Expected TypeError')

@@ -5,11 +5,17 @@ Version 4.1.0 released 2026-04-22
   whenever a non-None ``indent`` was passed; now the C encoder emits
   the newline-plus-indent prefix, the level-aware item separator, and
   the closing indent directly.  A representative nested-dict workload
-  benchmarks about 4-5x faster end-to-end, and the indent=0 and empty
-  container edge cases continue to match the Python output byte-for-
-  byte.  Note: ``PEP 678`` ``exc.add_note()`` annotations are still
-  only produced by the Python encoder; tests that rely on those notes
-  now explicitly disable the speedups via ``_toggle_speedups``.
+  benchmarks about 4-5x faster end-to-end, and the ``indent=0`` and
+  empty-container edge cases continue to match the Python output
+  byte-for-byte.
+
+* The C extension now emits PEP 678 ``exc.add_note()`` annotations on
+  serialization failures, matching the pure-Python encoder.  A chained
+  error on ``{'a': [1, object(), 3]}`` produces the same three notes
+  (``when serializing object object``, ``when serializing list item 1``,
+  ``when serializing dict item 'a'``) whether the speedups are loaded
+  or not, so the add_note assertions in ``test_errors.py`` no longer
+  need ``indent=2`` to force the Python path.
 
 Version 4.0.1 released 2026-04-18
 
