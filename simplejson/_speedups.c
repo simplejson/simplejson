@@ -432,7 +432,7 @@ static PyObject *
 encoder_build_indent_string(PyEncoderObject *s, Py_ssize_t indent_level);
 #if PY_VERSION_HEX >= 0x030B0000
 static void
-encoder_annotate_exception(_speedups_state *state, PyObject *note);
+encoder_annotate_exception(_speedups_state *state, const char *format, ...);
 #endif
 static int
 init_speedups_state(_speedups_state *state, PyObject *module);
@@ -3008,10 +3008,8 @@ encoder_listencode_default(PyEncoderObject *s, JSON_Accu *rval,
          * note uses the original obj's type name, matching the Python
          * encoder which binds type(o).__name__ before `o = default(o)`
          * runs. */
-        PyObject *note = PyUnicode_FromFormat(
+        encoder_annotate_exception(state,
             "when serializing %s object", Py_TYPE(obj)->tp_name);
-        encoder_annotate_exception(state, note);
-        Py_XDECREF(note);
 #endif
         Py_LeaveRecursiveCall();
         Py_XDECREF(ident);
@@ -3024,10 +3022,8 @@ encoder_listencode_default(PyEncoderObject *s, JSON_Accu *rval,
         /* default() succeeded but encoding its return value failed; in
          * the Python encoder `o` has been rebound to newobj at this
          * point, so the note reflects that type. */
-        PyObject *note = PyUnicode_FromFormat(
+        encoder_annotate_exception(state,
             "when serializing %s object", Py_TYPE(newobj)->tp_name);
-        encoder_annotate_exception(state, note);
-        Py_XDECREF(note);
 #endif
     }
     Py_DECREF(newobj);
@@ -3191,31 +3187,33 @@ encoder_build_indent_string(PyEncoderObject *s, Py_ssize_t indent_level)
 }
 
 #if PY_VERSION_HEX >= 0x030B0000
-/* Attach PEP 678 `note` to the in-flight exception via exc.add_note().
- * Mirrors the pure-Python encoder's `except BaseException as exc: ...
- * exc.add_note(...)` wrappers around each recursive encode step.
+/* Attach a PEP 678 note formatted via PyUnicode_FromFormatV to the in-
+ * flight exception. Mirrors the pure-Python encoder's
+ * `except BaseException as exc: exc.add_note(...); raise` wrappers
+ * around each recursive encode step.
  *
- * note may be NULL when the caller's PyUnicode_FromFormat itself raised
- * (e.g. a dict key whose __repr__ blew up); in that case we clear the
- * secondary exception so the in-flight one survives untouched.  If
- * add_note itself fails — rare, but possible on a BaseException subclass
- * that overrides it — the secondary exception is also swallowed for the
- * same reason.  The original exception is always restored before we
- * return, so this helper is safe to call on the error-bail path.
+ * Crucially, PyErr_Fetch runs BEFORE the note is built: the `%R`
+ * formatter walks into PyObject_Repr, which on debug builds
+ * (cpython-3.14-debug and cpython-3.14t+debug) asserts that no
+ * exception is currently set. Building the note while our caller's
+ * exception is still live would core-dump those jobs, as the CI
+ * failure on job 72447820967 / 72447820982 demonstrated. Fetch first,
+ * format second, Restore last.
+ *
+ * Failures on the note path — a repr() that raises, PyUnicode_FromFormatV
+ * returning NULL, a BaseException subclass whose add_note override
+ * raises — are swallowed so the in-flight exception survives intact.
  *
  * Only compiled on Python 3.11+, where PEP 678 exists. */
 static void
-encoder_annotate_exception(_speedups_state *state, PyObject *note)
+encoder_annotate_exception(_speedups_state *state, const char *format, ...)
 {
     PyObject *exc_type;
     PyObject *exc_value;
     PyObject *exc_tb;
+    PyObject *note;
     PyObject *result;
-
-    if (note == NULL) {
-        PyErr_Clear();
-        return;
-    }
+    va_list args;
 
     PyErr_Fetch(&exc_type, &exc_value, &exc_tb);
     if (exc_value == NULL) {
@@ -3226,12 +3224,22 @@ encoder_annotate_exception(_speedups_state *state, PyObject *note)
     }
     PyErr_NormalizeException(&exc_type, &exc_value, &exc_tb);
 
-    result = PyObject_CallMethodObjArgs(exc_value, state->JSON_attr_add_note,
-                                        note, NULL);
-    if (result == NULL)
+    va_start(args, format);
+    note = PyUnicode_FromFormatV(format, args);
+    va_end(args);
+
+    if (note != NULL) {
+        result = PyObject_CallMethodObjArgs(exc_value, state->JSON_attr_add_note,
+                                            note, NULL);
+        Py_DECREF(note);
+        if (result == NULL)
+            PyErr_Clear();
+        else
+            Py_DECREF(result);
+    }
+    else {
         PyErr_Clear();
-    else
-        Py_DECREF(result);
+    }
 
     PyErr_Restore(exc_type, exc_value, exc_tb);
 }
@@ -3326,11 +3334,9 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
             }
             if (encoder_listencode_obj(s, rval, value, inner_indent_level)) {
 #if PY_VERSION_HEX >= 0x030B0000
-                PyObject *note = PyUnicode_FromFormat(
+                encoder_annotate_exception(state,
                     "when serializing %s item %R",
                     Py_TYPE(dct)->tp_name, key);
-                encoder_annotate_exception(state, note);
-                Py_XDECREF(note);
 #endif
                 Py_DECREF(value); err = 1; break;
             }
@@ -3377,11 +3383,9 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
                 goto bail;
             if (encoder_listencode_obj(s, rval, value, inner_indent_level)) {
 #if PY_VERSION_HEX >= 0x030B0000
-                PyObject *note = PyUnicode_FromFormat(
+                encoder_annotate_exception(state,
                     "when serializing %s item %R",
                     Py_TYPE(dct)->tp_name, key);
-                encoder_annotate_exception(state, note);
-                Py_XDECREF(note);
 #endif
                 goto bail;
             }
@@ -3516,11 +3520,9 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
             }
             if (encoder_listencode_obj(s, rval, item, inner_indent_level)) {
 #if PY_VERSION_HEX >= 0x030B0000
-                PyObject *note = PyUnicode_FromFormat(
+                encoder_annotate_exception(state,
                     "when serializing %s item %zd",
                     Py_TYPE(seq)->tp_name, i);
-                encoder_annotate_exception(state, note);
-                Py_XDECREF(note);
 #endif
                 Py_DECREF(item); err = 1; break;
             }
@@ -3576,11 +3578,9 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq, Py_s
             }
             if (encoder_listencode_obj(s, rval, obj, inner_indent_level)) {
 #if PY_VERSION_HEX >= 0x030B0000
-                PyObject *note = PyUnicode_FromFormat(
+                encoder_annotate_exception(state,
                     "when serializing %s item %zd",
                     Py_TYPE(seq)->tp_name, i);
-                encoder_annotate_exception(state, note);
-                Py_XDECREF(note);
 #endif
                 goto bail;
             }
