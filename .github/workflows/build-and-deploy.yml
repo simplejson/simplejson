@@ -219,7 +219,13 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Build Python 2.7 wheels
-        uses: pypa/cibuildwheel@v1.12.0
+        # v1.11.1 is the last cibuildwheel release with cp27 Windows
+        # support: v1.12 removed cp27 from WINDOWS_PYTHONS, so the
+        # selector matches zero identifiers and the job errors with
+        # "No build identifiers selected". The manylinux cp27 image
+        # still ships in v1.11.1, so one version works for both
+        # Linux and Windows matrix entries.
+        uses: pypa/cibuildwheel@v1.11.1
         env:
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"

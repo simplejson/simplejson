@@ -55,7 +55,7 @@ bytes parser path in `_speedups.c` or `_speedups_scan.h`, the loop is:
    vs statements, refcount transitions)
 2. Push a commit
 3. Wait for the `Build Python 2.7 wheels` step in the wheel job
-   (uses `pypa/cibuildwheel@v1.12.0` / manylinux1 / gcc 4.8)
+   (uses `pypa/cibuildwheel@v1.11.1` / manylinux1 / gcc 4.8)
 
 ## Reading CI failures
 
@@ -85,9 +85,14 @@ Two cibuildwheel versions run in one job:
   In v3.x **PyPy is disabled by default**; `CIBW_SKIP: "pp*"` *errors*
   with `Invalid skip selector: 'pp*'. This selector matches a group
   that wasn't enabled.` Do not set it.
-- **`Build Python 2.7 wheels` step** uses `pypa/cibuildwheel@v1.12.0`.
-  That version *does* build PyPy by default, so this step **must**
-  keep `CIBW_SKIP: "pp*"`.
+- **`Build Python 2.7 wheels` step** uses `pypa/cibuildwheel@v1.11.1`
+  (not v1.12.0). v1.12 removed cp27 from `WINDOWS_PYTHONS`, so any
+  Windows matrix entry with `CIBW_BUILD: "cp27-*"` fails with "No
+  build identifiers selected". v1.11.1 is the last release that
+  builds cp27 on both Linux (via manylinux1 Docker image) and
+  Windows (via the NuGet `python2` package). That version *does*
+  build PyPy by default, so this step **must** keep
+  `CIBW_SKIP: "pp*"`.
 - `CIBW_ENABLE: "cpython-freethreading"` is deprecated in v3.4+
   (free-threaded builds are on by default). Remove it.
 
