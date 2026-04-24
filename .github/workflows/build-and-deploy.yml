@@ -234,20 +234,22 @@ jobs:
           CIBW_BUILD: "cp27-*"
           CIBW_SKIP: "pp*"
           CIBW_ARCHS: ${{ matrix.arch }}
-          # cibuildwheel v1.11+ filters cp27 out of WINDOWS_PYTHONS
-          # during identifier selection unless both DISTUTILS_USE_SDK
-          # and MSSdk are set in its own process environment (see
-          # cibuildwheel/windows.py). Without them the job errors
-          # with "No build identifiers selected" before the build
-          # phase starts. CIBW_ENVIRONMENT_WINDOWS forwards the same
-          # vars to the per-wheel build subprocess so distutils uses
-          # the active MSVC toolchain (set up by ilammy/msvc-dev-cmd
-          # above) instead of hunting for the removed VS 2008 / VC 9.0
-          # installer. No-op on Linux runs (read via CIBW_ENVIRONMENT_
-          # WINDOWS scoping + Linux never filters cp27).
-          DISTUTILS_USE_SDK: "1"
-          MSSdk: "1"
-          CIBW_ENVIRONMENT_WINDOWS: DISTUTILS_USE_SDK=1 MSSdk=1
+          # Windows-only gate for cp27: cibuildwheel v1.11+ filters
+          # cp27 out of WINDOWS_PYTHONS during identifier selection
+          # unless both DISTUTILS_USE_SDK and MSSdk are set in its
+          # own process environment (see cibuildwheel/windows.py).
+          # Without them the job errors with "No build identifiers
+          # selected" before the build phase starts. Mirrored via
+          # CIBW_ENVIRONMENT_WINDOWS so the per-wheel build
+          # subprocess forwards the vars to distutils, which then
+          # uses the active MSVC toolchain (set up by
+          # ilammy/msvc-dev-cmd above) instead of hunting for the
+          # removed VS 2008 / VC 9.0 installer. Scoped to Windows
+          # runners so stray Windows env vars don't leak onto the
+          # Linux cp27 matrix entry.
+          DISTUTILS_USE_SDK: ${{ runner.os == 'Windows' && '1' || '' }}
+          MSSdk: ${{ runner.os == 'Windows' && '1' || '' }}
+          CIBW_ENVIRONMENT_WINDOWS: ${{ runner.os == 'Windows' && 'DISTUTILS_USE_SDK=1 MSSdk=1' || '' }}
 
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
