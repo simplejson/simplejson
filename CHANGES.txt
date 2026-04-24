@@ -1,22 +1,13 @@
 Version 4.1.1 (unreleased)
 
-* Python 2.7 offline / ``--no-index`` installs no longer fail on the
-  PEP 517 isolated-build step complaining that
-  ``setuptools>=42`` is not in the wheelhouse. Two changes:
-
-  - The ``build_wheels_py27`` CI job now also builds Python 2.7
-    wheels for Windows AMD64 and Windows x86, so Py2.7-on-Windows
-    users (the original reporter's case) get a pre-built wheel from
-    PyPI instead of being forced to build from the sdist. Both
-    64-bit and 32-bit Py2.7 interpreters are covered; this joins the
-    existing Py2.7 manylinux1 / manylinux2010 x86_64 wheels.
-  - The fallback pure-Python wheel built by ``build_sdist`` now uses
-    ``bdist_wheel --universal`` and is tagged ``py2.py3-none-any``
-    instead of ``py3-none-any``, so Py2.7 users on any platform
-    without a matching binary wheel (e.g. macOS, aarch64 Linux) can
-    still install from a wheelhouse without triggering a source
-    build.
-
+* The ``build_wheels_py27`` CI job now also builds Python 2.7 wheels
+  for Windows AMD64 and Windows x86, joining the existing Py2.7
+  manylinux1 / manylinux2010 x86_64 wheels. This unblocks offline /
+  ``--no-index`` installs on Py2.7-on-Windows (the original
+  reporter's case), which previously had no matching binary wheel on
+  PyPI, fell through to the sdist, and failed on the PEP 517
+  isolated-build step complaining that ``setuptools>=42`` was not in
+  the wheelhouse.
   https://github.com/simplejson/simplejson/issues/377
 
 Version 4.1.0 released 2026-04-22
