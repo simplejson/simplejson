@@ -213,25 +213,41 @@ jobs:
             arch: x86_64
           - os: windows-latest
             arch: AMD64
+            msvc_arch: x64
           - os: windows-latest
             arch: x86
+            msvc_arch: x86
     steps:
       - uses: actions/checkout@v6
 
+      - name: Activate MSVC toolchain (Windows only)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
+
       - name: Build Python 2.7 wheels
-        # v1.11.1 is the last cibuildwheel release with cp27 Windows
-        # support: v1.12 removed cp27 from WINDOWS_PYTHONS, so the
-        # selector matches zero identifiers and the job errors with
-        # "No build identifiers selected". The manylinux cp27 image
-        # still ships in v1.11.1, so one version works for both
-        # Linux and Windows matrix entries.
-        uses: pypa/cibuildwheel@v1.11.1
+        uses: pypa/cibuildwheel@v1.12.0
         env:
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"
           CIBW_BUILD: "cp27-*"
           CIBW_SKIP: "pp*"
           CIBW_ARCHS: ${{ matrix.arch }}
+          # cibuildwheel v1.11+ filters cp27 out of WINDOWS_PYTHONS
+          # during identifier selection unless both DISTUTILS_USE_SDK
+          # and MSSdk are set in its own process environment (see
+          # cibuildwheel/windows.py). Without them the job errors
+          # with "No build identifiers selected" before the build
+          # phase starts. CIBW_ENVIRONMENT_WINDOWS forwards the same
+          # vars to the per-wheel build subprocess so distutils uses
+          # the active MSVC toolchain (set up by ilammy/msvc-dev-cmd
+          # above) instead of hunting for the removed VS 2008 / VC 9.0
+          # installer. No-op on Linux runs (read via CIBW_ENVIRONMENT_
+          # WINDOWS scoping + Linux never filters cp27).
+          DISTUTILS_USE_SDK: "1"
+          MSSdk: "1"
+          CIBW_ENVIRONMENT_WINDOWS: DISTUTILS_USE_SDK=1 MSSdk=1
 
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')

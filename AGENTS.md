@@ -55,7 +55,7 @@ bytes parser path in `_speedups.c` or `_speedups_scan.h`, the loop is:
    vs statements, refcount transitions)
 2. Push a commit
 3. Wait for the `Build Python 2.7 wheels` step in the wheel job
-   (uses `pypa/cibuildwheel@v1.11.1` / manylinux1 / gcc 4.8)
+   (uses `pypa/cibuildwheel@v1.12.0` / manylinux1 / gcc 4.8)
 
 ## Reading CI failures
 
@@ -85,14 +85,26 @@ Two cibuildwheel versions run in one job:
   In v3.x **PyPy is disabled by default**; `CIBW_SKIP: "pp*"` *errors*
   with `Invalid skip selector: 'pp*'. This selector matches a group
   that wasn't enabled.` Do not set it.
-- **`Build Python 2.7 wheels` step** uses `pypa/cibuildwheel@v1.11.1`
-  (not v1.12.0). v1.12 removed cp27 from `WINDOWS_PYTHONS`, so any
-  Windows matrix entry with `CIBW_BUILD: "cp27-*"` fails with "No
-  build identifiers selected". v1.11.1 is the last release that
-  builds cp27 on both Linux (via manylinux1 Docker image) and
-  Windows (via the NuGet `python2` package). That version *does*
-  build PyPy by default, so this step **must** keep
-  `CIBW_SKIP: "pp*"`.
+- **`Build Python 2.7 wheels` step** uses `pypa/cibuildwheel@v1.12.0`.
+  That version *does* build PyPy by default, so this step **must**
+  keep `CIBW_SKIP: "pp*"`. v2.0.0 dropped cp27 entirely; v1.12.0 is
+  the last release that still carries it. *Do not* chase a v1.11.x
+  pin to "fix" cp27 Windows — the Windows gate is the env vars
+  below, not the version number.
+- **cp27 on Windows** requires `DISTUTILS_USE_SDK=1` and `MSSdk=1`
+  in cibuildwheel's own environment (not just
+  `CIBW_ENVIRONMENT_WINDOWS`). cibuildwheel v1.11+ filters cp27 out
+  of `WINDOWS_PYTHONS` during identifier selection when those env
+  vars are unset — the symptom is the job erroring with
+  `cibuildwheel: No build identifiers selected` *before* the build
+  phase starts. The comment in `cibuildwheel/windows.py` explains:
+  "Only supported with custom compiler, since MS removed the 2008
+  compiler download." Set them at step scope *and* mirror via
+  `CIBW_ENVIRONMENT_WINDOWS=DISTUTILS_USE_SDK=1 MSSdk=1` so the
+  per-wheel build subprocess also sees them, then activate a modern
+  MSVC in the job via `ilammy/msvc-dev-cmd@v1` with
+  `arch: x64`/`arch: x86` matching the wheel arch — distutils will
+  use that in place of the missing VC 9.0.
 - `CIBW_ENABLE: "cpython-freethreading"` is deprecated in v3.4+
   (free-threaded builds are on by default). Remove it.
 
