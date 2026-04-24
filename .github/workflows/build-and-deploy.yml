@@ -204,8 +204,16 @@ jobs:
           path: tsan_report.txt
 
   build_wheels_py27:
-    name: Build Python 2.7 wheels (linux x86_64)
-    runs-on: ubuntu-latest
+    name: Build Python 2.7 wheels (${{ matrix.os }} ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: windows-latest
+            arch: AMD64
     steps:
       - uses: actions/checkout@v6
 
@@ -216,12 +224,15 @@ jobs:
             python -m simplejson.tests._cibw_runner "{project}"
           CIBW_BUILD: "cp27-*"
           CIBW_SKIP: "pp*"
+          # cibuildwheel v1 reads the arch var matching the runner
+          # platform and ignores the others, so setting both is safe.
           CIBW_ARCHS_LINUX: x86_64
+          CIBW_ARCHS_WINDOWS: AMD64
 
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
         with:
-          name: wheels-py27
+          name: wheels-py27-${{ matrix.os }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
   build_wheels:
@@ -378,7 +389,7 @@ jobs:
 
   gate_windows:
     name: Build wheels on windows-latest
-    needs: [build_wheels]
+    needs: [build_wheels, build_wheels_py27]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All windows-latest checks passed"
