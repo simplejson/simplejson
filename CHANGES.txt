@@ -1,3 +1,15 @@
+Version 4.1.1 released 2026-04-24
+
+* The ``build_wheels_py27`` CI job now also builds Python 2.7 wheels
+  for Windows AMD64 and Windows x86, joining the existing Py2.7
+  manylinux1 / manylinux2010 x86_64 wheels. This unblocks offline /
+  ``--no-index`` installs on Py2.7-on-Windows (the original
+  reporter's case), which previously had no matching binary wheel on
+  PyPI, fell through to the sdist, and failed on the PEP 517
+  isolated-build step complaining that ``setuptools>=42`` was not in
+  the wheelhouse.
+  https://github.com/simplejson/simplejson/issues/377
+
 Version 4.1.0 released 2026-04-22
 
 * The C extension now accelerates encoding when ``indent=`` is set.

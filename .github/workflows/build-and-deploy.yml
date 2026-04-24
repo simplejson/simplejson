@@ -1,13 +1,18 @@
 name: Build and upload to PyPI
 
-on: [push, pull_request, merge_group]
-# Alternatively, to publish when a (published) GitHub Release is created, use the following:
-# on:
-#   push:
-#   pull_request:
-#   release:
-#     types:
-#       - published
+on:
+  # Restrict the push trigger to main and release tags so feature-
+  # branch pushes don't double up: a branch push with an open PR
+  # would otherwise fire both the push and pull_request events on
+  # the same SHA. Merges to main still run (push), releases still
+  # run (push on tags, keying upload_pypi's refs/tags/v gate), PRs
+  # still run (pull_request), and the merge queue still runs
+  # (merge_group) - but only once per commit.
+  push:
+    branches: [main]
+    tags: ['v*', 'test-v*']
+  pull_request:
+  merge_group:
 
 jobs:
   test_pure_python:
@@ -204,10 +209,27 @@ jobs:
           path: tsan_report.txt
 
   build_wheels_py27:
-    name: Build Python 2.7 wheels (linux x86_64)
-    runs-on: ubuntu-latest
+    name: Build Python 2.7 wheels (${{ matrix.os }} ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: windows-latest
+            arch: AMD64
+            msvc_arch: x64
+          - os: windows-latest
+            arch: x86
+            msvc_arch: x86
     steps:
       - uses: actions/checkout@v6
+
+      - name: Activate MSVC toolchain (Windows only)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.msvc_arch }}
 
       - name: Build Python 2.7 wheels
         uses: pypa/cibuildwheel@v1.12.0
@@ -216,12 +238,28 @@ jobs:
             python -m simplejson.tests._cibw_runner "{project}"
           CIBW_BUILD: "cp27-*"
           CIBW_SKIP: "pp*"
-          CIBW_ARCHS_LINUX: x86_64
+          CIBW_ARCHS: ${{ matrix.arch }}
+          # Windows-only gate for cp27: cibuildwheel v1.11+ filters
+          # cp27 out of WINDOWS_PYTHONS during identifier selection
+          # unless both DISTUTILS_USE_SDK and MSSdk are set in its
+          # own process environment (see cibuildwheel/windows.py).
+          # Without them the job errors with "No build identifiers
+          # selected" before the build phase starts. Mirrored via
+          # CIBW_ENVIRONMENT_WINDOWS so the per-wheel build
+          # subprocess forwards the vars to distutils, which then
+          # uses the active MSVC toolchain (set up by
+          # ilammy/msvc-dev-cmd above) instead of hunting for the
+          # removed VS 2008 / VC 9.0 installer. Scoped to Windows
+          # runners so stray Windows env vars don't leak onto the
+          # Linux cp27 matrix entry.
+          DISTUTILS_USE_SDK: ${{ runner.os == 'Windows' && '1' || '' }}
+          MSSdk: ${{ runner.os == 'Windows' && '1' || '' }}
+          CIBW_ENVIRONMENT_WINDOWS: ${{ runner.os == 'Windows' && 'DISTUTILS_USE_SDK=1 MSSdk=1' || '' }}
 
       - uses: actions/upload-artifact@v7
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/')
         with:
-          name: wheels-py27
+          name: wheels-py27-${{ matrix.os }}-${{ matrix.arch }}
           path: ./wheelhouse/*.whl
 
   build_wheels:
@@ -373,7 +411,7 @@ jobs:
 
   gate_windows:
     name: Build wheels on windows-latest
-    needs: [build_wheels]
+    needs: [build_wheels, build_wheels_py27]
     runs-on: ubuntu-latest
     steps:
       - run: echo "All windows-latest checks passed"
