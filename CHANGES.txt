@@ -1,3 +1,14 @@
+Version 4.1.1 (unreleased)
+
+* Build the fallback pure-Python wheel with ``--universal`` so it is
+  tagged ``py2.py3-none-any`` instead of ``py3-none-any``. Air-gapped
+  Python 2.7 installs that use ``pip install --no-index`` against a
+  local wheelhouse can now pick up the pre-built wheel directly
+  instead of falling back to the sdist and failing on the PEP 517
+  isolated-build step (which requires ``setuptools>=42`` and ``wheel``
+  to be present in the wheelhouse).
+  https://github.com/simplejson/simplejson/issues/377
+
 Version 4.1.0 released 2026-04-22
 
 * The C extension now accelerates encoding when ``indent=`` is set.

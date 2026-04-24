@@ -311,7 +311,12 @@ jobs:
         run: python setup.py sdist
 
       - name: Build wheel
-        run: DISABLE_SPEEDUPS=1 python setup.py bdist_wheel
+        # --universal produces a py2.py3-none-any wheel so Python 2.7
+        # offline/air-gapped installs can use the pre-built wheel
+        # instead of being forced to build the sdist under PEP 517
+        # build isolation (which needs setuptools>=42 in the
+        # wheelhouse). See issue #377.
+        run: DISABLE_SPEEDUPS=1 python setup.py bdist_wheel --universal
 
       - name: Test sdist
         run: |
