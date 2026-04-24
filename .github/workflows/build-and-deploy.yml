@@ -1,13 +1,18 @@
 name: Build and upload to PyPI
 
-on: [push, pull_request, merge_group]
-# Alternatively, to publish when a (published) GitHub Release is created, use the following:
-# on:
-#   push:
-#   pull_request:
-#   release:
-#     types:
-#       - published
+on:
+  # Restrict the push trigger to main and release tags so feature-
+  # branch pushes don't double up: a branch push with an open PR
+  # would otherwise fire both the push and pull_request events on
+  # the same SHA. Merges to main still run (push), releases still
+  # run (push on tags, keying upload_pypi's refs/tags/v gate), PRs
+  # still run (pull_request), and the merge queue still runs
+  # (merge_group) - but only once per commit.
+  push:
+    branches: [main]
+    tags: ['v*', 'test-v*']
+  pull_request:
+  merge_group:
 
 jobs:
   test_pure_python:
