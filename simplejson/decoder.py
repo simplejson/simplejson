@@ -102,7 +102,7 @@ def py_scanstring(s, end, encoding=None, strict=True,
         elif terminator != '\\':
             if strict:
                 msg = "Invalid control character %r at"
-                raise JSONDecodeError(msg, s, prev_end)
+                raise JSONDecodeError(msg, s, end - 1)
             else:
                 _append(terminator)
                 continue
