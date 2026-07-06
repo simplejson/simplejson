@@ -1365,7 +1365,7 @@ scanstring_str(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                 default: c = 0;
             }
             if (c == 0) {
-                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 2);
+                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 1);
                 goto bail;
             }
         }
@@ -1564,7 +1564,7 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                 default: c = 0;
             }
             if (c == 0) {
-                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 2);
+                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 1);
                 goto bail;
             }
         }
@@ -1755,7 +1755,7 @@ scanstring_unicode(_speedups_state *state, PyObject *pystr, Py_ssize_t end,
                 default: c = 0;
             }
             if (c == 0) {
-                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 2);
+                raise_errmsg(state, ERR_STRING_ESC1, pystr, end - 1);
                 goto bail;
             }
         }
