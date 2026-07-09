@@ -44,17 +44,32 @@ del i
 FLOAT_REPR = repr
 
 _NAN = float('nan')
+_INFINITY = float('inf')
 
 
-def _nonfinite_decimal_to_float(d):
-    """Map a non-finite ``Decimal`` to the equivalent ``float`` so that
-    ``NaN`` and ``Infinity`` follow the same ``allow_nan``/``ignore_nan``
-    handling as floats (see #149).  ``float(Decimal('sNaN'))`` raises, so
-    signaling NaNs are mapped to a plain NaN.
+def _encode_decimal(d, _floatstr):
+    """Return the JSON representation of a ``Decimal``.
+
+    Finite Decimals are stringified as-is, preserving precision and trailing
+    zeros.  Non-finite Decimals (``NaN``, ``sNaN``, ``Infinity``) are routed
+    through the same ``allow_nan``/``ignore_nan`` handling as floats so they
+    never emit invalid JSON (see #149).
+
+    ``str(Decimal)`` yields a leading ``-`` sign at most (never ``+``); a
+    finite value's first significant character is always a digit, while a
+    non-finite value's is a letter (``N``, ``s`` or ``I``).  So a single
+    ``str()`` plus a one/two character check distinguishes the two.
     """
-    if d.is_nan():
-        return _NAN
-    return float(d)
+    s = str(d)
+    c = s[1] if s[0] == '-' else s[0]
+    if c <= '9':
+        # First significant character is a digit: finite Decimal.
+        return s
+    # Non-finite Decimal. ``N``/``s`` -> NaN (float(Decimal('sNaN')) raises,
+    # so map both quiet and signaling NaN to a plain NaN); ``I`` -> Infinity.
+    if c == 'I':
+        return _floatstr(-_INFINITY if s[0] == '-' else _INFINITY)
+    return _floatstr(_NAN)
 
 # dict-like types that should be encoded as JSON objects.
 # frozendict is a builtin added in CPython 3.15 (PEP 814).
@@ -549,10 +564,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 elif isinstance(value, float):
                     yield buf + _floatstr(value)
                 elif _use_decimal and isinstance(value, Decimal):
-                    if value.is_finite():
-                        yield buf + str(value)
-                    else:
-                        yield buf + _floatstr(_nonfinite_decimal_to_float(value))
+                    yield buf + _encode_decimal(value, _floatstr)
                 else:
                     yield buf
                     for_json = _for_json and call_method(value, 'for_json')
@@ -612,10 +624,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 key = int(key)
             key = str(key)
         elif _use_decimal and isinstance(key, Decimal):
-            if key.is_finite():
-                key = str(key)
-            else:
-                key = _floatstr(_nonfinite_decimal_to_float(key))
+            key = _encode_decimal(key, _floatstr)
         elif _skipkeys:
             key = None
         else:
@@ -687,10 +696,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 elif isinstance(value, float):
                     yield _floatstr(value)
                 elif _use_decimal and isinstance(value, Decimal):
-                    if value.is_finite():
-                        yield str(value)
-                    else:
-                        yield _floatstr(_nonfinite_decimal_to_float(value))
+                    yield _encode_decimal(value, _floatstr)
                 else:
                     for_json = _for_json and call_method(value, 'for_json')
                     if for_json:
@@ -766,10 +772,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     for chunk in _iterencode_dict(o, _current_indent_level):
                         yield chunk
                 elif _use_decimal and isinstance(o, Decimal):
-                    if o.is_finite():
-                        yield str(o)
-                    else:
-                        yield _floatstr(_nonfinite_decimal_to_float(o))
+                    yield _encode_decimal(o, _floatstr)
                 else:
                     while _iterable_as_array:
                         # Markers are not checked here because it is valid for
