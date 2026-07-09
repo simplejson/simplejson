@@ -138,6 +138,8 @@ typedef struct {
     PyObject *JSON_attr_sort;         /* "sort" */
     PyObject *JSON_attr_encoded_json; /* "encoded_json" */
     PyObject *JSON_attr_add_note;     /* "add_note" (PEP 678, 3.11+) */
+    PyObject *JSON_attr_is_finite;    /* "is_finite" (Decimal, see #149) */
+    PyObject *JSON_attr_is_nan;       /* "is_nan" (Decimal, see #149) */
     PyObject *RawJSONType;
     PyObject *JSONDecodeError;
 } _speedups_state;
@@ -429,6 +431,8 @@ static PyObject *
 encoder_long_to_str(PyObject *obj);
 static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj);
+static PyObject *
+encoder_encode_decimal(PyEncoderObject *s, PyObject *obj);
 static int
 encoder_accumulate_newline_indent(PyEncoderObject *s, _speedups_state *state,
                                   JSON_Accu *rval, Py_ssize_t indent_level);
@@ -1062,7 +1066,7 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
         return encoder_long_to_str(key);
     }
     else if (s->use_decimal && PyObject_TypeCheck(key, (PyTypeObject *)s->Decimal)) {
-        return PyObject_Str(key);
+        return encoder_encode_decimal(s, key);
     }
     if (s->skipkeys) {
         Py_INCREF(Py_None);
@@ -2830,6 +2834,57 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
     }
 }
 
+static int
+decimal_is_true_method(PyObject *obj, PyObject *method_name)
+{
+    /* Call a no-arg predicate method (is_finite/is_nan) on a Decimal and
+       return its truth value, or -1 on error. */
+    PyObject *res = PyObject_CallMethodObjArgs(obj, method_name, NULL);
+    int rv;
+    if (res == NULL)
+        return -1;
+    rv = PyObject_IsTrue(res);
+    Py_DECREF(res);
+    return rv;
+}
+
+static PyObject *
+encoder_encode_decimal(PyEncoderObject *s, PyObject *obj)
+{
+    /* Return the JSON representation of a Decimal. Finite Decimals are
+       stringified as-is (preserving precision and trailing zeros); non-finite
+       Decimals (NaN, sNaN, Infinity) are routed through the same
+       allow_nan/ignore_nan handling as floats so they never emit invalid
+       JSON. See https://github.com/simplejson/simplejson/issues/149 */
+    _speedups_state *state = get_speedups_state(s->module_ref);
+    PyObject *floatobj;
+    PyObject *encoded;
+    int is_finite;
+    int is_nan;
+    is_finite = decimal_is_true_method(obj, state->JSON_attr_is_finite);
+    if (is_finite < 0)
+        return NULL;
+    if (is_finite)
+        return PyObject_Str(obj);
+    /* Non-finite: map to the equivalent float. float(Decimal('sNaN'))
+       raises, so signaling (and quiet) NaNs are mapped to a plain NaN;
+       infinities convert cleanly. */
+    is_nan = decimal_is_true_method(obj, state->JSON_attr_is_nan);
+    if (is_nan < 0)
+        return NULL;
+    if (is_nan) {
+        floatobj = PyFloat_FromDouble(Py_NAN);
+    }
+    else {
+        floatobj = PyNumber_Float(obj);
+    }
+    if (floatobj == NULL)
+        return NULL;
+    encoded = encoder_encode_float(s, floatobj);
+    Py_DECREF(floatobj);
+    return encoded;
+}
+
 static PyObject *
 encoder_encode_string(PyEncoderObject *s, PyObject *obj)
 {
@@ -3090,7 +3145,7 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
         Py_LeaveRecursiveCall();
     }
     else if (s->use_decimal && PyObject_TypeCheck(obj, (PyTypeObject *)s->Decimal)) {
-        PyObject *encoded = PyObject_Str(obj);
+        PyObject *encoded = encoder_encode_decimal(s, obj);
         if (encoded != NULL)
             rv = _steal_accumulate(state, rval, encoded);
     }
@@ -3746,6 +3801,8 @@ reset_speedups_state_constants(_speedups_state *state)
     Py_CLEAR(state->JSON_attr_sort);
     Py_CLEAR(state->JSON_attr_encoded_json);
     Py_CLEAR(state->JSON_attr_add_note);
+    Py_CLEAR(state->JSON_attr_is_finite);
+    Py_CLEAR(state->JSON_attr_is_nan);
     Py_CLEAR(state->RawJSONType);
     Py_CLEAR(state->JSONDecodeError);
 }
@@ -3851,6 +3908,12 @@ init_speedups_state(_speedups_state *state, PyObject *module)
     state->JSON_attr_add_note = JSON_InternFromString("add_note");
     if (state->JSON_attr_add_note == NULL)
         return -1;
+    state->JSON_attr_is_finite = JSON_InternFromString("is_finite");
+    if (state->JSON_attr_is_finite == NULL)
+        return -1;
+    state->JSON_attr_is_nan = JSON_InternFromString("is_nan");
+    if (state->JSON_attr_is_nan == NULL)
+        return -1;
 
     (void)module;
     return 0;
@@ -3938,6 +4001,8 @@ speedups_traverse(PyObject *m, visitproc visit, void *arg)
     Py_VISIT(state->JSON_attr_asdict);
     Py_VISIT(state->JSON_attr_sort);
     Py_VISIT(state->JSON_attr_encoded_json);
+    Py_VISIT(state->JSON_attr_is_finite);
+    Py_VISIT(state->JSON_attr_is_nan);
     Py_VISIT(state->RawJSONType);
     Py_VISIT(state->JSONDecodeError);
     return 0;

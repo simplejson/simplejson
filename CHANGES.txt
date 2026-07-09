@@ -1,3 +1,15 @@
+Version 4.1.2 (unreleased)
+
+* Non-finite ``Decimal`` values are now handled consistently with the
+  matching ``float``.  Previously ``NaN``, ``sNaN`` and ``Infinity``
+  ``Decimal`` values bypassed the ``allow_nan`` / ``ignore_nan``
+  handling: ``ignore_nan=True`` emitted a literal ``NaN`` instead of
+  ``null``, and ``allow_nan=False`` silently emitted the invalid JSON
+  literal instead of raising ``ValueError``.  Finite ``Decimal`` values
+  (including ``0.00`` and other trailing-zero forms) are unchanged.  The
+  fix is applied to both the pure-Python encoder and the C extension.
+  https://github.com/simplejson/simplejson/issues/149
+
 Version 4.1.1 released 2026-04-24
 
 * The ``build_wheels_py27`` CI job now also builds Python 2.7 wheels
