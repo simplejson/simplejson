@@ -2850,14 +2850,35 @@ encoder_encode_decimal(PyEncoderObject *s, PyObject *obj)
     PyObject *encoded;
     Py_ssize_t len;
     int negative;
-    Py_UCS4 c;
+    JSON_UNICHR c;
+#if PY_MAJOR_VERSION >= 3
+    int kind;
+    void *data;
+#else
+    const char *data;
+#endif
     if (str == NULL)
         return NULL;
+#if PY_MAJOR_VERSION >= 3
+    if (PyUnicode_READY(str)) {
+        Py_DECREF(str);
+        return NULL;
+    }
     len = PyUnicode_GET_LENGTH(str);
-    negative = (len > 0 && PyUnicode_READ_CHAR(str, 0) == '-');
-    c = (Py_UCS4)0;
+    kind = PyUnicode_KIND(str);
+    data = PyUnicode_DATA(str);
+    negative = (len > 0 && PyUnicode_READ(kind, data, 0) == '-');
+    c = (JSON_UNICHR)0;
     if (len > (negative ? 1 : 0))
-        c = PyUnicode_READ_CHAR(str, negative ? 1 : 0);
+        c = PyUnicode_READ(kind, data, negative ? 1 : 0);
+#else
+    len = PyString_GET_SIZE(str);
+    data = PyString_AS_STRING(str);
+    negative = (len > 0 && data[0] == '-');
+    c = (JSON_UNICHR)0;
+    if (len > (negative ? 1 : 0))
+        c = (unsigned char)data[negative ? 1 : 0];
+#endif
     if (c <= '9') {
         /* First significant character is a digit (or unexpectedly empty):
            finite Decimal, emit as-is. */
