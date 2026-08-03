@@ -2788,32 +2788,37 @@ _encoded_const(_speedups_state *state, PyObject *obj)
 }
 
 static PyObject *
+encoder_encode_nonfinite(PyEncoderObject *s, int sign)
+{
+    _speedups_state *state = get_speedups_state(s->module_ref);
+
+    if (!s->allow_or_ignore_nan) {
+        PyErr_SetString(PyExc_ValueError, "Out of range float values are not JSON compliant");
+        return NULL;
+    }
+    if (s->allow_or_ignore_nan & JSON_IGNORE_NAN) {
+        return _encoded_const(state, Py_None);
+    }
+    /* JSON_ALLOW_NAN is set */
+    if (sign > 0) {
+        Py_INCREF(state->JSON_Infinity);
+        return state->JSON_Infinity;
+    }
+    if (sign < 0) {
+        Py_INCREF(state->JSON_NegInfinity);
+        return state->JSON_NegInfinity;
+    }
+    Py_INCREF(state->JSON_NaN);
+    return state->JSON_NaN;
+}
+
+static PyObject *
 encoder_encode_float(PyEncoderObject *s, PyObject *obj)
 {
     /* Return the JSON representation of a PyFloat */
-    _speedups_state *state = get_speedups_state(s->module_ref);
     double i = PyFloat_AS_DOUBLE(obj);
     if (!Py_IS_FINITE(i)) {
-        if (!s->allow_or_ignore_nan) {
-            PyErr_SetString(PyExc_ValueError, "Out of range float values are not JSON compliant");
-            return NULL;
-        }
-        if (s->allow_or_ignore_nan & JSON_IGNORE_NAN) {
-            return _encoded_const(state, Py_None);
-        }
-        /* JSON_ALLOW_NAN is set */
-        else if (i > 0) {
-            Py_INCREF(state->JSON_Infinity);
-            return state->JSON_Infinity;
-        }
-        else if (i < 0) {
-            Py_INCREF(state->JSON_NegInfinity);
-            return state->JSON_NegInfinity;
-        }
-        else {
-            Py_INCREF(state->JSON_NaN);
-            return state->JSON_NaN;
-        }
+        return encoder_encode_nonfinite(s, i > 0 ? 1 : (i < 0 ? -1 : 0));
     }
     /* Use a better float format here? */
     if (PyFloat_CheckExact(obj)) {
@@ -2846,8 +2851,6 @@ encoder_encode_decimal(PyEncoderObject *s, PyObject *obj)
        value's is a letter ('N'/'s' for [s]NaN, 'I' for Infinity). So a single
        str() plus a one/two character check distinguishes the two. */
     PyObject *str = PyObject_Str(obj);
-    PyObject *floatobj;
-    PyObject *encoded;
     Py_ssize_t len;
     int negative;
     JSON_UNICHR c;
@@ -2879,27 +2882,14 @@ encoder_encode_decimal(PyEncoderObject *s, PyObject *obj)
     if (len > (negative ? 1 : 0))
         c = (unsigned char)data[negative ? 1 : 0];
 #endif
-    if (c <= '9') {
-        /* First significant character is a digit (or unexpectedly empty):
-           finite Decimal, emit as-is. */
+    if (IS_DIGIT(c)) {
+        /* First significant character is a digit: finite Decimal, emit as-is. */
         return str;
     }
-    /* Non-finite Decimal; map to the equivalent float and let
-       encoder_encode_float apply allow_nan/ignore_nan. float(Decimal('sNaN'))
-       raises, so both quiet and signaling NaN ('N'/'s') map to a plain NaN;
-       'I' is an infinity carrying the sign already parsed above. */
+    /* Non-finite Decimal; use the same allow_nan/ignore_nan path as floats
+       without creating a temporary float. */
     Py_DECREF(str);
-    if (c == 'I') {
-        floatobj = PyFloat_FromDouble(negative ? -Py_HUGE_VAL : Py_HUGE_VAL);
-    }
-    else {
-        floatobj = PyFloat_FromDouble(Py_NAN);
-    }
-    if (floatobj == NULL)
-        return NULL;
-    encoded = encoder_encode_float(s, floatobj);
-    Py_DECREF(floatobj);
-    return encoded;
+    return encoder_encode_nonfinite(s, c == 'I' ? (negative ? -1 : 1) : 0);
 }
 
 static PyObject *

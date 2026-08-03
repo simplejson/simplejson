@@ -61,14 +61,15 @@ def _encode_decimal(d, _floatstr):
     ``str()`` plus a one/two character check distinguishes the two.
     """
     s = str(d)
-    c = s[1] if s[0] == '-' else s[0]
-    if c <= '9':
+    c0 = s[:1]
+    c = s[1:2] if c0 == '-' else c0
+    if '0' <= c <= '9':
         # First significant character is a digit: finite Decimal.
         return s
     # Non-finite Decimal. ``N``/``s`` -> NaN (float(Decimal('sNaN')) raises,
     # so map both quiet and signaling NaN to a plain NaN); ``I`` -> Infinity.
     if c == 'I':
-        return _floatstr(-_INFINITY if s[0] == '-' else _INFINITY)
+        return _floatstr(-_INFINITY if c0 == '-' else _INFINITY)
     return _floatstr(_NAN)
 
 # dict-like types that should be encoded as JSON objects.
