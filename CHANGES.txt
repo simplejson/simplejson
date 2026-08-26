@@ -1,3 +1,9 @@
+Version 4.1.2 released 2026-08-26
+
+* Parse failures due to trailing commas are now reported consistently
+  across implementations
+  https://github.com/simplejson/simplejson/pull/382
+
 Version 4.1.1 released 2026-04-24
 
 * The ``build_wheels_py27`` CI job now also builds Python 2.7 wheels
