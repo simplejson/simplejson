@@ -213,6 +213,7 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
             break
         elif nextchar != ',':
             raise JSONDecodeError("Expecting ',' delimiter or '}'", s, end - 1)
+        comma_idx = end - 1
 
         try:
             nextchar = s[end]
@@ -230,7 +231,7 @@ def JSONObject(state, encoding, strict, scan_once, object_hook,
             if nextchar == '}':
                 raise JSONDecodeError(
                     "Illegal trailing comma before end of object",
-                    s, end - 1)
+                    s, comma_idx)
             raise JSONDecodeError(
                 "Expecting property name enclosed in double quotes",
                 s, end - 1)
@@ -271,6 +272,7 @@ def JSONArray(state, scan_once, array_hook=None,
             break
         elif nextchar != ',':
             raise JSONDecodeError("Expecting ',' delimiter or ']'", s, end - 1)
+        comma_idx = end - 1
 
         try:
             if s[end] in _ws:
@@ -283,7 +285,7 @@ def JSONArray(state, scan_once, array_hook=None,
         if s[end:end + 1] == ']':
             raise JSONDecodeError(
                 "Illegal trailing comma before end of array",
-                s, end - 1)
+                s, comma_idx)
 
     if array_hook is not None:
         values = array_hook(values)
