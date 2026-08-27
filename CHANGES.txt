@@ -1,5 +1,11 @@
 Version 4.1.2 released 2026-08-26
 
+* Fix control character error position when content precedes the control char
+  https://github.com/simplejson/simplejson/pull/379
+* Report the offending char, not the backslash, for invalid \X escapes
+  https://github.com/simplejson/simplejson/pull/380
+* Handle non-finite Decimals like floats in the encoder
+  https://github.com/simplejson/simplejson/pull/381
 * Parse failures due to trailing commas are now reported consistently
   across implementations
   https://github.com/simplejson/simplejson/pull/382
