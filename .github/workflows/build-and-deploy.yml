@@ -290,7 +290,7 @@ jobs:
           platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.4.1
+        uses: pypa/cibuildwheel@v4.2.0
         env:
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"
@@ -319,7 +319,7 @@ jobs:
           python-version: '3.14'
 
       - name: Build Pyodide wheel with C speedups
-        uses: pypa/cibuildwheel@v3.4.1
+        uses: pypa/cibuildwheel@v4.2.0
         env:
           CIBW_PLATFORM: pyodide
           CIBW_TEST_COMMAND: >-
