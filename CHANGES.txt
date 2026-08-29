@@ -1,3 +1,9 @@
+Version 4.2.0 released 2026-XX-XX
+
+* Start building wheels for Python 3.15 and drop Python 3.8 support
+  via upgrade to cibuildwheel v4.2.0
+  https://github.com/simplejson/simplejson/pull/385
+
 Version 4.1.2 released 2026-08-26
 
 * Fix control character error position when content precedes the control char
