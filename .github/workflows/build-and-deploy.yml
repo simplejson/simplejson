@@ -24,7 +24,7 @@ jobs:
         os:
         - 'ubuntu-latest'
         python:
-          - 3.15-dev
+          - 3.15.0-rc.1
           - 3.14
           - 3.13
           - pypy-3.11
@@ -37,13 +37,13 @@ jobs:
       - run: python -m simplejson.tests._cibw_runner .
 
   test_prerelease:
-    name: Tests with C speedups on Python 3.15-dev
+    name: Tests with C speedups on Python 3.15.0-rc.1
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.15-dev'
+          python-version: '3.15.0-rc.1'
       - name: Build extension
         run: |
           python -m pip install --upgrade pip setuptools wheel
@@ -108,9 +108,9 @@ jobs:
           - "free-threaded"
         include:
           - variant: "standard"
-            uv_python: "cpython-3.14.4+debug"
+            uv_python: "cpython-3.14.7+debug"
           - variant: "free-threaded"
-            uv_python: "cpython-3.14.4+freethreaded+debug"
+            uv_python: "cpython-3.14.7+freethreaded+debug"
     steps:
       - uses: actions/checkout@v6
       - name: Install uv
@@ -157,13 +157,13 @@ jobs:
         run: PYTHON_GIL=0 .venv/bin/python -m simplejson.tests._cibw_runner .
 
   test_tsan:
-    name: TSan stress (CPython v3.14.0 free-threaded)
+    name: TSan stress (CPython v3.14.7 free-threaded)
     runs-on: ubuntu-latest
     env:
       # Keep in sync with the name above. Pinned so the cache key is stable;
       # bump when moving to a newer CPython (cache is keyed on this + clang
       # version + script hash).
-      CPYTHON_REF: v3.14.0
+      CPYTHON_REF: v3.14.7
       TSAN_ROOT: /home/runner/.cache/py-tsan-ft
     steps:
       - uses: actions/checkout@v6
