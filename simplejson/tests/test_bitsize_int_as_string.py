@@ -118,3 +118,23 @@ class TestBitSizeIntAsString(TestCase):
                     str(v),
                     json.loads(json.dumps(v, int_as_string_bitcount=n)),
                     "n=%d v=%d should be stringified" % (n, v))
+
+
+    def test_large_bitcounts(self):
+        for n in (64, 65, 127, 128, 256, 1024):
+            boundary = 1 << n
+            values = [0, boundary - 1, boundary, boundary + 1,
+                      -boundary + 1, -boundary, -boundary - 1]
+            expected = [0, boundary - 1, str(boundary), str(boundary + 1),
+                        -boundary + 1, str(-boundary), str(-boundary - 1)]
+            for indent in (None, 2):
+                self.assertEqual(expected, json.loads(json.dumps(
+                    values, int_as_string_bitcount=n, indent=indent)))
+                self.assertEqual({'value': expected}, json.loads(json.dumps(
+                    {'value': values}, int_as_string_bitcount=n, indent=indent)))
+
+    def test_huge_bitcount_does_not_build_boundary(self):
+        # A threshold can exceed native integer sizes without allocating 2**n.
+        for n in (2 ** 32 + 31, 2 ** 100):
+            self.assertEqual('[0, 1, -1]', json.dumps(
+                [0, 1, -1], int_as_string_bitcount=n))

@@ -516,9 +516,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             value = int(value)
         if (
             skip_quoting or
-            (-1 << _int_as_string_bitcount)
-            < value <
-            (1 << _int_as_string_bitcount)
+            value.bit_length() <= _int_as_string_bitcount
         ):
             return str(value)
         return '"' + str(value) + '"'

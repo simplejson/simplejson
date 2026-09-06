@@ -240,3 +240,17 @@ per-module state in 4.0 was driven by free-threading and
 subinterpreter isolation, not by abi3 readiness. If you're adding a
 new feature, don't feel obligated to stay limited-API-compatible —
 performance-sensitive code wins.
+
+## Integer stringification thresholds
+
+Both encoders accept positive `int_as_string_bitcount` values beyond native
+integer widths. Keep the C min/max comparison path for small thresholds;
+large thresholds compare magnitude bit lengths without allocating `2**n`.
+`large_int_bitcount` is an owned reference in `JSON_ENCODER_OBJECT_FIELDS`,
+so traversal and cleanup must include it. The boundary and huge-threshold tests
+in `test_bitsize_int_as_string.py` run under both paths via `_cibw_runner`.
+
+When creating a release venv, verify `sysconfig.get_config_var("Py_DEBUG")`
+and the resolved interpreter path. A version-only uv request can select an
+already-installed debug interpreter. Use an explicit release executable path
+when checking release-only compiler flags, rather than repeating the debug suite.

@@ -301,6 +301,7 @@ typedef struct _PyEncoderObject {
     int iterable_as_array;
     PyObject *max_long_size;
     PyObject *min_long_size;
+    PyObject *large_int_bitcount;
     PyObject *item_sort_key;
     PyObject *item_sort_kw;
     int for_json;
@@ -327,6 +328,7 @@ typedef struct _PyEncoderObject {
     X(item_sort_key)                  \
     X(max_long_size)                  \
     X(min_long_size)                  \
+    X(large_int_bitcount)             \
     X(Decimal)
 
 static PyMemberDef encoder_members[] = {
@@ -708,6 +710,36 @@ maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
     int ge, le;
     PyObject *quoted;
 
+    if (s->large_int_bitcount != NULL) {
+        size_t nbits;
+        PyObject *integer, *bits;
+        integer = PyNumber_Long(obj);
+        if (integer == NULL) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        nbits = _PyLong_NumBits(integer);
+        Py_DECREF(integer);
+        if (nbits == (size_t)-1 && PyErr_Occurred()) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        bits = PyLong_FromSize_t(nbits);
+        if (bits == NULL) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        ge = PyObject_RichCompareBool(bits, s->large_int_bitcount, Py_GT);
+        Py_DECREF(bits);
+        if (ge < 0) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        if (!ge)
+            return encoded;
+        goto quote;
+    }
+
     /* int_as_string_bitcount is not set: fast path, return as-is. */
     if (s->max_long_size == Py_None || s->min_long_size == Py_None)
         return encoded;
@@ -725,6 +757,7 @@ maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
     if (!(ge || le))
         return encoded;
 
+quote:
 #if PY_MAJOR_VERSION >= 3
     quoted = PyUnicode_FromFormat("\"%U\"", encoded);
 #else
@@ -2653,10 +2686,11 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         goto bail;
     if (PyInt_Check(int_as_string_bitcount) || PyLong_Check(int_as_string_bitcount)) {
         static const unsigned long long_long_bitsize = sizeof(long long) * CHAR_BIT;
-        long int_as_string_bitcount_val = PyLong_AsLong(int_as_string_bitcount);
+        int overflow = 0;
+        long int_as_string_bitcount_val = PyLong_AsLongAndOverflow(int_as_string_bitcount, &overflow);
         if (int_as_string_bitcount_val == -1 && PyErr_Occurred())
             goto bail;
-        if (int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < (long)long_long_bitsize) {
+        if (!overflow && int_as_string_bitcount_val > 0 && int_as_string_bitcount_val < (long)long_long_bitsize) {
             int n = (int)int_as_string_bitcount_val;
             /* Compute 2^n as unsigned (well-defined for n < 64) and
              * -(2^n) as signed without UB. Naive "-1LL << n" is a
@@ -2672,10 +2706,19 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
                 goto bail;
             }
         }
+        else if (overflow > 0 || int_as_string_bitcount_val > 0) {
+            /* Compare magnitudes without allocating a 2**n boundary. */
+            s->large_int_bitcount = PyNumber_Long(int_as_string_bitcount);
+            if (s->large_int_bitcount == NULL)
+                goto bail;
+            Py_INCREF(Py_None);
+            s->max_long_size = Py_None;
+            Py_INCREF(Py_None);
+            s->min_long_size = Py_None;
+        }
         else {
-            PyErr_Format(PyExc_TypeError,
-                         "int_as_string_bitcount (%ld) must be greater than 0 and less than the number of bits of a `long long` type (%lu bits)",
-                         int_as_string_bitcount_val, long_long_bitsize);
+            PyErr_SetString(PyExc_TypeError,
+                            "int_as_string_bitcount must be a positive integer");
             goto bail;
         }
     }
