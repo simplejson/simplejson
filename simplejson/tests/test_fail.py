@@ -135,6 +135,32 @@ class TestFail(TestCase):
             else:
                 self.fail("Unexpected success parsing '[,]'")
 
+    def test_object_property_error_message(self):
+        # '}' is legal where the first key would go, but not after a comma.
+        first = "Expecting property name enclosed in double quotes or '}'"
+        later = 'Expecting property name enclosed in double quotes'
+        test_cases = [
+            ('{:1}', first, 1),
+            ('{,}', first, 1),
+            ('{unquoted_key: "keys must be quoted"}', first, 1),
+            ('{"spam":42,:1}', later, 11),
+            ('{"spam":42,unquoted_key: 1}', later, 11),
+        ]
+        for data, msg, idx in test_cases:
+            try:
+                json.loads(data)
+            except json.JSONDecodeError:
+                e = sys.exc_info()[1]
+                self.assertEqual(
+                    e.msg, msg, "%r != %r for %r" % (e.msg, msg, data))
+                self.assertEqual(
+                    e.pos, idx, "pos %r != %r for %r" % (e.pos, idx, data))
+            except Exception:
+                e = sys.exc_info()[1]
+                self.fail("Unexpected exception raised %r %s" % (e, e))
+            else:
+                self.fail("Unexpected success parsing %r" % (data,))
+
     def test_truncated_input(self):
         test_cases = [
             ('', 'Expecting value', 0),
