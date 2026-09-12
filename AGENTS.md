@@ -249,6 +249,9 @@ large thresholds compare magnitude bit lengths without allocating `2**n`.
 `large_int_bitcount` is an owned reference in `JSON_ENCODER_OBJECT_FIELDS`,
 so traversal and cleanup must include it. The boundary and huge-threshold tests
 in `test_bitsize_int_as_string.py` run under both paths via `_cibw_runner`.
+For large thresholds, normalize integer subclasses once and share that value
+between decimal formatting and bit-length comparison: a stateful `__int__`
+must not influence the quoting decision through a second conversion.
 
 When creating a release venv, verify `sysconfig.get_config_var("Py_DEBUG")`
 and the resolved interpreter path. A version-only uv request can select an

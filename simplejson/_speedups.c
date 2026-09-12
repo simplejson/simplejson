@@ -712,14 +712,8 @@ maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
 
     if (s->large_int_bitcount != NULL) {
         size_t nbits;
-        PyObject *integer, *bits;
-        integer = PyNumber_Long(obj);
-        if (integer == NULL) {
-            Py_DECREF(encoded);
-            return NULL;
-        }
-        nbits = _PyLong_NumBits(integer);
-        Py_DECREF(integer);
+        PyObject *bits;
+        nbits = _PyLong_NumBits(obj);
         if (nbits == (size_t)-1 && PyErr_Occurred()) {
             Py_DECREF(encoded);
             return NULL;
@@ -3164,12 +3158,23 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             rv = _steal_accumulate(state, rval, cstr);
     }
     else if (PyInt_Check(obj) || PyLong_Check(obj)) {
-        PyObject *encoded = encoder_long_to_str(obj);
+        PyObject *integer, *encoded;
+        /* Large thresholds inspect the same normalized value we serialize. */
+        if (s->large_int_bitcount != NULL)
+            integer = PyNumber_Long(obj);
+        else {
+            integer = obj;
+            Py_INCREF(integer);
+        }
+        if (integer == NULL)
+            return -1;
+        encoded = encoder_long_to_str(integer);
         if (encoded != NULL) {
-            encoded = maybe_quote_bigint(s, encoded, obj);
+            encoded = maybe_quote_bigint(s, encoded, integer);
             if (encoded != NULL)
                 rv = _steal_accumulate(state, rval, encoded);
         }
+        Py_DECREF(integer);
     }
     else if (PyFloat_Check(obj)) {
         PyObject *encoded = encoder_encode_float(s, obj);

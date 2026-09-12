@@ -138,3 +138,17 @@ class TestBitSizeIntAsString(TestCase):
         for n in (2 ** 32 + 31, 2 ** 100):
             self.assertEqual('[0, 1, -1]', json.dumps(
                 [0, 1, -1], int_as_string_bitcount=n))
+
+    def test_large_bitcount_normalizes_subclass_once(self):
+        class ChangingInt(int):
+            calls = 0
+
+            def __int__(self):
+                self.calls += 1
+                return (1 << 64) if self.calls == 1 else 1
+
+        for indent in (None, 2):
+            value = ChangingInt(1)
+            self.assertEqual('"18446744073709551616"', json.dumps(
+                value, int_as_string_bitcount=64, indent=indent))
+            self.assertEqual(1, value.calls)
