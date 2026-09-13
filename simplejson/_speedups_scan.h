@@ -210,7 +210,11 @@ JSON_SCAN_FN(_parse_object)(PyScannerObject *s, PyObject *pystr,
 
             /* read key */
             if (JSON_SCAN_READ(idx) != '"') {
-                raise_errmsg(state, ERR_OBJECT_PROPERTY, pystr, idx);
+                /* '}' is still legal where the first key would go. */
+                raise_errmsg(state,
+                             did_parse ? ERR_OBJECT_PROPERTY
+                                       : ERR_OBJECT_PROPERTY_FIRST,
+                             pystr, idx);
                 goto bail;
             }
             key = JSON_SCAN_SCANSTRING_CALL(idx + 1, &next_idx);
