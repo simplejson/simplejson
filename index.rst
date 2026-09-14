@@ -310,6 +310,10 @@ Basic Usage
     :class:`int` ``2**n`` and higher or lower than ``-2**n`` will be encoded as strings. This is to
     avoid the rounding that happens in Javascript otherwise. Note that this
     option loses type information, so use with extreme caution.
+    Thresholds of 64 bits and above are supported by both encoders, including
+    128-bit integers. Very large thresholds do not allocate a power-of-two
+    boundary.
+
     See also *bigint_as_string* (which is equivalent to `int_as_string_bitcount=53`).
 
     .. note::
