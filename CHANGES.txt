@@ -1,9 +1,3 @@
-Unreleased
-
-* Support int_as_string_bitcount thresholds of 64 bits and above in the C
-  encoder, and avoid allocating power-of-two boundaries for large thresholds.
-  https://github.com/simplejson/simplejson/issues/306
-
 Version 4.1.2 released 2026-08-26
 
 * Fix control character error position when content precedes the control char

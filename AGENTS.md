@@ -242,31 +242,3 @@ per-module state in 4.0 was driven by free-threading and
 subinterpreter isolation, not by abi3 readiness. If you're adding a
 new feature, don't feel obligated to stay limited-API-compatible —
 performance-sensitive code wins.
-
-## Integer stringification thresholds
-
-Both encoders accept positive `int_as_string_bitcount` values beyond native
-integer widths. Keep the C min/max comparison path for small thresholds;
-large thresholds compare magnitude bit lengths without allocating `2**n`.
-`large_int_bitcount` is an owned reference in `JSON_ENCODER_OBJECT_FIELDS`,
-so traversal and cleanup must include it. The boundary and huge-threshold tests
-in `test_bitsize_int_as_string.py` run under both paths via `_cibw_runner`.
-For large thresholds, normalize integer subclasses once and share that value
-between decimal formatting and bit-length comparison: a stateful `__int__`
-must not influence the quoting decision through a second conversion.
-On Python 2, `PyNumber_Long` calls `__long__`, whereas the pure encoder's
-`int(value)` calls `__int__`. Normalize with `PyNumber_Int` first, then widen
-the resulting value for `_PyLong_NumBits`. Python 2 may retain a `long`
-subclass returned by `__int__`: do not call `PyNumber_Long` on that result,
-because its `__long__` can change the value or raise. Call the built-in
-`PyLong_Type.tp_as_number->nb_long` slot directly, or widen an int's payload
-with `PyLong_FromLong`, to obtain an exact long without dispatching another
-subclass hook. `_PyLong_Copy` is not declared by Python 2's public headers.
-Test both `int` and
-`long` subclasses, native-size and large returned values, and exceptions
-from `__int__` on an actual Python 2.7 interpreter.
-
-When creating a release venv, verify `sysconfig.get_config_var("Py_DEBUG")`
-and the resolved interpreter path. A version-only uv request can select an
-already-installed debug interpreter. Use an explicit release executable path
-when checking release-only compiler flags, rather than repeating the debug suite.

@@ -731,27 +731,26 @@ maybe_quote_bigint(PyEncoderObject* s, PyObject *encoded, PyObject *obj)
         }
         if (!ge)
             return encoded;
-        goto quote;
+    }
+    else {
+        /* int_as_string_bitcount is not set: fast path, return as-is. */
+        if (s->max_long_size == Py_None || s->min_long_size == Py_None)
+            return encoded;
+
+        ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
+        if (ge < 0) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
+        if (le < 0) {
+            Py_DECREF(encoded);
+            return NULL;
+        }
+        if (!(ge || le))
+            return encoded;
     }
 
-    /* int_as_string_bitcount is not set: fast path, return as-is. */
-    if (s->max_long_size == Py_None || s->min_long_size == Py_None)
-        return encoded;
-
-    ge = PyObject_RichCompareBool(obj, s->max_long_size, Py_GE);
-    if (ge < 0) {
-        Py_DECREF(encoded);
-        return NULL;
-    }
-    le = PyObject_RichCompareBool(obj, s->min_long_size, Py_LE);
-    if (le < 0) {
-        Py_DECREF(encoded);
-        return NULL;
-    }
-    if (!(ge || le))
-        return encoded;
-
-quote:
 #if PY_MAJOR_VERSION >= 3
     quoted = PyUnicode_FromFormat("\"%U\"", encoded);
 #else
