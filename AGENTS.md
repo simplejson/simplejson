@@ -256,7 +256,13 @@ between decimal formatting and bit-length comparison: a stateful `__int__`
 must not influence the quoting decision through a second conversion.
 On Python 2, `PyNumber_Long` calls `__long__`, whereas the pure encoder's
 `int(value)` calls `__int__`. Normalize with `PyNumber_Int` first, then widen
-the resulting built-in value for `_PyLong_NumBits`. Test both `int` and
+the resulting value for `_PyLong_NumBits`. Python 2 may retain a `long`
+subclass returned by `__int__`: do not call `PyNumber_Long` on that result,
+because its `__long__` can change the value or raise. Call the built-in
+`PyLong_Type.tp_as_number->nb_long` slot directly, or widen an int's payload
+with `PyLong_FromLong`, to obtain an exact long without dispatching another
+subclass hook. `_PyLong_Copy` is not declared by Python 2's public headers.
+Test both `int` and
 `long` subclasses, native-size and large returned values, and exceptions
 from `__int__` on an actual Python 2.7 interpreter.
 

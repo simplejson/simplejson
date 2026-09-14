@@ -3167,7 +3167,12 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             PyObject *normalized = PyNumber_Int(obj);
             if (normalized == NULL)
                 return -1;
-            integer = PyNumber_Long(normalized);
+            /* PyNumber_Int may retain a long subclass. Copy its payload
+             * instead of invoking a second conversion hook. */
+            if (PyInt_Check(normalized))
+                integer = PyLong_FromLong(PyInt_AS_LONG(normalized));
+            else
+                integer = PyLong_Type.tp_as_number->nb_long(normalized);
             Py_DECREF(normalized);
 #else
             integer = PyNumber_Long(obj);
