@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import simplejson as json
+from simplejson.compat import integer_types
 
 
 class TestBitSizeIntAsString(TestCase):
@@ -140,15 +141,34 @@ class TestBitSizeIntAsString(TestCase):
                 [0, 1, -1], int_as_string_bitcount=n))
 
     def test_large_bitcount_normalizes_subclass_once(self):
-        class ChangingInt(int):
-            calls = 0
+        for integer_type in integer_types:
+            class ChangingInt(integer_type):
+                calls = 0
 
-            def __int__(self):
-                self.calls += 1
-                return (1 << 64) if self.calls == 1 else 1
+                def __int__(self):
+                    self.calls += 1
+                    return normalized if self.calls == 1 else 0
 
-        for indent in (None, 2):
-            value = ChangingInt(1)
-            self.assertEqual('"18446744073709551616"', json.dumps(
-                value, int_as_string_bitcount=64, indent=indent))
-            self.assertEqual(1, value.calls)
+                def __long__(self):
+                    raise AssertionError('must normalize through __int__')
+
+            for normalized in (1 << 64, -(1 << 64), 1):
+                expected = str(normalized)
+                if abs(normalized) >= 1 << 64:
+                    expected = '"' + expected + '"'
+                for indent in (None, 2):
+                    value = ChangingInt(1)
+                    self.assertEqual(expected, json.dumps(
+                        value, int_as_string_bitcount=64, indent=indent))
+                    self.assertEqual(1, value.calls)
+
+    def test_large_bitcount_normalization_error_propagates(self):
+        for integer_type in integer_types:
+            class BadInt(integer_type):
+                def __int__(self):
+                    raise RuntimeError('normalization bomb')
+
+            for indent in (None, 2):
+                self.assertRaises(
+                    RuntimeError, json.dumps, BadInt(1),
+                    int_as_string_bitcount=64, indent=indent)

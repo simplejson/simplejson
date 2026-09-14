@@ -47,15 +47,17 @@ the C path.
 
 ## What uv can't give you: Python 2.7
 
-python-build-standalone does not ship Py2.7 binaries. There is **no
-way to test Py2 locally**. When touching code that affects the Py2
-bytes parser path in `_speedups.c` or `_speedups_scan.h`, the loop is:
-
-1. Reason about the change on paper (macro expansions, declarations
-   vs statements, refcount transitions)
-2. Push a commit
-3. Wait for the `Build Python 2.7 wheels` step in the wheel job
-   (uses `pypa/cibuildwheel@v1.12.0` / manylinux1 / gcc 4.8)
+python-build-standalone does not ship Py2.7 binaries. With Docker available,
+use the `python:2.7.18-buster` image (`--platform linux/amd64` on Apple
+Silicon) for a real CPython 2.7 interpreter and C compiler. Copy source into
+a container-local working directory, build with
+`REQUIRE_SPEEDUPS=1 python setup.py build_ext -i`, check the extension
+wiring as described below, then run `python -m simplejson.tests._cibw_runner .`.
+Keep this build separate from host extensions; a macOS `.so` cannot exercise
+the Linux C path. The legacy wheel CI still checks its manylinux1/gcc 4.8
+toolchain separately.
+Test files containing non-ASCII text, including comments, need a UTF-8
+source declaration to remain importable on Python 2.7.
 
 ## Reading CI failures
 
@@ -252,6 +254,11 @@ in `test_bitsize_int_as_string.py` run under both paths via `_cibw_runner`.
 For large thresholds, normalize integer subclasses once and share that value
 between decimal formatting and bit-length comparison: a stateful `__int__`
 must not influence the quoting decision through a second conversion.
+On Python 2, `PyNumber_Long` calls `__long__`, whereas the pure encoder's
+`int(value)` calls `__int__`. Normalize with `PyNumber_Int` first, then widen
+the resulting built-in value for `_PyLong_NumBits`. Test both `int` and
+`long` subclasses, native-size and large returned values, and exceptions
+from `__int__` on an actual Python 2.7 interpreter.
 
 When creating a release venv, verify `sysconfig.get_config_var("Py_DEBUG")`
 and the resolved interpreter path. A version-only uv request can select an

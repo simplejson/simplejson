@@ -3160,8 +3160,19 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
     else if (PyInt_Check(obj) || PyLong_Check(obj)) {
         PyObject *integer, *encoded;
         /* Large thresholds inspect the same normalized value we serialize. */
-        if (s->large_int_bitcount != NULL)
+        if (s->large_int_bitcount != NULL) {
+#if PY_MAJOR_VERSION < 3
+            /* Match int(value) in the Python encoder before widening for
+             * _PyLong_NumBits: long(value) would invoke __long__ instead. */
+            PyObject *normalized = PyNumber_Int(obj);
+            if (normalized == NULL)
+                return -1;
+            integer = PyNumber_Long(normalized);
+            Py_DECREF(normalized);
+#else
             integer = PyNumber_Long(obj);
+#endif
+        }
         else {
             integer = obj;
             Py_INCREF(integer);
