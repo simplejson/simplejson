@@ -3015,7 +3015,8 @@ encoder_markers_pop(PyEncoderObject *s, PyObject *ident)
 
 /* Helper for the for_json / _asdict paths in encoder_listencode_obj.
  * Steals the reference to `newobj` (returned by _call_json_method),
- * handles recursion-depth tracking, and dispatches to the right
+ * tracks the original object's circular-reference marker and recursion
+ * depth, and dispatches to the right
  * sub-encoder:
  *   - if as_dict is 0, encodes newobj as a generic JSON value via
  *     encoder_listencode_obj (for_json contract: return any JSON-
@@ -3026,14 +3027,20 @@ encoder_markers_pop(PyEncoderObject *s, PyObject *ident)
  * Cleans up on every exit path. */
 static int
 encoder_steal_encode(PyEncoderObject *s, JSON_Accu *rval,
-                     PyObject *newobj, Py_ssize_t indent_level,
+                     PyObject *obj, PyObject *newobj, Py_ssize_t indent_level,
                      int as_dict)
 {
     int rv;
+    PyObject *ident = NULL;
     if (newobj == NULL)
         return -1;
+    if (encoder_markers_push(s, obj, &ident)) {
+        Py_DECREF(newobj);
+        return -1;
+    }
     if (Py_EnterRecursiveCall(" while encoding a JSON object")) {
         Py_DECREF(newobj);
+        Py_XDECREF(ident);
         return -1;
     }
     if (as_dict) {
@@ -3050,6 +3057,12 @@ encoder_steal_encode(PyEncoderObject *s, JSON_Accu *rval,
     }
     Py_DECREF(newobj);
     Py_LeaveRecursiveCall();
+    if (rv == 0) {
+        if (encoder_markers_pop(s, ident) < 0)
+            rv = -1;
+    } else {
+        Py_XDECREF(ident);
+    }
     return rv;
 }
 
@@ -3197,10 +3210,10 @@ encoder_listencode_obj(PyEncoderObject *s, JSON_Accu *rval, PyObject *obj, Py_ss
             rv = _steal_accumulate(state, rval, encoded);
     }
     else if (s->for_json && _call_json_method(obj, state->JSON_attr_for_json, &newobj)) {
-        rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/0);
+        rv = encoder_steal_encode(s, rval, obj, newobj, indent_level, /*as_dict=*/0);
     }
     else if (s->namedtuple_as_object && _call_json_method(obj, state->JSON_attr_asdict, &newobj)) {
-        rv = encoder_steal_encode(s, rval, newobj, indent_level, /*as_dict=*/1);
+        rv = encoder_steal_encode(s, rval, obj, newobj, indent_level, /*as_dict=*/1);
     }
     else if (PyList_Check(obj) || (s->tuple_as_array && PyTuple_Check(obj))) {
         if (Py_EnterRecursiveCall(" while encoding a JSON object"))
