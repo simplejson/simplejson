@@ -1,4 +1,5 @@
-from unittest import TestCase
+import sys
+from unittest import TestCase, skipIf
 
 import simplejson as json
 
@@ -61,6 +62,8 @@ class TestCustomMethodCycles(TestCase):
     def test_acyclic_chain(self):
         self.assertEqual(json.loads(json.dumps(ForJson(ForJson(1)), for_json=True)), 1)
 
+    @skipIf(sys.platform == 'emscripten',
+            'Pyodide cannot recover from unbounded recursion')
     def test_circular_checks_can_be_disabled(self):
         value = ForJson()
         value.value = value
