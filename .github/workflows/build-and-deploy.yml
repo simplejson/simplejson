@@ -275,6 +275,8 @@ jobs:
             arch: aarch64
           - os: ubuntu-latest
             arch: ppc64le
+          - os: ubuntu-24.04-riscv
+            arch: auto
           - os: windows-latest
             arch: auto
           - os: macos-latest
