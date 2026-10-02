@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import simplejson
 from simplejson import encoder, decoder, scanner
-from simplejson.compat import PY3, long_type, b
+from simplejson.compat import PY3, b
 from simplejson.tests._helpers import has_speedups, skip_if_speedups_missing
 
 
@@ -81,13 +81,6 @@ class TestEncode(TestCase):
         self.assertRaises(ZeroDivisionError, test, 'for_json')
         self.assertRaises(ZeroDivisionError, test, 'ignore_nan')
         self.assertRaises(ZeroDivisionError, test, 'iterable_as_array')
-
-    @skip_if_speedups_missing
-    def test_int_as_string_bitcount_overflow(self):
-        long_count = long_type(2)**32+31
-        def test():
-            encoder.JSONEncoder(int_as_string_bitcount=long_count).encode(0)
-        self.assertRaises((TypeError, OverflowError), test)
 
     if PY3:
         @skip_if_speedups_missing

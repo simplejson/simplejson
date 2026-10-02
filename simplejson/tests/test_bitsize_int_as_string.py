@@ -1,6 +1,7 @@
 from unittest import TestCase
 
 import simplejson as json
+from simplejson.compat import PY3, integer_types, long_type
 
 
 class TestBitSizeIntAsString(TestCase):
@@ -118,3 +119,99 @@ class TestBitSizeIntAsString(TestCase):
                     str(v),
                     json.loads(json.dumps(v, int_as_string_bitcount=n)),
                     "n=%d v=%d should be stringified" % (n, v))
+
+
+    def test_large_bitcounts(self):
+        for n in (64, 65, 127, 128, 256, 1024):
+            boundary = 1 << n
+            values = [0, boundary - 1, boundary, boundary + 1,
+                      -boundary + 1, -boundary, -boundary - 1]
+            expected = [0, boundary - 1, str(boundary), str(boundary + 1),
+                        -boundary + 1, str(-boundary), str(-boundary - 1)]
+            for indent in (None, 2):
+                self.assertEqual(expected, json.loads(json.dumps(
+                    values, int_as_string_bitcount=n, indent=indent)))
+                self.assertEqual({'value': expected}, json.loads(json.dumps(
+                    {'value': values}, int_as_string_bitcount=n, indent=indent)))
+
+    def test_huge_bitcount_does_not_build_boundary(self):
+        # A threshold can exceed native integer sizes without allocating 2**n.
+        for n in (2 ** 32 + 31, 2 ** 100):
+            self.assertEqual('[0, 1, -1]', json.dumps(
+                [0, 1, -1], int_as_string_bitcount=n))
+
+    def test_large_bitcount_normalizes_subclass_once(self):
+        for integer_type in integer_types:
+            class ChangingInt(integer_type):
+                calls = 0
+
+                def __int__(self):
+                    self.calls += 1
+                    return normalized if self.calls == 1 else 0
+
+                def __long__(self):
+                    raise AssertionError('must normalize through __int__')
+
+            for normalized in (1 << 64, -(1 << 64), 1):
+                expected = str(normalized)
+                if abs(normalized) >= 1 << 64:
+                    expected = '"' + expected + '"'
+                for indent in (None, 2):
+                    value = ChangingInt(1)
+                    self.assertEqual(expected, json.dumps(
+                        value, int_as_string_bitcount=64, indent=indent))
+                    self.assertEqual(1, value.calls)
+
+    def test_large_bitcount_normalization_error_propagates(self):
+        for integer_type in integer_types:
+            class BadInt(integer_type):
+                def __int__(self):
+                    raise RuntimeError('normalization bomb')
+
+            for indent in (None, 2):
+                self.assertRaises(
+                    RuntimeError, json.dumps, BadInt(1),
+                    int_as_string_bitcount=64, indent=indent)
+
+    def _assert_returned_long_is_not_converted(self, returned_type):
+        for integer_type in integer_types:
+            class OriginalInt(integer_type):
+                calls = 0
+
+                def __int__(self):
+                    self.calls += 1
+                    return returned
+
+                def __long__(self):
+                    return long_type(7)
+
+            for normalized in (7, 1 << 64, -(1 << 64)):
+                expected = str(normalized)
+                if abs(normalized) >= 1 << 64:
+                    expected = '"' + expected + '"'
+                for indent in (None, 2):
+                    returned = returned_type(normalized)
+                    value = OriginalInt(7)
+                    self.assertEqual(expected, json.dumps(
+                        value, int_as_string_bitcount=64, indent=indent))
+                    self.assertEqual(1, value.calls)
+
+    def test_large_bitcount_returned_long_value_preserved(self):
+        if PY3:
+            self.skipTest('Python 2 int() can return a long subclass')
+
+        class ReturnedLong(long_type):
+            def __long__(self):
+                return 1 << 64
+
+        self._assert_returned_long_is_not_converted(ReturnedLong)
+
+    def test_large_bitcount_returned_long_hook_not_called(self):
+        if PY3:
+            self.skipTest('Python 2 int() can return a long subclass')
+
+        class ReturnedLong(long_type):
+            def __long__(self):
+                raise RuntimeError('unexpected second conversion')
+
+        self._assert_returned_long_is_not_converted(ReturnedLong)

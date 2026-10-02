@@ -516,12 +516,23 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             value = int(value)
         if (
             skip_quoting or
-            (-1 << _int_as_string_bitcount)
-            < value <
-            (1 << _int_as_string_bitcount)
+            value.bit_length() <= _int_as_string_bitcount
         ):
             return str(value)
         return '"' + str(value) + '"'
+
+    def _iterencode_method(obj, result, _current_indent_level, encode):
+        if markers is not None:
+            markerid = id(obj)
+            if markerid in markers:
+                raise ValueError("Circular reference detected")
+            markers[markerid] = obj
+        try:
+            for chunk in encode(result, _current_indent_level):
+                yield chunk
+        finally:
+            if markers is not None:
+                del markers[markerid]
 
     def _iterencode_list(lst, _current_indent_level):
         if not lst:
@@ -570,15 +581,16 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     yield buf
                     for_json = _for_json and call_method(value, 'for_json')
                     if for_json:
-                        chunks = _iterencode(for_json[0], _current_indent_level)
+                        chunks = _iterencode_method(value, for_json[0],
+                                                    _current_indent_level, _iterencode)
                     else:
                         _asdict = _namedtuple_as_object and call_method(value, '_asdict')
                         if _asdict:
                             dct = _asdict[0]
                             if not isinstance(dct, dict):
                                 raise TypeError("_asdict() must return a dict, not %s" % (type(dct).__name__,))
-                            chunks = _iterencode_dict(dct,
-                                                      _current_indent_level)
+                            chunks = _iterencode_method(value, dct,
+                                                        _current_indent_level, _iterencode_dict)
                         elif isinstance(value, list):
                             chunks = _iterencode_list(value, _current_indent_level)
                         elif _tuple_as_array and isinstance(value, tuple):
@@ -701,15 +713,16 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 else:
                     for_json = _for_json and call_method(value, 'for_json')
                     if for_json:
-                        chunks = _iterencode(for_json[0], _current_indent_level)
+                        chunks = _iterencode_method(value, for_json[0],
+                                                    _current_indent_level, _iterencode)
                     else:
                         _asdict = _namedtuple_as_object and call_method(value, '_asdict')
                         if _asdict:
                             dct = _asdict[0]
                             if not isinstance(dct, dict):
                                 raise TypeError("_asdict() must return a dict, not %s" % (type(dct).__name__,))
-                            chunks = _iterencode_dict(dct,
-                                                      _current_indent_level)
+                            chunks = _iterencode_method(value, dct,
+                                                        _current_indent_level, _iterencode_dict)
                         elif isinstance(value, list):
                             chunks = _iterencode_list(value, _current_indent_level)
                         elif _tuple_as_array and isinstance(value, tuple):
@@ -753,7 +766,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         else:
             for_json = _for_json and call_method(o, 'for_json')
             if for_json:
-                for chunk in _iterencode(for_json[0], _current_indent_level):
+                for chunk in _iterencode_method(o, for_json[0],
+                                              _current_indent_level, _iterencode):
                     yield chunk
             else:
                 _asdict = _namedtuple_as_object and call_method(o, '_asdict')
@@ -761,7 +775,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     dct = _asdict[0]
                     if not isinstance(dct, dict):
                         raise TypeError("_asdict() must return a dict, not %s" % (type(dct).__name__,))
-                    for chunk in _iterencode_dict(dct, _current_indent_level):
+                    for chunk in _iterencode_method(o, dct,
+                                                  _current_indent_level, _iterencode_dict):
                         yield chunk
                 elif isinstance(o, list):
                     for chunk in _iterencode_list(o, _current_indent_level):
