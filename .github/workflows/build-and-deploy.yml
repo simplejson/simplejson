@@ -24,26 +24,31 @@ jobs:
         os:
         - 'ubuntu-latest'
         python:
-          - 3.15-dev
-          - 3.14
-          - 3.13
+          - '3.15'
+          - '3.14'
+          - '3.13'
+          - pypy-3.12
           - pypy-3.11
           - graalpy-25.0
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
+          # Lets '3.15' resolve to the newest release candidate until
+          # 3.15.0 final lands in setup-python, then to the final.
+          allow-prereleases: true
       - run: python -m simplejson.tests._cibw_runner .
 
   test_prerelease:
-    name: Tests with C speedups on Python 3.15-dev
+    name: Tests with C speedups on Python 3.15
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: '3.15-dev'
+          python-version: '3.15'
+          allow-prereleases: true
       - name: Build extension
         run: |
           python -m pip install --upgrade pip setuptools wheel
@@ -61,13 +66,20 @@ jobs:
         run: python -m simplejson.tests._cibw_runner .
 
   test_free_threading:
-    name: Tests with free-threading on Python 3.14t
+    name: Tests with free-threading on Python ${{ matrix.python }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python:
+          - '3.14t'
+          - '3.15t'
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: '3.14t'
+          python-version: ${{ matrix.python }}
+          allow-prereleases: true
       - name: Verify Python is a free-threaded build
         run: |
           python -c "
@@ -75,7 +87,7 @@ jobs:
           gil_disabled = sysconfig.get_config_var('Py_GIL_DISABLED')
           assert gil_disabled == 1, (
               'Python is not a free-threaded build '
-              '(Py_GIL_DISABLED={!r}); setup-python did not install 3.14t.'
+              '(Py_GIL_DISABLED={!r}); setup-python did not install ${{ matrix.python }}.'
               .format(gil_disabled))
           print('OK: Py_GIL_DISABLED=1, sys.version=' + sys.version)
           "
@@ -108,13 +120,13 @@ jobs:
           - "free-threaded"
         include:
           - variant: "standard"
-            uv_python: "cpython-3.14.4+debug"
+            uv_python: "cpython-3.14.8+debug"
           - variant: "free-threaded"
-            uv_python: "cpython-3.14.4+freethreaded+debug"
+            uv_python: "cpython-3.14.8+freethreaded+debug"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.0.0
+        uses: astral-sh/setup-uv@v10.2.0
       - name: Install Python via python-build-standalone (${{ matrix.uv_python }})
         run: |
           uv python install ${{ matrix.uv_python }}
@@ -157,16 +169,16 @@ jobs:
         run: PYTHON_GIL=0 .venv/bin/python -m simplejson.tests._cibw_runner .
 
   test_tsan:
-    name: TSan stress (CPython v3.14.0 free-threaded)
+    name: TSan stress (CPython v3.14.8 free-threaded)
     runs-on: ubuntu-latest
     env:
       # Keep in sync with the name above. Pinned so the cache key is stable;
       # bump when moving to a newer CPython (cache is keyed on this + clang
       # version + script hash).
-      CPYTHON_REF: v3.14.0
+      CPYTHON_REF: v3.14.8
       TSAN_ROOT: /home/runner/.cache/py-tsan-ft
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install build deps
         run: |
           sudo apt-get update
@@ -181,7 +193,7 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
       - name: Restore TSan CPython build
         id: cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.TSAN_ROOT }}
           key: tsan-cpython-${{ env.CPYTHON_REF }}-${{ runner.os }}-clang${{ steps.clang.outputs.version }}-${{ hashFiles('scripts/run_tsan_stress.sh') }}
@@ -195,7 +207,7 @@ jobs:
         # Skip save on cache hit (nothing new) or if the build itself failed
         # (would cache a broken install).
         if: always() && steps.cache.outputs.cache-hit != 'true' && steps.build.outcome == 'success'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: ${{ env.TSAN_ROOT }}
           key: ${{ steps.cache.outputs.cache-primary-key }}
@@ -223,7 +235,7 @@ jobs:
             arch: x86
             msvc_arch: x86
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Activate MSVC toolchain (Windows only)
         if: runner.os == 'Windows'
@@ -283,7 +295,7 @@ jobs:
             arch: "x86_64 universal2 arm64"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up QEMU
         if: runner.os == 'Linux'
@@ -292,7 +304,7 @@ jobs:
           platforms: all
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v4.2.0
+        uses: pypa/cibuildwheel@v4.2.1
         env:
           CIBW_TEST_COMMAND: >-
             python -m simplejson.tests._cibw_runner "{project}"
@@ -311,9 +323,9 @@ jobs:
     name: Build Pyodide wheel (wasm32)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         name: Install Python
         with:
           # Host Python for cibuildwheel; Pyodide targets are selected
@@ -321,7 +333,7 @@ jobs:
           python-version: '3.14'
 
       - name: Build Pyodide wheel with C speedups
-        uses: pypa/cibuildwheel@v4.2.0
+        uses: pypa/cibuildwheel@v4.2.1
         env:
           CIBW_PLATFORM: pyodide
           CIBW_TEST_COMMAND: >-
@@ -337,9 +349,9 @@ jobs:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         name: Install Python
         with:
           python-version: '3.14'
@@ -373,9 +385,9 @@ jobs:
     name: Test PEP 517 build (pyproject.toml)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         name: Install Python
         with:
           python-version: '3.14'

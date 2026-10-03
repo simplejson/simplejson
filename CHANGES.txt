@@ -1,3 +1,26 @@
+Version 4.2.0 released 2026-10-02
+
+* Start building wheels for Python 3.15 and drop Python 3.8 support
+  via upgrade to cibuildwheel v4.2.0
+  https://github.com/simplejson/simplejson/pull/385
+* Build and test riscv64 Linux wheels on native RISE runners
+  https://github.com/simplejson/simplejson/pull/389
+* The C scanner now reports the same error message as the pure Python
+  decoder for an invalid first key in an object
+  https://github.com/simplejson/simplejson/pull/388
+* ``int_as_string_bitcount`` now supports thresholds of 64 bits and above
+  (including 128-bit integers) in both the C and pure Python encoders;
+  the C encoder previously rejected them
+  https://github.com/simplejson/simplejson/pull/387
+* Circular references introduced through ``for_json()`` or ``_asdict()``
+  now raise ``ValueError("Circular reference detected")`` instead of
+  recursing without bound
+  https://github.com/simplejson/simplejson/pull/390
+* CI now tests Python 3.15 (including free-threaded 3.15t), PyPy 3.12,
+  CPython 3.14.8 debug builds, and uses current GitHub Actions and
+  cibuildwheel v4.2.1
+  https://github.com/simplejson/simplejson/pull/386
+
 Version 4.1.2 released 2026-08-26
 
 * Fix control character error position when content precedes the control char

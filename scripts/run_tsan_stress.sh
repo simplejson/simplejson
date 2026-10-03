@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-: "${CPYTHON_REF:=v3.14.0}"
+: "${CPYTHON_REF:=v3.14.8}"
 : "${CPYTHON_REPO:=https://github.com/python/cpython.git}"
 : "${TSAN_ROOT:=${HOME}/.cache/py-tsan-ft}"
 : "${TSAN_OPTIONS:=halt_on_error=0 second_deadlock_stack=1 history_size=7 handle_segv=0}"

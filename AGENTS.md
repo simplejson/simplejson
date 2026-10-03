@@ -14,17 +14,17 @@ variants (including debug and free-threaded debug) in under 10 seconds:
 
 ```bash
 # Regular release (same thing setup-python installs in CI)
-uv python install cpython-3.14.4
+uv python install cpython-3.14.8
 
 # Debug build — exposes sys.gettotalrefcount, Py_DECREF asserts,
 # and the internal consistency checks release builds skip. This is
 # the variant that caught the -1LL << n UB bug.
-uv python install cpython-3.14.4+debug
+uv python install cpython-3.14.8+debug
 
 # Free-threaded + debug — highest-value single variant for this PR.
 # Stacks refcount asserts, GIL-disabled scheduling, and the
 # specializer in one interpreter.
-uv python install cpython-3.14.4+freethreaded+debug
+uv python install cpython-3.14.8+freethreaded+debug
 ```
 
 Each installed Python is a self-contained directory under
@@ -32,7 +32,7 @@ Each installed Python is a self-contained directory under
 `wheel` with `uv pip`:
 
 ```bash
-uv venv --python cpython-3.14.4+debug /tmp/debug-venv
+uv venv --python cpython-3.14.8+debug /tmp/debug-venv
 uv pip install --python /tmp/debug-venv/bin/python setuptools wheel
 rm -f simplejson/_speedups*.so
 REQUIRE_SPEEDUPS=1 /tmp/debug-venv/bin/python setup.py build_ext -i
@@ -68,7 +68,7 @@ page only sees the failure *annotations*, not the actual step output.
 When you see an annotation like `pip wheel ... failed with code 1`
 and no detail:
 
-1. Reproduce locally across `python3.10`..`python3.14.4` and both
+1. Reproduce locally across `python3.10`..`python3.14.8` and both
    free-threaded + debug via uv. 90% of real failures reproduce.
 2. Check if the run is **stale** — compare the run's head SHA
    against the branch head. `mcp__github__list_commits` for the
@@ -83,8 +83,8 @@ and no detail:
 
 Two cibuildwheel versions run in one job:
 
-- **Main `Build wheels` step** uses `pypa/cibuildwheel@v3.4.1` (Py3).
-  In v3.x **PyPy is disabled by default**; `CIBW_SKIP: "pp*"` *errors*
+- **Main `Build wheels` step** uses `pypa/cibuildwheel@v4.2.1` (Py3).
+  In v3.x and later **PyPy is disabled by default**; `CIBW_SKIP: "pp*"` *errors*
   with `Invalid skip selector: 'pp*'. This selector matches a group
   that wasn't enabled.` Do not set it.
 - **`Build Python 2.7 wheels` step** uses `pypa/cibuildwheel@v1.12.0`.
@@ -137,7 +137,7 @@ Asserting on the total delta will flake.
 Earlier Python versions don't. A local release build with `-Werror`
 will pass on 3.11/3.12/3.13 and fail on 3.14 if you introduce any
 unreachable code on a hot path. Always spot-check with
-`cpython-3.14.4` specifically when doing C refactors.
+`cpython-3.14.8` specifically when doing C refactors.
 
 ## `_speedups_scan.h` is included **twice**
 
