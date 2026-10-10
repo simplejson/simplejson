@@ -19,7 +19,54 @@ class BadIter:
         raise self.exc_type("from __iter__")
 
 
+class IterableValues(object):
+    def __init__(self, values):
+        self.values = values
+
+    def __iter__(self):
+        return iter(self.values)
+
+
+class RecursiveIterator(object):
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self
+
+    next = __next__
+
+
 class TestIterable(unittest.TestCase):
+    def test_iterable_cycles(self):
+        direct = IterableValues([])
+        direct.values.append(direct)
+        first = IterableValues([])
+        second = IterableValues([first])
+        first.values.append(second)
+        for value in (direct, first, [direct], {'value': direct}, RecursiveIterator()):
+            for indent in (None, 2):
+                with self.assertRaises(ValueError) as exc:
+                    json.dumps(value, iterable_as_array=True, indent=indent)
+                self.assertEqual(str(exc.exception), 'Circular reference detected')
+
+    def test_iterable_repeated_reference_is_not_a_cycle(self):
+        value = IterableValues([1, 2])
+        for circular in (True, False):
+            for indent in (None, 2):
+                encoded = json.dumps([value, value], iterable_as_array=True,
+                                     check_circular=circular, indent=indent)
+                self.assertEqual(json.loads(encoded), [[1, 2], [1, 2]])
+
+    def test_iterable_circular_checks_can_be_disabled(self):
+        value = IterableValues([])
+        value.values.append(value)
+        for cycle in (value, RecursiveIterator()):
+            for indent in (None, 2):
+                self.assertRaises(RuntimeError, json.dumps, cycle,
+                                  iterable_as_array=True, check_circular=False,
+                                  indent=indent)
+
     def test_iterable(self):
         for l in ([], [1], [1, 2], [1, 2, 3]):
             for opts in [{}, {'indent': 2}]:

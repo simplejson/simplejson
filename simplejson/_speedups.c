@@ -3102,8 +3102,26 @@ encoder_listencode_default(PyEncoderObject *s, JSON_Accu *rval,
                 return -1;
             PyErr_Clear();
         } else {
+            /* The iterator may be fresh on every visit to obj. Track the
+             * original iterable too, without double-marking self-iterators. */
+            if (newobj != obj && encoder_markers_push(s, obj, &ident)) {
+                Py_DECREF(newobj);
+                return -1;
+            }
+            if (Py_EnterRecursiveCall(" while encoding a JSON object")) {
+                Py_DECREF(newobj);
+                Py_XDECREF(ident);
+                return -1;
+            }
             rv = encoder_listencode_list(s, rval, newobj, indent_level);
             Py_DECREF(newobj);
+            Py_LeaveRecursiveCall();
+            if (rv == 0) {
+                if (encoder_markers_pop(s, ident) < 0)
+                    rv = -1;
+            } else {
+                Py_XDECREF(ident);
+            }
             return rv;
         }
     }

@@ -791,13 +791,19 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     yield _encode_decimal(o, _floatstr)
                 else:
                     while _iterable_as_array:
-                        # Markers are not checked here because it is valid for
-                        # an iterable to return self.
                         try:
-                            o = iter(o)
+                            iterator = iter(o)
                         except TypeError:
                             break
-                        for chunk in _iterencode_list(o, _current_indent_level):
+                        if iterator is o:
+                            chunks = _iterencode_list(iterator, _current_indent_level)
+                        else:
+                            # Track the iterable as well as its iterator so a
+                            # fresh iterator cannot hide a cycle through o.
+                            chunks = _iterencode_method(o, iterator,
+                                                        _current_indent_level,
+                                                        _iterencode_list)
+                        for chunk in chunks:
                             yield chunk
                         return
                     if markers is not None:
