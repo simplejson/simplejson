@@ -96,10 +96,16 @@ class FalsySelfIterator(object):
 # Every level is a new object, so circular checks cannot stop the
 # encoder; only the C encoder's recursion guard does. On Python 3.14+ the
 # interpreter's own stack checks also catch Deep, whose __iter__ is a
-# Python call, so the nested frozensets, which the encoder walks without
-# calling into Python, are what crash the child there without the guard.
+# Python call, so the nested frozensets are what crash the child there
+# without the guard: with namedtuple_as_object=False the encoder walks
+# them without calling into Python (otherwise each level's _asdict lookup
+# raises AttributeError, which passes through the interpreter's stack
+# check). Before 3.14 the guard's limit is a fixed count, so the encodes
+# run in a thread with a large stack to let the guard, not the platform's
+# stack size, decide the outcome.
 UNBOUNDED_ITERABLE_SCRIPT = '''
 import sys
+import threading
 sys.path.insert(0, sys.argv[1])
 import simplejson
 from simplejson import encoder
@@ -113,15 +119,30 @@ nested = frozenset()
 for _ in range(100000):
     nested = frozenset([nested])
 
-for value, kw in ((Deep(), {}), (nested, {'namedtuple_as_object': False})):
-    for check_circular in (True, False):
-        try:
-            simplejson.dumps(value, iterable_as_array=True,
-                             check_circular=check_circular, **kw)
-        except RuntimeError:
-            pass
-        else:
-            raise AssertionError('expected a recursion error')
+results = []
+
+def run():
+    try:
+        for value, kw in ((Deep(), {}),
+                          (nested, {'namedtuple_as_object': False})):
+            for check_circular in (True, False):
+                try:
+                    simplejson.dumps(value, iterable_as_array=True,
+                                     check_circular=check_circular, **kw)
+                except RuntimeError:
+                    pass
+                else:
+                    results.append('expected a recursion error')
+        results.append('done')
+    except BaseException as exc:
+        results.append(repr(exc))
+
+if sys.version_info < (3, 14):
+    threading.stack_size(32 * 1024 * 1024)
+thread = threading.Thread(target=run)
+thread.start()
+thread.join()
+assert results == ['done'], results
 '''
 
 

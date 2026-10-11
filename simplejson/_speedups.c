@@ -2966,9 +2966,10 @@ _steal_accumulate(_speedups_state *state, JSON_Accu *accu, PyObject *stolen)
 /* Push a reference to `obj` into the encoder's circular-reference marker
  * dict, keyed by the object's address. Allocates a fresh PyLong ident and
  * stores it in *ident_ptr (caller owns the reference, and must pass it to
- * encoder_markers_pop to remove the entry). If markers tracking is off
+ * encoder_markers_pop on success, or encoder_markers_discard on an error
+ * path, to remove the entry). If markers tracking is off
  * (s->markers == Py_None), stores NULL in *ident_ptr and returns 0 with
- * no side effects — that NULL is the sentinel markers_pop understands.
+ * no side effects — that NULL is the sentinel both of those understand.
  * On circular reference sets the ValueError; on any other failure sets
  * the corresponding exception. Returns 0 on success, -1 on error. */
 static int

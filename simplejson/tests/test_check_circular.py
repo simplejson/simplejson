@@ -14,6 +14,9 @@ def make_encoders(markers, item_sort_key=None):
     def default(obj):
         if isinstance(obj, ViaDefault):
             return [Unserializable()]
+        if isinstance(obj, ClearingViaDefault):
+            markers.clear()
+            raise ValueError('boom')
         raise TypeError('not serializable')
     py_encode = encoder._make_iterencode(
         markers, default, encoder.encode_basestring_ascii, None, repr,
@@ -33,6 +36,10 @@ class Unserializable(object):
 
 class ViaDefault(object):
     # default() converts it to a list holding an Unserializable.
+    pass
+
+class ClearingViaDefault(object):
+    # default() clears the markers dict, then raises ValueError('boom').
     pass
 
 class ForJsonList(object):
@@ -145,7 +152,8 @@ class TestCheckCircular(TestCase):
             for value in (ClearingRaisingIterator(),
                           [ClearingRaisingIterator()],
                           {'a': ClearingRaisingIterator()},
-                          ClearingRaisingForJson()):
+                          ClearingRaisingForJson(),
+                          [ClearingViaDefault()]):
                 with self.assertRaises(ValueError) as cm:
                     encode(value)
                 self.assertEqual(str(cm.exception), 'boom', name)
