@@ -1,7 +1,11 @@
+import os
+import subprocess
+import sys
 import unittest
 from simplejson.compat import StringIO
 
 import simplejson as json
+from simplejson.tests._helpers import skip_if_speedups_missing
 
 def iter_dumps(obj, **kw):
     return ''.join(json.JSONEncoder(**kw).iterencode(obj))
@@ -61,6 +65,56 @@ class FiniteRecursiveIterator(RecursiveIterator):
     next = __next__
 
 
+class CountingRecursiveIterable(object):
+    def __init__(self):
+        self.calls = 0
+
+    def __iter__(self):
+        self.calls += 1
+        return iter([self])
+
+
+class FalsySelfIterator(object):
+    # Its truth value is False while it still has items to yield.
+    def __init__(self):
+        self.items = [1, 1]
+
+    def __len__(self):
+        return 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.items:
+            return self.items.pop()
+        raise StopIteration
+
+    next = __next__
+
+
+# Every level is a new object, so only the C encoder's recursion guard
+# stops it; without the guard the C stack overflows.
+UNBOUNDED_ITERABLE_SCRIPT = '''
+import simplejson
+from simplejson import encoder
+assert encoder.c_make_encoder is not None
+
+class Deep(object):
+    def __iter__(self):
+        return iter([Deep()])
+
+for check_circular in (True, False):
+    try:
+        simplejson.dumps(Deep(), iterable_as_array=True,
+                         check_circular=check_circular)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('expected RecursionError')
+'''
+
+
 class TestIterable(unittest.TestCase):
     def test_iterable_cycles(self):
         direct = IterableValues([])
@@ -92,6 +146,45 @@ class TestIterable(unittest.TestCase):
                 encoded = json.dumps(cycle_type(), iterable_as_array=True,
                                      check_circular=False, indent=indent)
                 self.assertEqual(json.loads(encoded), [[[]]])
+
+    def test_iterable_cycle_does_not_iterate_again(self):
+        for wrap in (lambda v: v, lambda v: [v], lambda v: {'v': v}):
+            for indent in (None, 2):
+                value = CountingRecursiveIterable()
+                self.assertRaises(ValueError, json.dumps, wrap(value),
+                                  iterable_as_array=True, indent=indent)
+                self.assertEqual(value.calls, 1)
+
+    def test_falsy_self_iterator_is_iterated(self):
+        for indent in (None, 2):
+            encoded = json.dumps(FalsySelfIterator(), iterable_as_array=True,
+                                 indent=indent)
+            self.assertEqual(json.loads(encoded), [1, 1])
+
+    @skip_if_speedups_missing
+    def test_unbounded_iterable_recursion_is_guarded(self):
+        # Run in a child process so a regression crashes the child, not
+        # the test suite.
+        if sys.platform == 'emscripten':
+            self.skipTest('subprocess not available on Emscripten')
+        root = os.path.dirname(os.path.dirname(os.path.abspath(json.__file__)))
+        env = dict(os.environ)
+        env['PYTHONPATH'] = os.pathsep.join(
+            [p for p in (root, env.get('PYTHONPATH')) if p])
+        proc = subprocess.Popen(
+            [sys.executable, '-c', UNBOUNDED_ITERABLE_SCRIPT],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+        out, err = proc.communicate()
+        self.assertEqual(proc.returncode, 0, err)
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
+    def test_add_note_names_the_iterable(self):
+        with self.assertRaises(TypeError) as cm:
+            json.dumps([IterableValues([object()])], iterable_as_array=True)
+        self.assertEqual(cm.exception.__notes__, [
+            'when serializing object object',
+            'when serializing IterableValues item 0',
+            'when serializing list item 0'])
 
     def test_iterable(self):
         for l in ([], [1], [1, 2], [1, 2, 3]):

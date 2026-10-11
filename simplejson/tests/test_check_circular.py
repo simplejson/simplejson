@@ -1,8 +1,41 @@
+import decimal
 from unittest import TestCase
 import simplejson as json
+from simplejson import encoder
+from simplejson.tests._helpers import has_speedups
 
 def default_iterable(obj):
     return list(obj)
+
+def make_encoders(markers):
+    # Build the Python and (when available) C encoders around one shared
+    # markers dict, as JSONEncoder.iterencode would, so tests can inspect
+    # the dict after an encode.
+    def default(obj):
+        raise TypeError('not serializable')
+    py_encode = encoder._make_iterencode(
+        markers, default, encoder.encode_basestring_ascii, None, repr,
+        ': ', ', ', False, False, False, True, True, None, None,
+        'utf-8', True, True, Decimal=decimal.Decimal)
+    encoders = [('python', lambda o: ''.join(py_encode(o, 0)))]
+    if has_speedups():
+        c_encode = encoder.c_make_encoder(
+            markers, default, encoder.encode_basestring_ascii, None,
+            ': ', ', ', False, False, True, {}, False, True, True,
+            None, None, 'utf-8', True, False, decimal.Decimal, True)
+        encoders.append(('c', lambda o: ''.join(c_encode(o, 0))))
+    return encoders
+
+class Unserializable(object):
+    pass
+
+class ForJsonList(object):
+    def for_json(self):
+        return [Unserializable()]
+
+class IterableWithBadItem(object):
+    def __iter__(self):
+        return iter([1, Unserializable()])
 
 class TestCheckCircular(TestCase):
     def test_circular_dict(self):
@@ -48,3 +81,35 @@ class TestCheckCircular(TestCase):
         except (TypeError, ValueError):
             pass
 
+    def test_markers_released_after_error(self):
+        # A failed encode must not leave markers behind, or an encoder
+        # whose markers dict is reused reports a false circular reference.
+        markers = {}
+        values = [
+            [1, Unserializable()],
+            {'a': Unserializable()},
+            ForJsonList(),
+            IterableWithBadItem(),
+            Unserializable(),
+            [{'a': [IterableWithBadItem()]}],
+        ]
+        for name, encode in make_encoders(markers):
+            for value in values:
+                for attempt in range(2):
+                    self.assertRaises(TypeError, encode, value)
+                    self.assertEqual(markers, {}, (name, value))
+
+    def test_markers_cleared_during_encoding(self):
+        # Removing a marker from under the encoder raises KeyError when it
+        # is popped, rather than releasing the marker's key twice.
+        markers = {}
+        class ClearingIterator(object):
+            def __iter__(self):
+                return self
+            def __next__(self):
+                markers.clear()
+                raise StopIteration
+            next = __next__
+        for name, encode in make_encoders(markers):
+            self.assertRaises(KeyError, encode, ClearingIterator())
+            self.assertRaises(KeyError, encode, [ClearingIterator()])

@@ -292,7 +292,8 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     by JSON. When it is true, all non-ASCII characters are escaped.
 
     If ``check_circular`` is false, then the circular reference check
-    for container types will be skipped and a circular reference will
+    for container types (including iterables encoded with
+    ``iterable_as_array``) will be skipped and a circular reference will
     result in an ``OverflowError`` (or worse).
 
     If *allow_nan* is true (default: ``False``), then out of range ``float``
