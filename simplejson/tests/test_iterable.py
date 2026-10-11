@@ -37,6 +37,30 @@ class RecursiveIterator(object):
     next = __next__
 
 
+class FiniteRecursiveIterable(object):
+    def __init__(self):
+        self.remaining = 2
+
+    def __iter__(self):
+        if self.remaining:
+            self.remaining -= 1
+            return iter((self,))
+        return iter(())
+
+
+class FiniteRecursiveIterator(RecursiveIterator):
+    def __init__(self):
+        self.remaining = 2
+
+    def __next__(self):
+        if self.remaining:
+            self.remaining -= 1
+            return self
+        raise StopIteration
+
+    next = __next__
+
+
 class TestIterable(unittest.TestCase):
     def test_iterable_cycles(self):
         direct = IterableValues([])
@@ -59,13 +83,15 @@ class TestIterable(unittest.TestCase):
                 self.assertEqual(json.loads(encoded), [[1, 2], [1, 2]])
 
     def test_iterable_circular_checks_can_be_disabled(self):
-        value = IterableValues([])
-        value.values.append(value)
-        for cycle in (value, RecursiveIterator()):
+        # Bounded self-references exercise disabled circular checks without
+        # depending on a platform's recovery from stack exhaustion.
+        for cycle_type in (FiniteRecursiveIterable, FiniteRecursiveIterator):
             for indent in (None, 2):
-                self.assertRaises(RuntimeError, json.dumps, cycle,
-                                  iterable_as_array=True, check_circular=False,
-                                  indent=indent)
+                self.assertRaises(ValueError, json.dumps, cycle_type(),
+                                  iterable_as_array=True, indent=indent)
+                encoded = json.dumps(cycle_type(), iterable_as_array=True,
+                                     check_circular=False, indent=indent)
+                self.assertEqual(json.loads(encoded), [[[]]])
 
     def test_iterable(self):
         for l in ([], [1], [1, 2], [1, 2, 3]):
