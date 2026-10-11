@@ -531,9 +531,16 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         try:
             for chunk in encode(result, _current_indent_level):
                 yield chunk
-        finally:
+        except BaseException:
+            # Like the C encoder's encoder_markers_discard: release the
+            # marker so a reused markers dict reports no false cycle,
+            # without letting a marker that has already gone replace
+            # the in-flight exception.
             if markers is not None:
-                del markers[markerid]
+                markers.pop(markerid, None)
+            raise
+        if markers is not None:
+            del markers[markerid]
 
     def _iterencode_list(lst, _current_indent_level, _origin=None):
         # _origin is the object being encoded: lst itself, or under
@@ -625,9 +632,12 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     _current_indent_level -= 1
                     yield '\n' + (_indent * _current_indent_level)
                 yield ']'
-        finally:
+        except BaseException:
             if markers is not None:
-                del markers[markerid]
+                markers.pop(markerid, None)
+            raise
+        if markers is not None:
+            del markers[markerid]
 
     def _stringify_key(key):
         if isinstance(key, string_types): # pragma: no cover
@@ -755,9 +765,12 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 _current_indent_level -= 1
                 yield '\n' + (_indent * _current_indent_level)
             yield '}'
-        finally:
+        except BaseException:
             if markers is not None:
-                del markers[markerid]
+                markers.pop(markerid, None)
+            raise
+        if markers is not None:
+            del markers[markerid]
 
     def _iterencode(o, _current_indent_level):
         if isinstance(o, string_types):
@@ -827,13 +840,14 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                         for chunk in _iterencode(o, _current_indent_level):
                             yield chunk
                     except BaseException as exc:
+                        if markers is not None:
+                            markers.pop(markerid, None)
                         if _HAS_ADD_NOTE:
                             exc.add_note(
                                 'when serializing %s object'
                                 % type(o).__name__)
                         raise
-                    finally:
-                        if markers is not None:
-                            del markers[markerid]
+                    if markers is not None:
+                        del markers[markerid]
 
     return _iterencode

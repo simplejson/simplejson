@@ -7,26 +7,32 @@ from simplejson.tests._helpers import has_speedups
 def default_iterable(obj):
     return list(obj)
 
-def make_encoders(markers):
+def make_encoders(markers, item_sort_key=None):
     # Build the Python and (when available) C encoders around one shared
     # markers dict, as JSONEncoder.iterencode would, so tests can inspect
     # the dict after an encode.
     def default(obj):
+        if isinstance(obj, ViaDefault):
+            return [Unserializable()]
         raise TypeError('not serializable')
     py_encode = encoder._make_iterencode(
         markers, default, encoder.encode_basestring_ascii, None, repr,
-        ': ', ', ', False, False, False, True, True, None, None,
+        ': ', ', ', False, False, False, True, True, None, item_sort_key,
         'utf-8', True, True, Decimal=decimal.Decimal)
     encoders = [('python', lambda o: ''.join(py_encode(o, 0)))]
     if has_speedups():
         c_encode = encoder.c_make_encoder(
             markers, default, encoder.encode_basestring_ascii, None,
             ': ', ', ', False, False, True, {}, False, True, True,
-            None, None, 'utf-8', True, False, decimal.Decimal, True)
+            None, item_sort_key, 'utf-8', True, False, decimal.Decimal, True)
         encoders.append(('c', lambda o: ''.join(c_encode(o, 0))))
     return encoders
 
 class Unserializable(object):
+    pass
+
+class ViaDefault(object):
+    # default() converts it to a list holding an Unserializable.
     pass
 
 class ForJsonList(object):
@@ -91,6 +97,7 @@ class TestCheckCircular(TestCase):
             ForJsonList(),
             IterableWithBadItem(),
             Unserializable(),
+            ViaDefault(),
             [{'a': [IterableWithBadItem()]}],
         ]
         for name, encode in make_encoders(markers):
@@ -110,6 +117,36 @@ class TestCheckCircular(TestCase):
                 markers.clear()
                 raise StopIteration
             next = __next__
+        def clearing_sort_key(item):
+            markers.clear()
+            return item[0]
         for name, encode in make_encoders(markers):
             self.assertRaises(KeyError, encode, ClearingIterator())
             self.assertRaises(KeyError, encode, [ClearingIterator()])
+        for name, encode in make_encoders(markers, clearing_sort_key):
+            self.assertRaises(KeyError, encode, {'a': 1, 'b': 2})
+            self.assertRaises(KeyError, encode, [{'a': 1, 'b': 2}])
+
+    def test_markers_cleared_before_error(self):
+        # The error that stopped the encode propagates, not a KeyError
+        # for the marker that was already removed.
+        markers = {}
+        class ClearingRaisingIterator(object):
+            def __iter__(self):
+                return self
+            def __next__(self):
+                markers.clear()
+                raise ValueError('boom')
+            next = __next__
+        class ClearingRaisingForJson(object):
+            def for_json(self):
+                return ClearingRaisingIterator()
+        for name, encode in make_encoders(markers):
+            for value in (ClearingRaisingIterator(),
+                          [ClearingRaisingIterator()],
+                          {'a': ClearingRaisingIterator()},
+                          ClearingRaisingForJson()):
+                with self.assertRaises(ValueError) as cm:
+                    encode(value)
+                self.assertEqual(str(cm.exception), 'boom', name)
+                self.assertEqual(markers, {}, name)

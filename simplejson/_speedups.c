@@ -3648,10 +3648,10 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq,
     else {
         /* For non-exact types (list/tuple subclasses or other iterables)
          * we cannot short-circuit on emptiness without consuming the
-         * iterator. iterable_as_array in particular reaches us with a
-         * bare iterator whose PyObject_IsTrue always returns 1, so the
-         * emptiness is only discovered on the first PyIter_Next call
-         * inside the slow path below. */
+         * iterator. iterable_as_array in particular reaches us with an
+         * iterator, whose truth value says nothing about whether it
+         * will yield items, so the emptiness is only discovered on the
+         * first PyIter_Next call inside the slow path below. */
         is_exact_fast = 0;
     }
 

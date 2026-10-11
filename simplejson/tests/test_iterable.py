@@ -93,9 +93,14 @@ class FalsySelfIterator(object):
     next = __next__
 
 
-# Every level is a new object, so only the C encoder's recursion guard
-# stops it; without the guard the C stack overflows.
+# Every level is a new object, so circular checks cannot stop the
+# encoder; only the C encoder's recursion guard does. On Python 3.14+ the
+# interpreter's own stack checks also catch Deep, whose __iter__ is a
+# Python call, so the nested frozensets, which the encoder walks without
+# calling into Python, are what crash the child there without the guard.
 UNBOUNDED_ITERABLE_SCRIPT = '''
+import sys
+sys.path.insert(0, sys.argv[1])
 import simplejson
 from simplejson import encoder
 assert encoder.c_make_encoder is not None
@@ -104,14 +109,19 @@ class Deep(object):
     def __iter__(self):
         return iter([Deep()])
 
-for check_circular in (True, False):
-    try:
-        simplejson.dumps(Deep(), iterable_as_array=True,
-                         check_circular=check_circular)
-    except RuntimeError:
-        pass
-    else:
-        raise AssertionError('expected RecursionError')
+nested = frozenset()
+for _ in range(100000):
+    nested = frozenset([nested])
+
+for value, kw in ((Deep(), {}), (nested, {'namedtuple_as_object': False})):
+    for check_circular in (True, False):
+        try:
+            simplejson.dumps(value, iterable_as_array=True,
+                             check_circular=check_circular, **kw)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError('expected a recursion error')
 '''
 
 
@@ -168,12 +178,9 @@ class TestIterable(unittest.TestCase):
         if sys.platform == 'emscripten':
             self.skipTest('subprocess not available on Emscripten')
         root = os.path.dirname(os.path.dirname(os.path.abspath(json.__file__)))
-        env = dict(os.environ)
-        env['PYTHONPATH'] = os.pathsep.join(
-            [p for p in (root, env.get('PYTHONPATH')) if p])
         proc = subprocess.Popen(
-            [sys.executable, '-c', UNBOUNDED_ITERABLE_SCRIPT],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+            [sys.executable, '-c', UNBOUNDED_ITERABLE_SCRIPT, root],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate()
         self.assertEqual(proc.returncode, 0, err)
 
