@@ -126,3 +126,23 @@ class TestForJson(unittest.TestCase):
                 raise AttributeError(name)
         self.assertRaises(
             TypeError, json.dumps, NoJsonMethods(), for_json=True)
+
+    def test_methods_raising_type_error_are_called_once(self):
+        # A TypeError from for_json() or _asdict() means "not supported",
+        # and the encoder moves on to default() without retrying them.
+        calls = []
+        class Raises(object):
+            def for_json(self):
+                calls.append('for_json')
+                raise TypeError('nope')
+            def _asdict(self):
+                calls.append('_asdict')
+                raise TypeError('nope')
+        for value, expected in ((Raises(), '"d"'),
+                                ([Raises()], '["d"]'),
+                                ({'k': Raises()}, '{"k": "d"}')):
+            del calls[:]
+            self.assertEqual(
+                json.dumps(value, for_json=True, default=lambda o: 'd'),
+                expected)
+            self.assertEqual(calls, ['for_json', '_asdict'])

@@ -399,6 +399,47 @@ class TestDictEncodingPaths(TestCase):
         result = json.loads(json.dumps(d))
         self.assertEqual(result, d)
 
+    def test_dict_resized_during_encoding(self):
+        """Resizing the dict while one of its values is encoded fails the
+        way iterating a dict that changes size does."""
+        d = {}
+        class Grow(object):
+            def for_json(self):
+                d['z'] = 1
+                return 'x'
+        class Shrink(object):
+            def for_json(self):
+                d.pop('b', None)
+                return 'x'
+        for value, other in ((Grow(), None), (Shrink(), 2)):
+            d.clear()
+            d['a'] = value
+            if other is not None:
+                d['b'] = other
+            with self.assertRaises(RuntimeError) as cm:
+                json.dumps(d, for_json=True)
+            self.assertEqual(str(cm.exception),
+                             'dictionary changed size during iteration')
+
+    def test_dict_entry_removed_while_value_fails(self):
+        """The error note for a value can name a key that encoding the
+        value removed from the dict."""
+        import decimal
+        d = {}
+        # Decimal keys are not memoized, so the dict holds the only
+        # reference to this one.
+        d[decimal.Decimal('1.25')] = object()
+        def default(o):
+            d.clear()
+            raise TypeError('boom')
+        with self.assertRaises(TypeError) as cm:
+            json.dumps(d, default=default, use_decimal=True)
+        if sys.version_info >= (3, 11):
+            self.assertTrue(
+                cm.exception.__notes__[-1].startswith(
+                    'when serializing dict item '),
+                cm.exception.__notes__)
+
 
 class TestListEncodingPaths(TestCase):
     """Verify that the indexed fast path (exact list/tuple) and the
@@ -451,3 +492,29 @@ class TestListEncodingPaths(TestCase):
         """Large list stresses the indexed fast path."""
         data = list(range(1000))
         self.assertEqual(json.loads(json.dumps(data)), data)
+
+    def test_list_resized_during_encoding(self):
+        """Items are read up to the list's current length, as a list
+        iterator does, when encoding an item resizes the list."""
+        lst = []
+        def clear_list(o):
+            del lst[:]
+            return None
+        lst.extend([object()] + [[i] for i in range(100)])
+        self.assertEqual(json.dumps(lst, default=clear_list), '[null]')
+
+        shrinking = []
+        class Shrink(object):
+            def for_json(self):
+                del shrinking[1:]
+                return 'x'
+        shrinking.extend([Shrink(), 'a' * 50 + 'b', ['tail']])
+        self.assertEqual(json.dumps(shrinking, for_json=True), '["x"]')
+
+        growing = []
+        class Grow(object):
+            def for_json(self):
+                growing.append(2)
+                return 1
+        growing.append(Grow())
+        self.assertEqual(json.dumps(growing, for_json=True), '[1, 2]')
