@@ -197,6 +197,32 @@ class TestErrors(TestCase):
             str(cm.exception),
             'keys must be str, int, float, bool or None, not Decimal')
 
+    def test_type_name_of_class_with_dotted_name(self):
+        # A class's __name__ is used as is, even when it contains dots.
+        Dotted = type('pkg.Dotted', (object,), {})
+        with self.assertRaises(TypeError) as cm:
+            json.dumps({Dotted(): 1})
+        self.assertEqual(
+            str(cm.exception),
+            'keys must be str, int, float, bool or None, not pkg.Dotted')
+        if sys.version_info >= (3, 11):
+            DottedDict = type('pkg.DottedDict', (dict,), {})
+            with self.assertRaises(TypeError) as cm:
+                json.dumps(DottedDict(a=Dotted()))
+            self.assertEqual(cm.exception.__notes__,
+                             ['when serializing pkg.Dotted object',
+                              "when serializing pkg.DottedDict item 'a'"])
+
+    @unittest.skipIf(sys.version_info < (3,), 'Python 2 class names are bytes')
+    def test_type_name_of_class_with_non_ascii_name(self):
+        name = 'pkg.Über'
+        Uber = type(name, (object,), {})
+        with self.assertRaises(TypeError) as cm:
+            json.dumps({Uber(): 1})
+        self.assertEqual(
+            str(cm.exception),
+            'keys must be str, int, float, bool or None, not ' + name)
+
     @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_after_asdict_names_the_dict(self):
         import collections

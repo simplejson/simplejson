@@ -421,6 +421,42 @@ class TestDictEncodingPaths(TestCase):
             self.assertEqual(str(cm.exception),
                              'dictionary changed size during iteration')
 
+    def test_dict_keys_replaced_during_encoding(self):
+        """Replacing keys without changing the dict's size fails the way
+        iterating such a dict does on Python 3, instead of encoding keys
+        twice."""
+        if not PY3:
+            self.skipTest('Python 2 dict iteration only checks the size')
+        d = {}
+        class Readd(object):
+            def for_json(self):
+                d['a'] = d.pop('a')
+                return 'x'
+        class Replace(object):
+            def for_json(self):
+                del d['a']
+                d['z'] = 26
+                return 'x'
+        for value in (Readd(), Replace()):
+            d.clear()
+            d['a'] = value
+            d['b'] = 1
+            with self.assertRaises(RuntimeError) as cm:
+                json.dumps(d, for_json=True)
+            self.assertEqual(str(cm.exception),
+                             'dictionary keys changed during iteration')
+
+    def test_dict_subclass_items_returning_iterator(self):
+        """A dict subclass whose items() returns an iterator can be
+        sorted."""
+        class D(dict):
+            def items(self):
+                return iter(dict.items(self))
+        self.assertEqual(json.dumps(D(b=2, a=1), sort_keys=True),
+                         '{"a": 1, "b": 2}')
+        self.assertEqual(json.dumps(D({1: 'x', 'a': 1}), sort_keys=True),
+                         '{"1": "x", "a": 1}')
+
     def test_dict_entry_removed_while_value_fails(self):
         """The error note for a value can name a key that encoding the
         value removed from the dict."""
