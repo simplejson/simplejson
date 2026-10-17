@@ -399,52 +399,60 @@ class TestDictEncodingPaths(TestCase):
         result = json.loads(json.dumps(d))
         self.assertEqual(result, d)
 
+    def assert_fails_like_dict_iteration(self, mutate):
+        """Encoding {'a': X, 'b': 1}, where encoding X runs mutate(d),
+        fails with the RuntimeError, if any, that this interpreter's dict
+        iteration raises for the same change. CPython 3 detects resizes
+        and replaced keys, Python 2 only resizes, and PyPy and GraalPy
+        not all of them. Returns whether there was one to check."""
+        probe = {'a': 1, 'b': 2}
+        items = getattr(probe, 'iteritems', probe.items)()
+        mutated = []
+        try:
+            for key, _ in items:
+                if key == 'a' and not mutated:
+                    mutated.append(key)
+                    mutate(probe)
+        except RuntimeError:
+            message = str(sys.exc_info()[1])
+        else:
+            return False
+        d = {}
+        class Mutate(object):
+            def for_json(self):
+                mutate(d)
+                return 'x'
+        d['a'] = Mutate()
+        d['b'] = 1
+        with self.assertRaises(RuntimeError) as cm:
+            json.dumps(d, for_json=True)
+        self.assertEqual(str(cm.exception), message)
+        return True
+
     def test_dict_resized_during_encoding(self):
         """Resizing the dict while one of its values is encoded fails the
         way iterating a dict that changes size does."""
-        d = {}
-        class Grow(object):
-            def for_json(self):
-                d['z'] = 1
-                return 'x'
-        class Shrink(object):
-            def for_json(self):
-                d.pop('b', None)
-                return 'x'
-        for value, other in ((Grow(), None), (Shrink(), 2)):
-            d.clear()
-            d['a'] = value
-            if other is not None:
-                d['b'] = other
-            with self.assertRaises(RuntimeError) as cm:
-                json.dumps(d, for_json=True)
-            self.assertEqual(str(cm.exception),
-                             'dictionary changed size during iteration')
+        def grow(d):
+            d['z'] = 1
+        def shrink(d):
+            del d['b']
+        checked = [self.assert_fails_like_dict_iteration(mutate)
+                   for mutate in (grow, shrink)]
+        if not any(checked):
+            self.skipTest('dict iteration does not detect resizing')
 
     def test_dict_keys_replaced_during_encoding(self):
         """Replacing keys without changing the dict's size fails the way
-        iterating such a dict does on Python 3, instead of encoding keys
-        twice."""
-        if not PY3:
-            self.skipTest('Python 2 dict iteration only checks the size')
-        d = {}
-        class Readd(object):
-            def for_json(self):
-                d['a'] = d.pop('a')
-                return 'x'
-        class Replace(object):
-            def for_json(self):
-                del d['a']
-                d['z'] = 26
-                return 'x'
-        for value in (Readd(), Replace()):
-            d.clear()
-            d['a'] = value
-            d['b'] = 1
-            with self.assertRaises(RuntimeError) as cm:
-                json.dumps(d, for_json=True)
-            self.assertEqual(str(cm.exception),
-                             'dictionary keys changed during iteration')
+        iterating such a dict does, instead of encoding keys twice."""
+        def readd(d):
+            d['a'] = d.pop('a')
+        def replace(d):
+            del d['a']
+            d['z'] = 26
+        checked = [self.assert_fails_like_dict_iteration(mutate)
+                   for mutate in (readd, replace)]
+        if not any(checked):
+            self.skipTest('dict iteration does not detect replaced keys')
 
     def test_dict_subclass_items_returning_iterator(self):
         """A dict subclass whose items() returns an iterator can be
