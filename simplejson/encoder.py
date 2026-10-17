@@ -625,7 +625,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                             elif isinstance(value, _dict_types):
                                 chunks = _iterencode_dict(value, _current_indent_level)
                             else:
-                                chunks = _iterencode(value, _current_indent_level)
+                                # for_json and _asdict were already tried
+                                chunks = _iterencode(value, _current_indent_level, True)
                         for chunk in chunks:
                             yield chunk
                 except BaseException as exc:
@@ -749,10 +750,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                         else:
                             _asdict = _namedtuple_as_object and call_method(value, '_asdict')
                             if _asdict:
-                                dct = _asdict[0]
-                                if not isinstance(dct, dict):
-                                    raise TypeError("_asdict() must return a dict, not %s" % (type(dct).__name__,))
-                                chunks = _iterencode_method(value, dct,
+                                # Not `dct`: the note below names dct's type.
+                                asdict_dct = _asdict[0]
+                                if not isinstance(asdict_dct, dict):
+                                    raise TypeError("_asdict() must return a dict, not %s" % (type(asdict_dct).__name__,))
+                                chunks = _iterencode_method(value, asdict_dct,
                                                             _current_indent_level, _iterencode_dict)
                             elif isinstance(value, list):
                                 chunks = _iterencode_list(value, _current_indent_level)
@@ -761,7 +763,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                             elif isinstance(value, _dict_types):
                                 chunks = _iterencode_dict(value, _current_indent_level)
                             else:
-                                chunks = _iterencode(value, _current_indent_level)
+                                # for_json and _asdict were already tried
+                                chunks = _iterencode(value, _current_indent_level, True)
                         for chunk in chunks:
                             yield chunk
                 except BaseException as exc:
@@ -780,7 +783,10 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         if markers is not None:
             del markers[markerid]
 
-    def _iterencode(o, _current_indent_level):
+    def _iterencode(o, _current_indent_level, _methods_tried=False):
+        # _methods_tried: the list and dict item paths already called
+        # for_json() and _asdict() on o, so calling them again would run
+        # them (and any side effects) twice, unlike the C encoder.
         if isinstance(o, string_types):
             yield _encoder(o)
         elif _PY3 and isinstance(o, bytes) and _encoding is not None:
@@ -798,13 +804,15 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         elif isinstance(o, float):
             yield _floatstr(o)
         else:
-            for_json = _for_json and call_method(o, 'for_json')
+            for_json = (_for_json and not _methods_tried
+                        and call_method(o, 'for_json'))
             if for_json:
                 for chunk in _iterencode_method(o, for_json[0],
                                               _current_indent_level, _iterencode):
                     yield chunk
             else:
-                _asdict = _namedtuple_as_object and call_method(o, '_asdict')
+                _asdict = (_namedtuple_as_object and not _methods_tried
+                           and call_method(o, '_asdict'))
                 if _asdict:
                     dct = _asdict[0]
                     if not isinstance(dct, dict):

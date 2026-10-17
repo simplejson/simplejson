@@ -492,6 +492,31 @@ json_PyDict_GetItemRef(PyObject *dict, PyObject *key, PyObject **result)
 #endif
 }
 
+/* The type name used in error messages and exception notes, matching
+ * the pure-Python encoder's type(obj).__name__, which is what type's
+ * __name__ getter returns: ht_name for heap types, and tp_name after its
+ * module prefix ("collections.deque") for static types. Nothing here can
+ * fail, since a note is formatted while an exception is set. */
+static const char *
+json_type_name(PyObject *obj)
+{
+    PyTypeObject *tp = Py_TYPE(obj);
+    const char *dot;
+    if (PyType_HasFeature(tp, Py_TPFLAGS_HEAPTYPE)) {
+#if PY_MAJOR_VERSION >= 3
+        /* A spec-created type keeps its module prefix in tp_name only.
+         * For a class, tp_name is the UTF-8 of ht_name, which may itself
+         * contain dots, so it is the fallback for non-ASCII names. */
+        PyObject *ht_name = ((PyHeapTypeObject *)tp)->ht_name;
+        if (PyUnicode_IS_ASCII(ht_name))
+            return (const char *)PyUnicode_DATA(ht_name);
+#endif
+        return tp->tp_name;
+    }
+    dot = strrchr(tp->tp_name, '.');
+    return dot == NULL ? tp->tp_name : dot + 1;
+}
+
 static inline int
 json_memo_intern_key(PyObject *memo, PyObject **key_ptr)
 {
@@ -1099,7 +1124,7 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
     }
     PyErr_Format(PyExc_TypeError,
                  "keys must be str, int, float, bool or None, "
-                 "not %.100s", key->ob_type->tp_name);
+                 "not %.100s", json_type_name(key));
     return NULL;
 }
 
@@ -1152,6 +1177,18 @@ encoder_dict_iteritems(PyEncoderObject *s, PyObject *dct)
         items = PyMapping_Items(dct);
     if (items == NULL)
         return NULL;
+#if PY_MAJOR_VERSION < 3
+    /* Python 3's PyMapping_Items always makes a list, but Python 2's
+     * returns whatever items() returned, and the sort below reads it as
+     * a list. */
+    if (!PyList_CheckExact(items)) {
+        PyObject *items_list = PySequence_List(items);
+        Py_DECREF(items);
+        if (items_list == NULL)
+            return NULL;
+        items = items_list;
+    }
+#endif
 
     /* Unsorted path: return iter(items) directly. */
     if (s->item_sort_kw == Py_None) {
@@ -2607,6 +2644,15 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         &ignore_nan, &Decimal, &iterable_as_array))
         return NULL;
 
+    /* markers goes straight to PyDict_Contains, PyDict_SetItem and
+     * PyDict_DelItem, which do not check the type of their argument. */
+    if (markers != Py_None && !PyDict_Check(markers)) {
+        PyErr_Format(PyExc_TypeError,
+                     "make_encoder() argument 1 must be dict or None, not %.80s",
+                     json_type_name(markers));
+        return NULL;
+    }
+
     s = (PyEncoderObject *)type->tp_alloc(type, 0);
     if (s == NULL)
         return NULL;
@@ -3097,7 +3143,7 @@ encoder_steal_encode(PyEncoderObject *s, JSON_Accu *rval,
         } else {
             PyErr_Format(PyExc_TypeError,
                          "_asdict() must return a dict, not %.80s",
-                         Py_TYPE(newobj)->tp_name);
+                         json_type_name(newobj));
             rv = -1;
         }
     } else {
@@ -3182,7 +3228,7 @@ encoder_listencode_default(PyEncoderObject *s, JSON_Accu *rval,
          * encoder which binds type(o).__name__ before `o = default(o)`
          * runs. */
         encoder_annotate_exception(state,
-            "when serializing %s object", Py_TYPE(obj)->tp_name);
+            "when serializing %s object", json_type_name(obj));
 #endif
         Py_LeaveRecursiveCall();
         encoder_markers_discard(s, ident);
@@ -3196,7 +3242,7 @@ encoder_listencode_default(PyEncoderObject *s, JSON_Accu *rval,
          * the Python encoder `o` has been rebound to newobj at this
          * point, so the note reflects that type. */
         encoder_annotate_exception(state,
-            "when serializing %s object", Py_TYPE(newobj)->tp_name);
+            "when serializing %s object", json_type_name(newobj));
 #endif
     }
     Py_DECREF(newobj);
@@ -3485,51 +3531,86 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
     if (s->item_sort_kw == Py_None && PyDict_CheckExact(dct)) {
         Py_ssize_t pos = 0;
         PyObject *key, *value;
+        Py_ssize_t size;
+#if PY_MAJOR_VERSION >= 3
+        Py_ssize_t remaining;
+#endif
         int err = 0;
 
         idx = 0;
         Py_BEGIN_CRITICAL_SECTION(dct);
+        size = PyDict_Size(dct);
+#if PY_MAJOR_VERSION >= 3
+        remaining = size;
+#endif
         while (PyDict_Next(dct, &pos, &key, &value)) {
+#if PY_MAJOR_VERSION >= 3
+            /* User code that replaced keys without changing the size
+             * (pop and re-add a key) leaves entries past the original
+             * ones. Fail the way Python 3's dict iterator does rather
+             * than encode keys twice. */
+            if (remaining == 0) {
+                PyErr_SetString(PyExc_RuntimeError,
+                                "dictionary keys changed during iteration");
+                err = 1;
+                break;
+            }
+            remaining--;
+#endif
+            /* Hold key until the value is encoded: encoding the value
+             * can run user code (default, for_json, ...) that removes
+             * the entry, and the error note below still needs key. */
             Py_INCREF(key);
             Py_INCREF(value);
 
             encoded = encoder_encode_dict_key(s, key);
-            Py_DECREF(key);
             if (encoded == NULL) {
-                Py_DECREF(value); err = 1; break;
+                Py_DECREF(key); Py_DECREF(value); err = 1; break;
             }
             if (encoded == Py_None) {
                 /* skipkeys */
                 encoded = NULL;
+                Py_DECREF(key);
                 Py_DECREF(value);
                 continue;
             }
             if (idx) {
                 if (JSON_Accu_Accumulate(state, rval, s->item_separator)) {
-                    Py_DECREF(value); err = 1; break;
+                    Py_DECREF(key); Py_DECREF(value); err = 1; break;
                 }
                 if (indented && encoder_accumulate_newline_indent(
                                     s, state, rval, inner_indent_level)) {
-                    Py_DECREF(value); err = 1; break;
+                    Py_DECREF(key); Py_DECREF(value); err = 1; break;
                 }
             }
             if (JSON_Accu_Accumulate(state, rval, encoded)) {
-                Py_DECREF(value); err = 1; break;
+                Py_DECREF(key); Py_DECREF(value); err = 1; break;
             }
             Py_CLEAR(encoded);
             if (JSON_Accu_Accumulate(state, rval, s->key_separator)) {
-                Py_DECREF(value); err = 1; break;
+                Py_DECREF(key); Py_DECREF(value); err = 1; break;
             }
             if (encoder_listencode_obj(s, rval, value, inner_indent_level)) {
 #if PY_VERSION_HEX >= 0x030B0000
                 encoder_annotate_exception(state,
                     "when serializing %s item %R",
-                    Py_TYPE(dct)->tp_name, key);
+                    json_type_name(dct), key);
 #endif
-                Py_DECREF(value); err = 1; break;
+                Py_DECREF(key); Py_DECREF(value); err = 1; break;
             }
+            Py_DECREF(key);
             Py_DECREF(value);
             idx++;
+            /* PyDict_Next walks entry slots, so a dict resized by that
+             * user code would have entries skipped or repeated. Fail
+             * the way the pure-Python encoder's dict iteration does,
+             * which on Python 2 is only this check. */
+            if (PyDict_Size(dct) != size) {
+                PyErr_SetString(PyExc_RuntimeError,
+                                "dictionary changed size during iteration");
+                err = 1;
+                break;
+            }
         }
         Py_END_CRITICAL_SECTION();
 
@@ -3578,7 +3659,7 @@ encoder_listencode_dict(PyEncoderObject *s, JSON_Accu *rval, PyObject *dct, Py_s
 #if PY_VERSION_HEX >= 0x030B0000
                 encoder_annotate_exception(state,
                     "when serializing %s item %R",
-                    Py_TYPE(dct)->tp_name, key);
+                    json_type_name(dct), key);
 #endif
                 goto bail;
             }
@@ -3672,7 +3753,6 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq,
          * the bail handler's Py_XDECREF(obj) stays a no-op for this
          * path. */
         PyObject *item;
-        Py_ssize_t size;
         int is_list = PyList_CheckExact(seq);
         int err = 0;
 
@@ -3685,8 +3765,12 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq,
         }
 
         Py_BEGIN_CRITICAL_SECTION(seq);
-        size = is_list ? PyList_GET_SIZE(seq) : PyTuple_GET_SIZE(seq);
-        for (i = 0; i < size; i++) {
+        /* Re-read the size on every iteration, as a list iterator does:
+         * encoding an item can run user code (default, for_json, ...)
+         * that resizes the list, and on free-threaded builds the
+         * critical section can be released while that code runs. */
+        for (i = 0; i < (is_list ? PyList_GET_SIZE(seq)
+                                 : PyTuple_GET_SIZE(seq)); i++) {
             item = is_list ? PyList_GET_ITEM(seq, i)
                            : PyTuple_GET_ITEM(seq, i);
             Py_INCREF(item);
@@ -3703,7 +3787,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq,
 #if PY_VERSION_HEX >= 0x030B0000
                 encoder_annotate_exception(state,
                     "when serializing %s item %zd",
-                    Py_TYPE(origin)->tp_name, i);
+                    json_type_name(origin), i);
 #endif
                 Py_DECREF(item); err = 1; break;
             }
@@ -3751,7 +3835,7 @@ encoder_listencode_list(PyEncoderObject *s, JSON_Accu *rval, PyObject *seq,
 #if PY_VERSION_HEX >= 0x030B0000
                 encoder_annotate_exception(state,
                     "when serializing %s item %zd",
-                    Py_TYPE(origin)->tp_name, i);
+                    json_type_name(origin), i);
 #endif
                 goto bail;
             }

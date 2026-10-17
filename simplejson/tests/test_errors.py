@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys, pickle
 import unittest
 from unittest import TestCase
@@ -170,3 +171,77 @@ class TestErrors(TestCase):
                 "when serializing dict item 'a'")
         else:
             self.fail('Expected TypeError')
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
+    def test_add_note_uses_type_name(self):
+        # Notes name type(obj).__name__, without the module prefix that
+        # C types carry in tp_name.
+        import collections
+        import itertools
+        cases = [
+            (lambda: json.dumps(collections.OrderedDict(a=object())),
+             ['when serializing object object',
+              "when serializing OrderedDict item 'a'"]),
+            (lambda: json.dumps(itertools.chain()),
+             ['when serializing chain object']),
+        ]
+        for encode, notes in cases:
+            with self.assertRaises(TypeError) as cm:
+                encode()
+            self.assertEqual(cm.exception.__notes__, notes)
+
+    def test_key_error_uses_type_name(self):
+        import decimal
+        with self.assertRaises(TypeError) as cm:
+            json.dumps({decimal.Decimal(1): 1}, use_decimal=False)
+        self.assertEqual(
+            str(cm.exception),
+            'keys must be str, int, float, bool or None, not Decimal')
+
+    def test_type_name_of_class_with_dotted_name(self):
+        # A class's __name__ is used as is, even when it contains dots.
+        Dotted = type('pkg.Dotted', (object,), {})
+        with self.assertRaises(TypeError) as cm:
+            json.dumps({Dotted(): 1})
+        self.assertEqual(
+            str(cm.exception),
+            'keys must be str, int, float, bool or None, not pkg.Dotted')
+        if sys.version_info >= (3, 11):
+            DottedDict = type('pkg.DottedDict', (dict,), {})
+            with self.assertRaises(TypeError) as cm:
+                json.dumps(DottedDict(a=Dotted()))
+            self.assertEqual(cm.exception.__notes__,
+                             ['when serializing pkg.Dotted object',
+                              "when serializing pkg.DottedDict item 'a'"])
+
+    @unittest.skipIf(sys.version_info < (3,), 'Python 2 class names are bytes')
+    def test_type_name_of_class_with_non_ascii_name(self):
+        name = 'pkg.Über'
+        Uber = type(name, (object,), {})
+        with self.assertRaises(TypeError) as cm:
+            json.dumps({Uber(): 1})
+        self.assertEqual(
+            str(cm.exception),
+            'keys must be str, int, float, bool or None, not ' + name)
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
+    def test_add_note_after_asdict_names_the_dict(self):
+        import collections
+        class D(dict):
+            pass
+        NT = collections.namedtuple('NT', 'x')
+        with self.assertRaises(TypeError) as cm:
+            json.dumps(D([('a', NT(1)), ('b', object())]))
+        self.assertEqual(cm.exception.__notes__,
+                         ['when serializing object object',
+                          "when serializing D item 'b'"])
+
+        class NotADict(object):
+            def _asdict(self):
+                return [1]
+        with self.assertRaises(TypeError) as cm:
+            json.dumps({'a': NotADict()})
+        self.assertEqual(str(cm.exception),
+                         '_asdict() must return a dict, not list')
+        self.assertEqual(cm.exception.__notes__,
+                         ["when serializing dict item 'a'"])

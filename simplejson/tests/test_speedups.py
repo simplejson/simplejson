@@ -66,6 +66,17 @@ class TestEncode(TestCase):
         self.assertRaises(ZeroDivisionError, enc, 'spam', 4)
 
     @skip_if_speedups_missing
+    def test_make_encoder_rejects_non_dict_markers(self):
+        import decimal
+        for markers in ([], (), 0, 'abc', set()):
+            self.assertRaises(
+                TypeError, encoder.c_make_encoder,
+                markers, lambda obj: str(obj),
+                encoder.encode_basestring_ascii, None, ': ', ', ',
+                False, False, False, {}, False, False, False,
+                None, None, 'utf-8', False, False, decimal.Decimal, False)
+
+    @skip_if_speedups_missing
     def test_bad_bool_args(self):
         def test(name):
             encoder.JSONEncoder(**{name: BadBool()}).encode({})
