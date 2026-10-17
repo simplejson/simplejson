@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys, pickle
 import unittest
 from unittest import TestCase
