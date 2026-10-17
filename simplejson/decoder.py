@@ -358,9 +358,6 @@ class JSONDecoder(object):
         ``int(num_str)``.  This can be used to use another datatype or parser
         for JSON integers (e.g. :class:`float`).
 
-        Parser callbacks are used whenever they are not ``None``, even if
-        their boolean value is false.
-
         *allow_nan*, if True (default false), will allow the parser to
         accept the non-standard floats ``NaN``, ``Infinity``, and ``-Infinity``.
 
