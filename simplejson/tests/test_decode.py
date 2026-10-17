@@ -7,6 +7,25 @@ import simplejson as json
 from simplejson.compat import StringIO, b, binary_type
 from simplejson import OrderedDict
 
+
+class RecordingParser(list):
+    def __call__(self, value):
+        self.append(value)
+        return 'parsed:' + value
+
+
+class FalsyParser(RecordingParser):
+    def __bool__(self):
+        return False
+    __nonzero__ = __bool__
+
+
+class UncheckedParser(RecordingParser):
+    def __bool__(self):
+        raise AssertionError('parser truth value was checked')
+    __nonzero__ = __bool__
+
+
 class MisbehavingBytesSubtype(binary_type):
     def decode(self, encoding=None):
         return "bad decode"
@@ -16,6 +35,53 @@ class MisbehavingBytesSubtype(binary_type):
         return b("bad __bytes__")
 
 class TestDecode(TestCase):
+    def check_parser_callback(self, parser_type, option, text, values,
+                              allow_nan=False):
+        for decode in (json.loads, json.JSONDecoder):
+            parser = parser_type()
+            kwargs = {option: parser, 'allow_nan': allow_nan}
+            if decode is json.JSONDecoder:
+                result = decode(**kwargs).decode(text)
+            else:
+                result = decode(text, **kwargs)
+            self.assertEqual(result, ['parsed:' + value for value in values])
+            self.assertEqual(list(parser), values)
+
+    def test_parse_int_false_callable(self):
+        for parser_type in (RecordingParser, FalsyParser):
+            self.check_parser_callback(
+                parser_type, 'parse_int', '[1, -2, 300]', ['1', '-2', '300'])
+
+    def test_parse_float_false_callable(self):
+        for parser_type in (RecordingParser, FalsyParser):
+            self.check_parser_callback(
+                parser_type, 'parse_float', '[1.5, -2e3]', ['1.5', '-2e3'])
+
+    def test_parse_constant_false_callable(self):
+        for parser_type in (RecordingParser, FalsyParser):
+            self.check_parser_callback(
+                parser_type, 'parse_constant', '[NaN, Infinity, -Infinity]',
+                ['NaN', 'Infinity', '-Infinity'])
+
+    def test_parse_constant_false_callable_with_allow_nan(self):
+        for parser_type in (RecordingParser, FalsyParser, UncheckedParser):
+            self.check_parser_callback(
+                parser_type, 'parse_constant', '[NaN, Infinity, -Infinity]',
+                ['NaN', 'Infinity', '-Infinity'], allow_nan=True)
+
+    def test_parse_int_does_not_check_truth(self):
+        self.check_parser_callback(
+            UncheckedParser, 'parse_int', '[1, -2]', ['1', '-2'])
+
+    def test_parse_float_does_not_check_truth(self):
+        self.check_parser_callback(
+            UncheckedParser, 'parse_float', '[1.5, -2e3]', ['1.5', '-2e3'])
+
+    def test_parse_constant_does_not_check_truth(self):
+        self.check_parser_callback(
+            UncheckedParser, 'parse_constant', '[NaN, Infinity, -Infinity]',
+            ['NaN', 'Infinity', '-Infinity'])
+
     def test_decimal(self):
         rval = json.loads('1.1', parse_float=decimal.Decimal)
         self.assertTrue(isinstance(rval, decimal.Decimal))
