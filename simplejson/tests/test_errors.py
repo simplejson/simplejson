@@ -69,6 +69,70 @@ class TestErrors(TestCase):
         self.assertEqual(err.end, e.end)
 
     @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
+    def test_add_note_override_preserves_exception(self):
+        class NoteError(ValueError):
+            def add_note(self, note):
+                raise RuntimeError('note failed')
+
+        error = NoteError('original error')
+
+        def default(obj):
+            raise error
+
+        for value in (object(), [object()], {'key': object()}):
+            try:
+                json.dumps(value, default=default)
+            except NoteError as exc:
+                self.assertIs(exc, error)
+            else:
+                self.fail('Expected original NoteError')
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
+    def test_add_note_key_repr_preserves_exception(self):
+        class Key(str):
+            def __repr__(self):
+                raise RuntimeError('repr failed')
+
+        error = ValueError('original error')
+
+        def default(obj):
+            raise error
+
+        try:
+            json.dumps({Key('key'): object()}, default=default)
+        except ValueError as exc:
+            self.assertIs(exc, error)
+        else:
+            self.fail('Expected original ValueError')
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
+    def test_add_note_type_name_preserves_exception(self):
+        class NameErrorType(type):
+            def __getattribute__(cls, name):
+                if name == '__name__':
+                    raise RuntimeError('name failed')
+                return type.__getattribute__(cls, name)
+
+        error = ValueError('original error')
+
+        def default(obj):
+            raise error
+
+        value = NameErrorType('Value', (object,), {})()
+        values = (
+            value,
+            NameErrorType('List', (list,), {})([value]),
+            NameErrorType('Dict', (dict,), {})({'key': value}),
+        )
+        for value in values:
+            try:
+                json.dumps(value, default=default)
+            except ValueError as exc:
+                self.assertIs(exc, error)
+            else:
+                self.fail('Expected original ValueError')
+
+    @unittest.skipIf(sys.version_info < (3, 11), 'add_note requires Python 3.11+')
     def test_add_note_list_recursion(self):
         x = []
         x.append(x)
