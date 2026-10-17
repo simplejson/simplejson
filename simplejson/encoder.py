@@ -11,6 +11,16 @@ from .compat import binary_type, text_type, string_types, integer_types, PY3
 # PEP 678 add_note() is available on Python 3.11+
 _HAS_ADD_NOTE = sys.version_info >= (3, 11)
 
+
+def _annotate_exception(exc, note_format, obj, *args):
+    if _HAS_ADD_NOTE:
+        try:
+            exc.add_note(note_format % ((type(obj).__name__,) + args))
+        except BaseException:
+            # Diagnostic failures must not replace the serialization error.
+            pass
+
+
 def _import_speedups():
     try:
         from . import _speedups
@@ -602,10 +612,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     for chunk in chunks:
                         yield chunk
             except BaseException as exc:
-                if _HAS_ADD_NOTE:
-                    exc.add_note(
-                        'when serializing %s item %d'
-                        % (type(lst).__name__, i))
+                _annotate_exception(
+                    exc, 'when serializing %s item %d',
+                    lst, i)
                 raise
         if first:
             # iterable_as_array misses the fast path at the top
@@ -734,10 +743,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                     for chunk in chunks:
                         yield chunk
             except BaseException as exc:
-                if _HAS_ADD_NOTE:
-                    exc.add_note(
-                        'when serializing %s item %r'
-                        % (type(dct).__name__, key))
+                _annotate_exception(
+                    exc, 'when serializing %s item %r',
+                    dct, key)
                 raise
         if newline_indent is not None:
             _current_indent_level -= 1
@@ -810,10 +818,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                         for chunk in _iterencode(o, _current_indent_level):
                             yield chunk
                     except BaseException as exc:
-                        if _HAS_ADD_NOTE:
-                            exc.add_note(
-                                'when serializing %s object'
-                                % type(o).__name__)
+                        _annotate_exception(
+                            exc, 'when serializing %s object', o)
                         raise
                     if markers is not None:
                         del markers[markerid]
