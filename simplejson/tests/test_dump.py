@@ -399,6 +399,91 @@ class TestDictEncodingPaths(TestCase):
         result = json.loads(json.dumps(d))
         self.assertEqual(result, d)
 
+    def assert_fails_like_dict_iteration(self, mutate):
+        """Encoding {'a': X, 'b': 1}, where encoding X runs mutate(d),
+        fails with the RuntimeError, if any, that this interpreter's dict
+        iteration raises for the same change. CPython 3 detects resizes
+        and replaced keys, Python 2 only resizes, and PyPy and GraalPy
+        not all of them. Returns whether there was one to check."""
+        probe = {'a': 1, 'b': 2}
+        items = getattr(probe, 'iteritems', probe.items)()
+        mutated = []
+        try:
+            for key, _ in items:
+                if key == 'a' and not mutated:
+                    mutated.append(key)
+                    mutate(probe)
+        except RuntimeError:
+            message = str(sys.exc_info()[1])
+        else:
+            return False
+        d = {}
+        class Mutate(object):
+            def for_json(self):
+                mutate(d)
+                return 'x'
+        d['a'] = Mutate()
+        d['b'] = 1
+        with self.assertRaises(RuntimeError) as cm:
+            json.dumps(d, for_json=True)
+        self.assertEqual(str(cm.exception), message)
+        return True
+
+    def test_dict_resized_during_encoding(self):
+        """Resizing the dict while one of its values is encoded fails the
+        way iterating a dict that changes size does."""
+        def grow(d):
+            d['z'] = 1
+        def shrink(d):
+            del d['b']
+        checked = [self.assert_fails_like_dict_iteration(mutate)
+                   for mutate in (grow, shrink)]
+        if not any(checked):
+            self.skipTest('dict iteration does not detect resizing')
+
+    def test_dict_keys_replaced_during_encoding(self):
+        """Replacing keys without changing the dict's size fails the way
+        iterating such a dict does, instead of encoding keys twice."""
+        def readd(d):
+            d['a'] = d.pop('a')
+        def replace(d):
+            del d['a']
+            d['z'] = 26
+        checked = [self.assert_fails_like_dict_iteration(mutate)
+                   for mutate in (readd, replace)]
+        if not any(checked):
+            self.skipTest('dict iteration does not detect replaced keys')
+
+    def test_dict_subclass_items_returning_iterator(self):
+        """A dict subclass whose items() returns an iterator can be
+        sorted."""
+        class D(dict):
+            def items(self):
+                return iter(dict.items(self))
+        self.assertEqual(json.dumps(D(b=2, a=1), sort_keys=True),
+                         '{"a": 1, "b": 2}')
+        self.assertEqual(json.dumps(D({1: 'x', 'a': 1}), sort_keys=True),
+                         '{"1": "x", "a": 1}')
+
+    def test_dict_entry_removed_while_value_fails(self):
+        """The error note for a value can name a key that encoding the
+        value removed from the dict."""
+        import decimal
+        d = {}
+        # Decimal keys are not memoized, so the dict holds the only
+        # reference to this one.
+        d[decimal.Decimal('1.25')] = object()
+        def default(o):
+            d.clear()
+            raise TypeError('boom')
+        with self.assertRaises(TypeError) as cm:
+            json.dumps(d, default=default, use_decimal=True)
+        if sys.version_info >= (3, 11):
+            self.assertTrue(
+                cm.exception.__notes__[-1].startswith(
+                    'when serializing dict item '),
+                cm.exception.__notes__)
+
 
 class TestListEncodingPaths(TestCase):
     """Verify that the indexed fast path (exact list/tuple) and the
@@ -451,3 +536,29 @@ class TestListEncodingPaths(TestCase):
         """Large list stresses the indexed fast path."""
         data = list(range(1000))
         self.assertEqual(json.loads(json.dumps(data)), data)
+
+    def test_list_resized_during_encoding(self):
+        """Items are read up to the list's current length, as a list
+        iterator does, when encoding an item resizes the list."""
+        lst = []
+        def clear_list(o):
+            del lst[:]
+            return None
+        lst.extend([object()] + [[i] for i in range(100)])
+        self.assertEqual(json.dumps(lst, default=clear_list), '[null]')
+
+        shrinking = []
+        class Shrink(object):
+            def for_json(self):
+                del shrinking[1:]
+                return 'x'
+        shrinking.extend([Shrink(), 'a' * 50 + 'b', ['tail']])
+        self.assertEqual(json.dumps(shrinking, for_json=True), '["x"]')
+
+        growing = []
+        class Grow(object):
+            def for_json(self):
+                growing.append(2)
+                return 1
+        growing.append(Grow())
+        self.assertEqual(json.dumps(growing, for_json=True), '[1, 2]')
