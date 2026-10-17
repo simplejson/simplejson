@@ -213,8 +213,8 @@ class JSONEncoder(object):
         If check_circular is true, then lists, dicts, iterables encoded with
         iterable_as_array, and custom encoded objects will be checked for
         circular references during encoding to prevent an infinite recursion
-        (which would cause a RecursionError). Otherwise, no such check takes
-        place.
+        (which would cause a RecursionError, or RuntimeError on Python 2).
+        Otherwise, no such check takes place.
 
         If allow_nan is true (default: False), then out of range float
         values (nan, inf, -inf) will be serialized to

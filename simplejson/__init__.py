@@ -294,7 +294,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
     If ``check_circular`` is false, then the circular reference check
     for container types (including iterables encoded with
     ``iterable_as_array``) will be skipped and a circular reference will
-    result in a ``RecursionError`` (or worse).
+    result in a ``RecursionError`` (``RuntimeError`` on Python 2) or worse.
 
     If *allow_nan* is true (default: ``False``), then out of range ``float``
     values (``nan``, ``inf``, ``-inf``) will be serialized to

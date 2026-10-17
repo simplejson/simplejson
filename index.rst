@@ -217,7 +217,8 @@ Basic Usage
     If *check_circular* is false (default: ``True``), then the circular
     reference check for container types (including iterables encoded with
     *iterable_as_array*) will be skipped and a circular reference will
-    result in a :exc:`RecursionError` (or worse).
+    result in a :exc:`RecursionError` (:exc:`RuntimeError` on Python 2) or
+    worse.
 
     If *allow_nan* is false (default: ``False``), then it will be a
     :exc:`ValueError` to serialize out of range :class:`float` values
@@ -636,8 +637,8 @@ Encoders and decoders
    If *check_circular* is true (the default), then lists, dicts, iterables
    encoded with *iterable_as_array*, and custom encoded objects will be checked
    for circular references during encoding to prevent an infinite recursion
-   (which would cause a :exc:`RecursionError`). Otherwise, no such check takes
-   place.
+   (which would cause a :exc:`RecursionError`, or :exc:`RuntimeError` on
+   Python 2). Otherwise, no such check takes place.
 
    If *allow_nan* is true (not the default), then ``NaN``, ``Infinity``, and
    ``-Infinity`` will be encoded as such. This behavior is not JSON

@@ -213,6 +213,14 @@ class TestIterable(unittest.TestCase):
             'when serializing object object',
             'when serializing IterableValues item 0',
             'when serializing list item 0'])
+        # A C iterable is named by type(o).__name__, as in the Python
+        # encoder, not by its tp_name with the module prefix.
+        import collections
+        with self.assertRaises(TypeError) as cm:
+            json.dumps(collections.deque([object()]), iterable_as_array=True)
+        self.assertEqual(cm.exception.__notes__, [
+            'when serializing object object',
+            'when serializing deque item 0'])
 
     def test_iterable(self):
         for l in ([], [1], [1, 2], [1, 2, 3]):

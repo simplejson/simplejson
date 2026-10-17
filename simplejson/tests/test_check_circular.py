@@ -17,6 +17,9 @@ def make_encoders(markers, item_sort_key=None):
         if isinstance(obj, ClearingViaDefault):
             markers.clear()
             raise ValueError('boom')
+        if isinstance(obj, ClearingSafeViaDefault):
+            markers.clear()
+            return 'safe'
         raise TypeError('not serializable')
     py_encode = encoder._make_iterencode(
         markers, default, encoder.encode_basestring_ascii, None, repr,
@@ -40,6 +43,10 @@ class ViaDefault(object):
 
 class ClearingViaDefault(object):
     # default() clears the markers dict, then raises ValueError('boom').
+    pass
+
+class ClearingSafeViaDefault(object):
+    # default() clears the markers dict, then returns 'safe'.
     pass
 
 class ForJsonList(object):
@@ -76,23 +83,14 @@ class TestCheckCircular(TestCase):
         self.assertRaises(TypeError, json.dumps, [set()], check_circular=False)
 
     def test_default_callback_clears_markers(self):
-        # Regression test: clearing the markers dict from inside the
-        # default() callback must not cause a use-after-free on ident.
+        # Clearing the markers dict from inside a default() callback that
+        # then returns makes the marker pop fail with KeyError, rather than
+        # releasing the marker's key twice (a use-after-free).
         markers = {}
-        call_count = [0]
-        class Custom:
-            pass
-        def bad_default(obj):
-            call_count[0] += 1
-            if call_count[0] <= 1:
-                markers.clear()
-                return "safe"
-            return str(obj)
-        # Should not crash (previously: segfault from double Py_XDECREF)
-        try:
-            json.dumps(Custom(), default=bad_default)
-        except (TypeError, ValueError):
-            pass
+        for name, encode in make_encoders(markers):
+            for value in (ClearingSafeViaDefault(), [ClearingSafeViaDefault()]):
+                self.assertRaises(KeyError, encode, value)
+                self.assertEqual(markers, {}, name)
 
     def test_markers_released_after_error(self):
         # A failed encode must not leave markers behind, or an encoder
