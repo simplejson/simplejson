@@ -497,9 +497,9 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
     ):
     if _use_decimal and Decimal is None:
         Decimal = decimal.Decimal
-    if _item_sort_key and not callable(_item_sort_key):
+    if _item_sort_key is not None and not callable(_item_sort_key):
         raise TypeError("item_sort_key must be None or callable")
-    elif _sort_keys and not _item_sort_key:
+    elif _sort_keys and _item_sort_key is None:
         _item_sort_key = itemgetter(0)
 
     if (_int_as_string_bitcount is not None and
@@ -700,7 +700,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 iteritems = dct.items()
             else:
                 iteritems = dct.iteritems()
-            if _item_sort_key:
+            if _item_sort_key is not None:
                 items = []
                 for k, v in dct.items():
                     if not isinstance(k, string_types):
@@ -712,7 +712,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             else:
                 items = iteritems
             for key, value in items:
-                if not (_item_sort_key or isinstance(key, string_types)):
+                if _item_sort_key is None and not isinstance(key, string_types):
                     key = _stringify_key(key)
                     if key is None:
                         # _skipkeys must be True
