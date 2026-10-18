@@ -2,6 +2,7 @@ from unittest import TestCase
 
 import simplejson as json
 from operator import itemgetter
+from simplejson.compat import StringIO
 
 class TestItemSortKey(TestCase):
     def test_simple_first(self):
@@ -25,3 +26,43 @@ class TestItemSortKey(TestCase):
         self.assertEqual(
             '{"b": 0, "a": 1}',
             json.dumps(a, item_sort_key=lambda kv: kv[1]))
+
+
+class FalseSortKey(dict):
+    def __call__(self, item):
+        return -item[1]
+
+
+class TruthValueErrorSortKey(FalseSortKey):
+    def __bool__(self):
+        raise AssertionError("sorting callback truth value must not be tested")
+
+    __nonzero__ = __bool__
+
+
+class TestExplicitItemSortKey(TestCase):
+    def test_callable_presence_does_not_depend_on_truth_value(self):
+        value = {'a': 1, 'b': 2}
+        expected = '{"b": 2, "a": 1}'
+        for key_type in (FalseSortKey, TruthValueErrorSortKey):
+            for sort_keys in (False, True):
+                key = key_type()
+                self.assertEqual(
+                    json.dumps(value, item_sort_key=key, sort_keys=sort_keys),
+                    expected)
+                output = StringIO()
+                json.dump(value, output, item_sort_key=key, sort_keys=sort_keys)
+                self.assertEqual(output.getvalue(), expected)
+                encoder = json.JSONEncoder(item_sort_key=key, sort_keys=sort_keys)
+                self.assertEqual(encoder.encode(value), expected)
+                self.assertEqual(''.join(encoder.iterencode(value)), expected)
+
+    def test_false_valued_noncallable_is_rejected(self):
+        for value in (False, 0, '', [], {}):
+            self.assertRaises(TypeError, json.dumps, {'a': 1}, item_sort_key=value)
+
+    def test_false_valued_sort_key_with_nested_and_skipped_keys(self):
+        value = [{None: 2, 'b': 3, 1: 4, (1,): 1}]
+        self.assertEqual(
+            json.dumps(value, item_sort_key=FalseSortKey(), skipkeys=True),
+            '[{"1": 4, "b": 3, "null": 2}]')

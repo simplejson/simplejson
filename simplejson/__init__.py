@@ -246,7 +246,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array and not iterable_as_array
         and not bigint_as_string and not sort_keys
-        and not item_sort_key and not for_json
+        and item_sort_key is None and not for_json
         and not ignore_nan and int_as_string_bitcount is None
         and not kw
     ):
@@ -372,7 +372,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         encoding == 'utf-8' and default is None and use_decimal
         and namedtuple_as_object and tuple_as_array and not iterable_as_array
         and not bigint_as_string and not sort_keys
-        and not item_sort_key and not for_json
+        and item_sort_key is None and not for_json
         and not ignore_nan and int_as_string_bitcount is None
         and not kw
     ):
