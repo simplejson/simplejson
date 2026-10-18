@@ -377,9 +377,11 @@ class JSONDecoder(object):
         self.encoding = encoding
         self.object_hook = object_hook
         self.object_pairs_hook = object_pairs_hook
-        self.parse_float = parse_float or float
-        self.parse_int = parse_int or bounded_int
-        self.parse_constant = parse_constant or (allow_nan and _CONSTANTS.__getitem__ or None)
+        self.parse_float = float if parse_float is None else parse_float
+        self.parse_int = bounded_int if parse_int is None else parse_int
+        if parse_constant is None:
+            parse_constant = allow_nan and _CONSTANTS.__getitem__ or None
+        self.parse_constant = parse_constant
         self.strict = strict
         self.array_hook = array_hook
         self.parse_object = JSONObject
