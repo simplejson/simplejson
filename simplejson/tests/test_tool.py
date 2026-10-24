@@ -46,7 +46,7 @@ class TestTool(unittest.TestCase):
     ]
     """)
 
-    def runTool(self, args=None, data=None):
+    def runTool(self, args=None, data=None, env=None):
         if sys.platform == 'emscripten':
             self.skipTest("subprocess not available on Emscripten")
         argv = [sys.executable, '-m', 'simplejson.tool']
@@ -55,7 +55,8 @@ class TestTool(unittest.TestCase):
         proc = subprocess.Popen(argv,
                                 stdin=subprocess.PIPE,
                                 stderr=subprocess.PIPE,
-                                stdout=subprocess.PIPE)
+                                stdout=subprocess.PIPE,
+                                env=env)
         out, err = proc.communicate(data)
         self.assertEqual(strip_python_stderr(err), ''.encode())
         self.assertEqual(proc.returncode, 0)
@@ -76,6 +77,38 @@ class TestTool(unittest.TestCase):
                 self.expect.splitlines())
         finally:
             os.unlink(infile_name)
+
+    def assert_utf8_infile(self, use_outfile):
+        infile, infile_name = open_temp_file()
+        outfile, outfile_name = open_temp_file()
+        try:
+            infile.write(b'{"\xc3\xa4": "\xf0\x9f\x9a\x80"}')
+            infile.close()
+            outfile.close()
+            args = [infile_name]
+            if use_outfile:
+                args.append(outfile_name)
+            # Keep standard streams in UTF-8 without changing file I/O defaults.
+            env = dict(os.environ, PYTHONUTF8='0', PYTHONIOENCODING='utf-8',
+                       LC_ALL='C', PYTHONCOERCECLOCALE='0')
+            lines = self.runTool(args=args, env=env)
+            if use_outfile:
+                self.assertEqual(lines, [])
+                with open(outfile_name, 'rb') as f:
+                    lines = f.read().decode('utf8').splitlines()
+            self.assertEqual(lines, [
+                '{', '    "\\u00e4": "\\ud83d\\ude80"', '}'])
+        finally:
+            infile.close()
+            outfile.close()
+            os.unlink(infile_name)
+            os.unlink(outfile_name)
+
+    def test_utf8_infile_stdout(self):
+        self.assert_utf8_infile(use_outfile=False)
+
+    def test_utf8_infile_outfile(self):
+        self.assert_utf8_infile(use_outfile=True)
 
     def test_infile_outfile(self):
         infile, infile_name = open_temp_file()
