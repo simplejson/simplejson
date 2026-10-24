@@ -18,10 +18,10 @@ def main():
         infile = sys.stdin
         outfile = sys.stdout
     elif len(sys.argv) == 2:
-        infile = open(sys.argv[1], 'r')
+        infile = open(sys.argv[1], 'rb')
         outfile = sys.stdout
     elif len(sys.argv) == 3:
-        infile = open(sys.argv[1], 'r')
+        infile = open(sys.argv[1], 'rb')
         outfile = open(sys.argv[2], 'w')
     else:
         raise SystemExit(sys.argv[0] + " [infile [outfile]]")
