@@ -556,11 +556,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         # _origin is the object being encoded: lst itself, or under
         # iterable_as_array the iterable that produced the iterator lst.
         # It is the circular reference marker (a fresh iterator would
-        # never match) and is named in error notes. An iterator's truth
-        # value says nothing about emptiness, so only lists and tuples
-        # take the fast path.
+        # never match) and is named in error notes. Only exact lists and
+        # tuples can be checked for emptiness without invoking subclass
+        # truth/length hooks or consuming an iterator.
         if _origin is None:
-            if not lst:
+            if (type(lst) is list or type(lst) is tuple) and not lst:
                 yield '[]'
                 return
             _origin = lst
@@ -677,7 +677,8 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         return key
 
     def _iterencode_dict(dct, _current_indent_level):
-        if not dct:
+        size = dict.__len__(dct) if isinstance(dct, dict) else len(dct)
+        if size == 0:
             yield '{}'
             return
         if markers is not None:
