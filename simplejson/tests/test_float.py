@@ -24,6 +24,19 @@ class TestFloat(TestCase):
             self.assertRaises(ValueError, json.loads, s, allow_nan=False)
             self.assertRaises(ValueError, json.loads, s)
 
+    def test_degenerates_deny_message(self):
+        # The error names the value, as the pure Python encoder does.
+        for f, text in ((PosInf, 'inf'), (NegInf, '-inf'), (NaN, 'nan')):
+            try:
+                json.dumps(f, allow_nan=False)
+            except ValueError:
+                e = sys.exc_info()[1]
+                self.assertEqual(
+                    str(e),
+                    'Out of range float values are not JSON compliant: ' + text)
+            else:
+                self.fail('Unexpected success encoding %r' % (f,))
+
     def test_floats(self):
         for num in [1617161771.7650001, math.pi, math.pi**100,
                     math.pi**-100, 3.1]:
