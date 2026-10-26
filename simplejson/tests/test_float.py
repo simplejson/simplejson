@@ -44,3 +44,106 @@ class TestFloat(TestCase):
         except AttributeError:
             float_range = [2.2250738585072014e-308, 1.7976931348623157e+308]
         self.assertEqual(json.loads(json.dumps(float_range)), float_range)
+
+
+class AlwaysEqualFloat(float):
+    def __eq__(self, other):
+        return True
+
+    def __ne__(self, other):
+        return False
+
+    __hash__ = float.__hash__
+
+
+class AlwaysUnequalFloat(float):
+    def __eq__(self, other):
+        return False
+
+    def __ne__(self, other):
+        return True
+
+    __hash__ = float.__hash__
+
+
+class RaisingComparisonFloat(float):
+    def __eq__(self, other):
+        raise AssertionError('float comparison hook called')
+
+    def __ne__(self, other):
+        raise AssertionError('float comparison hook called')
+
+    __hash__ = float.__hash__
+
+
+class TestFloatSubclassComparison(TestCase):
+    subclasses = (AlwaysEqualFloat, AlwaysUnequalFloat, RaisingComparisonFloat)
+    wrappers = (lambda value: value, lambda value: [value],
+                lambda value: {'value': value}, lambda value: {value: 'value'})
+
+    def test_finite_classification(self):
+        for subclass in self.subclasses:
+            for value in (0.0, -0.0, 1.5, -1.5, sys.float_info.max):
+                for wrap in self.wrappers:
+                    for use_decimal in (False, True):
+                        for indent in (None, 2):
+                            for options in ({}, {'allow_nan': True},
+                                            {'ignore_nan': True}):
+                                options = dict(options, use_decimal=use_decimal,
+                                               indent=indent)
+                                self.assertEqual(
+                                    json.dumps(wrap(subclass(value)), **options),
+                                    json.dumps(wrap(value), **options))
+
+    def test_nonfinite_allowed_or_ignored(self):
+        for subclass in self.subclasses:
+            for value in (NaN, PosInf, NegInf):
+                for wrap in self.wrappers:
+                    for use_decimal in (False, True):
+                        for indent in (None, 2):
+                            for options in ({'allow_nan': True},
+                                            {'ignore_nan': True},
+                                            {'allow_nan': True, 'ignore_nan': True}):
+                                options = dict(options, use_decimal=use_decimal,
+                                               indent=indent)
+                                self.assertEqual(
+                                    json.dumps(wrap(subclass(value)), **options),
+                                    json.dumps(wrap(value), **options))
+
+    def test_nonfinite_denied(self):
+        for subclass in self.subclasses:
+            for value in (NaN, PosInf, NegInf):
+                for wrap in self.wrappers:
+                    for use_decimal in (False, True):
+                        self.assertRaises(
+                            ValueError, json.dumps, wrap(subclass(value)),
+                            allow_nan=False, use_decimal=use_decimal)
+
+    def test_finite_conversion_hook_is_preserved(self):
+        class ConvertedFloat(float):
+            calls = 0
+
+            def __float__(self):
+                self.calls += 1
+                return 42.0
+
+        class RaisingConversionFloat(float):
+            def __float__(self):
+                raise RuntimeError('float conversion hook called')
+
+        for wrap in self.wrappers:
+            value = ConvertedFloat(1.5)
+            self.assertEqual(json.dumps(wrap(value)), json.dumps(wrap(42.0)))
+            self.assertEqual(value.calls, 1)
+            self.assertRaises(RuntimeError, json.dumps,
+                              wrap(RaisingConversionFloat(1.5)))
+
+    def test_nonfinite_does_not_call_conversion_hook(self):
+        class NonfiniteFloat(RaisingComparisonFloat):
+            def __float__(self):
+                raise AssertionError('nonfinite conversion hook called')
+
+        for value in (NaN, PosInf, NegInf):
+            for options in ({'allow_nan': True}, {'ignore_nan': True}):
+                self.assertEqual(json.dumps(NonfiniteFloat(value), **options),
+                                 json.dumps(value, **options))
