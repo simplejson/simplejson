@@ -2876,7 +2876,14 @@ encoder_encode_nonfinite(PyEncoderObject *s, int sign)
     _speedups_state *state = get_speedups_state(s->module_ref);
 
     if (!s->allow_or_ignore_nan) {
-        PyErr_SetString(PyExc_ValueError, "Out of range float values are not JSON compliant");
+        const char *msg;
+        if (sign > 0)
+            msg = "Out of range float values are not JSON compliant: inf";
+        else if (sign < 0)
+            msg = "Out of range float values are not JSON compliant: -inf";
+        else
+            msg = "Out of range float values are not JSON compliant: nan";
+        PyErr_SetString(PyExc_ValueError, msg);
         return NULL;
     }
     if (s->allow_or_ignore_nan & JSON_IGNORE_NAN) {
