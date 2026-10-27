@@ -22,7 +22,7 @@ def main():
         outfile = sys.stdout
     elif len(sys.argv) == 3:
         infile = open(sys.argv[1], 'rb')
-        outfile = open(sys.argv[2], 'w')
+        outfile = None
     else:
         raise SystemExit(sys.argv[0] + " [infile [outfile]]")
     with infile:
@@ -32,6 +32,8 @@ def main():
                             use_decimal=True)
         except ValueError:
             raise SystemExit(sys.exc_info()[1])
+    if outfile is None:
+        outfile = open(sys.argv[2], 'w')
     with outfile:
         json.dump(obj, outfile, sort_keys=True, indent='    ', use_decimal=True)
         outfile.write('\n')
