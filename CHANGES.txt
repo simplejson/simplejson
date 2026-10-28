@@ -1,3 +1,9 @@
+Unreleased
+
+* Classify float subclasses by their underlying value in the pure Python
+  encoder, matching the C encoder even when comparison methods are overridden.
+  Preserve custom float conversion for finite values.
+
 Version 4.2.0 released 2026-10-02
 
 * Start building wheels for Python 3.15 and drop Python 3.8 support
