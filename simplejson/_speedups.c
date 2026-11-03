@@ -2870,20 +2870,62 @@ _encoded_const(_speedups_state *state, PyObject *obj)
     }
 }
 
+/* Set the ValueError the pure Python encoder raises for a non-finite value:
+   the fixed text followed by repr(obj).  floatstr() in encoder.py builds that
+   message from the object it was handed, so a float subclass with its own
+   __repr__ is named by that repr.  The Decimal path collapses a non-finite
+   Decimal to a bare float before it reaches floatstr(), so it passes obj as
+   NULL and gets the name of the plain float that sign selects. */
+static int
+encoder_nonfinite_error(PyObject *obj, int sign)
+{
+    PyObject *name;
+    PyObject *msg;
+    PyObject *full;
+
+    if (obj != NULL) {
+        name = PyObject_Repr(obj);
+        if (name == NULL)
+            return -1;
+    }
+    else {
+        const char *plain = sign > 0 ? "inf" : (sign < 0 ? "-inf" : "nan");
+#if PY_MAJOR_VERSION >= 3
+        name = PyUnicode_FromString(plain);
+#else
+        name = PyString_FromString(plain);
+#endif
+        if (name == NULL)
+            return -1;
+    }
+#if PY_MAJOR_VERSION >= 3
+    msg = PyUnicode_FromString(
+        "Out of range float values are not JSON compliant: ");
+#else
+    msg = PyString_FromString(
+        "Out of range float values are not JSON compliant: ");
+#endif
+    if (msg == NULL) {
+        Py_DECREF(name);
+        return -1;
+    }
+    full = PyNumber_Add(msg, name);
+    Py_DECREF(msg);
+    Py_DECREF(name);
+    if (full == NULL)
+        return -1;
+    PyErr_SetObject(PyExc_ValueError, full);
+    Py_DECREF(full);
+    return -1;
+}
+
 static PyObject *
-encoder_encode_nonfinite(PyEncoderObject *s, int sign)
+encoder_encode_nonfinite(PyEncoderObject *s, PyObject *obj, int sign)
 {
     _speedups_state *state = get_speedups_state(s->module_ref);
 
     if (!s->allow_or_ignore_nan) {
-        const char *msg;
-        if (sign > 0)
-            msg = "Out of range float values are not JSON compliant: inf";
-        else if (sign < 0)
-            msg = "Out of range float values are not JSON compliant: -inf";
-        else
-            msg = "Out of range float values are not JSON compliant: nan";
-        PyErr_SetString(PyExc_ValueError, msg);
+        encoder_nonfinite_error(obj, sign);
         return NULL;
     }
     if (s->allow_or_ignore_nan & JSON_IGNORE_NAN) {
@@ -2908,7 +2950,7 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
     /* Return the JSON representation of a PyFloat */
     double i = PyFloat_AS_DOUBLE(obj);
     if (!Py_IS_FINITE(i)) {
-        return encoder_encode_nonfinite(s, i > 0 ? 1 : (i < 0 ? -1 : 0));
+        return encoder_encode_nonfinite(s, obj, i > 0 ? 1 : (i < 0 ? -1 : 0));
     }
     /* Use a better float format here? */
     if (PyFloat_CheckExact(obj)) {
@@ -2977,9 +3019,11 @@ encoder_encode_decimal(PyEncoderObject *s, PyObject *obj)
         return str;
     }
     /* Non-finite Decimal; use the same allow_nan/ignore_nan path as floats
-       without creating a temporary float. */
+       without creating a temporary float.  No object is passed because the
+       pure Python encoder converts these to a bare float before floatstr()
+       names them, so the message gets the plain 'inf'/'-inf'/'nan' text. */
     Py_DECREF(str);
-    return encoder_encode_nonfinite(s, c == 'I' ? (negative ? -1 : 1) : 0);
+    return encoder_encode_nonfinite(s, NULL, c == 'I' ? (negative ? -1 : 1) : 0);
 }
 
 static PyObject *

@@ -37,6 +37,28 @@ class TestFloat(TestCase):
             else:
                 self.fail('Unexpected success encoding %r' % (f,))
 
+    def test_degenerates_deny_message_float_subclass(self):
+        # The error names the value with repr(), as the pure Python encoder
+        # does, so a float subclass is named by its own __repr__ on both the
+        # C and the pure Python path.
+        class CustomReprFloat(float):
+            def __repr__(self):
+                return 'CustomReprFloat(%s)' % float.__repr__(self)
+
+        for text in ('inf', '-inf', 'nan'):
+            f = CustomReprFloat(text)
+            for value in (f, [f], {'k': f}, {f: 1}):
+                try:
+                    json.dumps(value, allow_nan=False)
+                except ValueError:
+                    e = sys.exc_info()[1]
+                    self.assertEqual(
+                        str(e),
+                        'Out of range float values are not JSON compliant: '
+                        'CustomReprFloat(%s)' % text)
+                else:
+                    self.fail('Unexpected success encoding %r' % (value,))
+
     def test_floats(self):
         for num in [1617161771.7650001, math.pi, math.pi**100,
                     math.pi**-100, 3.1]:
