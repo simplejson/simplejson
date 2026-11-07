@@ -2870,6 +2870,8 @@ _encoded_const(_speedups_state *state, PyObject *obj)
     }
 }
 
+#define NONFINITE_MSG "Out of range float values are not JSON compliant: "
+
 /* Set the ValueError the pure Python encoder raises for a non-finite value:
    the fixed text followed by repr(obj).  floatstr() in encoder.py builds that
    message from the object it was handed, so a float subclass with its own
@@ -2879,43 +2881,25 @@ _encoded_const(_speedups_state *state, PyObject *obj)
 static int
 encoder_nonfinite_error(PyObject *obj, int sign)
 {
-    PyObject *name;
     PyObject *msg;
-    PyObject *full;
 
-    if (obj != NULL) {
-        name = PyObject_Repr(obj);
-        if (name == NULL)
-            return -1;
-    }
-    else {
-        const char *plain = sign > 0 ? "inf" : (sign < 0 ? "-inf" : "nan");
-#if PY_MAJOR_VERSION >= 3
-        name = PyUnicode_FromString(plain);
-#else
-        name = PyString_FromString(plain);
-#endif
-        if (name == NULL)
-            return -1;
-    }
-#if PY_MAJOR_VERSION >= 3
-    msg = PyUnicode_FromString(
-        "Out of range float values are not JSON compliant: ");
-#else
-    msg = PyString_FromString(
-        "Out of range float values are not JSON compliant: ");
-#endif
-    if (msg == NULL) {
-        Py_DECREF(name);
+    if (obj == NULL) {
+        PyErr_Format(PyExc_ValueError, NONFINITE_MSG "%s",
+                     sign > 0 ? "inf" : (sign < 0 ? "-inf" : "nan"));
         return -1;
     }
-    full = PyNumber_Add(msg, name);
-    Py_DECREF(msg);
-    Py_DECREF(name);
-    if (full == NULL)
-        return -1;
-    PyErr_SetObject(PyExc_ValueError, full);
-    Py_DECREF(full);
+    /* Not PyErr_Format with %R: before 3.12 it replaces an exception raised
+       by __repr__ with a ValueError whose value is None. */
+#if PY_MAJOR_VERSION >= 3
+    msg = PyUnicode_FromFormat(NONFINITE_MSG "%R", obj);
+#else
+    msg = PyString_FromString(NONFINITE_MSG);
+    PyString_ConcatAndDel(&msg, PyObject_Repr(obj));
+#endif
+    if (msg != NULL) {
+        PyErr_SetObject(PyExc_ValueError, msg);
+        Py_DECREF(msg);
+    }
     return -1;
 }
 
