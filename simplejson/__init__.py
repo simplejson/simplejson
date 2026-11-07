@@ -158,13 +158,17 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
          namedtuple_as_object=True, tuple_as_array=True,
          bigint_as_string=False, sort_keys=False, item_sort_key=None,
          for_json=False, ignore_nan=False, int_as_string_bitcount=None,
-         iterable_as_array=False, **kw):
+         iterable_as_array=False, coerce_keys=True, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
 
     If *skipkeys* is true then ``dict`` keys that are not basic types
     (``str``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
+
+    If *coerce_keys* is false (default: ``True``), keys must be strings.
+    Other keys raise ``TypeError``, or are skipped if *skipkeys* is true.
+    Encoded byte strings still follow the *encoding* option.
 
     If *ensure_ascii* is false (default: ``True``), then the output may
     contain non-ASCII characters, so long as they do not need to be escaped
@@ -248,7 +252,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
         and not bigint_as_string and not sort_keys
         and item_sort_key is None and not for_json
         and not ignore_nan and int_as_string_bitcount is None
-        and not kw
+        and coerce_keys and not kw
     ):
         iterable = _default_encoder.iterencode(obj)
     else:
@@ -267,6 +271,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             for_json=for_json,
             ignore_nan=ignore_nan,
             int_as_string_bitcount=int_as_string_bitcount,
+            coerce_keys=coerce_keys,
             **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at
     # a debuggability cost
@@ -280,12 +285,16 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
           namedtuple_as_object=True, tuple_as_array=True,
           bigint_as_string=False, sort_keys=False, item_sort_key=None,
           for_json=False, ignore_nan=False, int_as_string_bitcount=None,
-          iterable_as_array=False, **kw):
+          iterable_as_array=False, coerce_keys=True, **kw):
     """Serialize ``obj`` to a JSON formatted ``str``.
 
     If ``skipkeys`` is true then ``dict`` keys that are not basic types
     (``str``, ``int``, ``long``, ``float``, ``bool``, ``None``)
     will be skipped instead of raising a ``TypeError``.
+
+    If *coerce_keys* is false (default: ``True``), keys must be strings.
+    Other keys raise ``TypeError``, or are skipped if *skipkeys* is true.
+    Encoded byte strings still follow the *encoding* option.
 
     If *ensure_ascii* is false (default: ``True``), then the output may
     contain non-ASCII characters, so long as they do not need to be escaped
@@ -375,7 +384,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         and not bigint_as_string and not sort_keys
         and item_sort_key is None and not for_json
         and not ignore_nan and int_as_string_bitcount is None
-        and not kw
+        and coerce_keys and not kw
     ):
         return _default_encoder.encode(obj)
     if cls is None:
@@ -394,6 +403,7 @@ def dumps(obj, skipkeys=False, ensure_ascii=True, check_circular=True,
         for_json=for_json,
         ignore_nan=ignore_nan,
         int_as_string_bitcount=int_as_string_bitcount,
+        coerce_keys=coerce_keys,
         **kw).encode(obj)
 
 
