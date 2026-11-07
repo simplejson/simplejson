@@ -59,6 +59,20 @@ class TestFloat(TestCase):
                 else:
                     self.fail('Unexpected success encoding %r' % (value,))
 
+    def test_degenerates_deny_repr_error_propagates(self):
+        # An exception raised by __repr__ while naming the value propagates
+        # unchanged instead of being replaced by the ValueError.
+        class ReprError(Exception):
+            pass
+
+        class RaisingReprFloat(float):
+            def __repr__(self):
+                raise ReprError('repr failed')
+
+        f = RaisingReprFloat('inf')
+        for value in (f, [f], {f: 1}):
+            self.assertRaises(ReprError, json.dumps, value, allow_nan=False)
+
     def test_floats(self):
         for num in [1617161771.7650001, math.pi, math.pi**100,
                     math.pi**-100, 3.1]:
