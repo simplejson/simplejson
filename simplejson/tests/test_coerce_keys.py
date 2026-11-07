@@ -1,4 +1,5 @@
-from decimal import Decimal
+# Resolve Decimal at runtime because test_decimal reloads its module.
+import decimal
 from operator import itemgetter
 from unittest import TestCase
 
@@ -24,7 +25,7 @@ class TestCoerceKeys(TestCase):
 
     def test_rejects_nonstring_keys_in_all_container_paths(self):
         keys = (1, long_type(2 ** 65), 1.5, True, False, None,
-                Decimal('1.1'), (1,), object())
+                decimal.Decimal('1.1'), (1,), object())
         for options in self.options():
             encoder = json.JSONEncoder(coerce_keys=False, **options)
             for key in keys:
@@ -61,7 +62,7 @@ class TestCoerceKeys(TestCase):
             pass
 
         pairs = [('keep', 1), (1, Unencodable()), (None, Unencodable()),
-                 (Decimal('2.5'), Unencodable())]
+                 (decimal.Decimal('2.5'), Unencodable())]
         for options in self.options():
             for container in (dict, DictSubclass, json.OrderedDict):
                 value = container(pairs)
@@ -82,7 +83,7 @@ class TestCoerceKeys(TestCase):
         self.assertEqual(seen, ['keep'])
 
     def test_string_keys_and_values_preserved(self):
-        value = {StringSubclass('key'): [None, True, 1, 1.5, Decimal('2.5')]}
+        value = {StringSubclass('key'): [None, True, 1, 1.5, decimal.Decimal('2.5')]}
         for options in self.options():
             self.assertEqual(json.dumps(value, coerce_keys=False, **options),
                              json.dumps(value, **options))
@@ -107,7 +108,8 @@ class TestCoerceKeys(TestCase):
     def test_nonfinite_keys_are_rejected_before_float_options(self):
         for options in ({}, {'allow_nan': True}, {'ignore_nan': True}):
             encoder = json.JSONEncoder(coerce_keys=False, **options)
-            for key in (float('nan'), float('inf'), Decimal('NaN'), Decimal('Infinity')):
+            for key in (float('nan'), float('inf'),
+                        decimal.Decimal('NaN'), decimal.Decimal('Infinity')):
                 with self.assertRaises(TypeError) as error:
                     encoder.encode({key: 1})
                 self.assertIn('coerce_keys is False', str(error.exception))
