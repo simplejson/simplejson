@@ -159,7 +159,8 @@ Basic Usage
                    namedtuple_as_object=True, tuple_as_array=True, \
                    bigint_as_string=False, sort_keys=False, \
                    item_sort_key=None, for_json=None, ignore_nan=False, \
-                   int_as_string_bitcount=None, iterable_as_array=False, **kw)
+                   int_as_string_bitcount=None, iterable_as_array=False, \
+                   coerce_keys=True, **kw)
 
     Serialize *obj* as a JSON formatted stream to *fp*
     (a ``.write()``-supporting file-like object) using this
@@ -190,7 +191,8 @@ Basic Usage
                     namedtuple_as_object=True, tuple_as_array=True, \
                     bigint_as_string=False, sort_keys=False, \
                     item_sort_key=None, for_json=None, ignore_nan=False, \
-                    int_as_string_bitcount=None, iterable_as_array=False, **kw)
+                    int_as_string_bitcount=None, iterable_as_array=False, \
+                    coerce_keys=True, **kw)
 
     Serialize *obj* to a JSON formatted :class:`str`.
 
@@ -198,6 +200,27 @@ Basic Usage
     of a basic type (:class:`str`, :class:`int`, :class:`long`,
     :class:`float`, :class:`bool`, ``None``) will be skipped instead of
     raising a :exc:`TypeError`.
+
+    If *coerce_keys* is false (default: ``True``), object keys must be
+    strings. Numeric keys (including :class:`~decimal.Decimal`), booleans,
+    ``None``, and other non-string keys raise :exc:`TypeError`, or are
+    skipped when *skipkeys* is true. This prevents a numeric key such as
+    ``1`` from silently becoming the same JSON name as the string ``"1"``::
+
+        >>> json.dumps({1: "integer", "1": "string"}, coerce_keys=False)
+        Traceback (most recent call last):
+          ...
+        TypeError: keys must be strings when coerce_keys is False, not int
+        >>> json.dumps({1: "integer", "1": "string"}, coerce_keys=False, skipkeys=True)
+        '{"1": "string"}'
+
+    The option applies to nested dictionaries and to dictionaries returned
+    by custom encoders. Rejected keys are filtered before *item_sort_key*
+    is called. Values keep their normal encoding behavior. Encoded byte
+    strings still follow the *encoding* option; on Python 3, use
+    ``encoding=None`` as well to accept only text string keys. This does
+    not detect duplicate JSON names supplied by a custom dictionary or
+    produced by decoding byte string keys.
 
     .. note::
 
@@ -577,7 +600,8 @@ Encoders and decoders
                        namedtuple_as_object=True, tuple_as_array=True, \
                        bigint_as_string=False, item_sort_key=None, \
                        for_json=True, ignore_nan=False, \
-                       int_as_string_bitcount=None, iterable_as_array=False)
+                       int_as_string_bitcount=None, iterable_as_array=False, \
+                       coerce_keys=True)
 
    Extensible JSON encoder for Python data structures.
 
@@ -629,6 +653,11 @@ Encoders and decoders
    If *skipkeys* is false (the default), then it is a :exc:`TypeError` to
    attempt encoding of keys that are not str, int, long, float, Decimal, bool,
    or None. If *skipkeys* is true, such items are simply skipped.
+
+   If *coerce_keys* is false (default: ``True``), only string keys are
+   accepted. Other keys raise :exc:`TypeError`, or are skipped when
+   *skipkeys* is true. Encoded byte strings still follow the *encoding*
+   option. See :func:`dumps` for examples and details.
 
    If *ensure_ascii* is true (the default), the output is guaranteed to be
    :class:`str` objects with all incoming unicode characters escaped.  If
@@ -769,7 +798,8 @@ Encoders and decoders
                               tuple_as_array=True, \
                               bigint_as_string=False, item_sort_key=None, \
                               for_json=True, ignore_nan=False, \
-                              int_as_string_bitcount=None)
+                              int_as_string_bitcount=None, \
+                              iterable_as_array=False, coerce_keys=True)
 
    Subclass of :class:`JSONEncoder` that escapes &, <, and > for embedding in HTML.
 
