@@ -1,3 +1,4 @@
+import sys
 import decimal
 from decimal import Decimal
 from unittest import TestCase
@@ -102,6 +103,21 @@ class TestDecimal(TestCase):
             self.assertRaises(ValueError, json.dumps, d, allow_nan=False)
         # allow_nan defaults to False, so a plain dumps must raise too.
         self.assertRaises(ValueError, json.dumps, Decimal('NaN'))
+
+    def test_decimal_nan_deny_message(self):
+        # The error names the value, as it does for the equivalent float.
+        for d, text in ((Decimal('NaN'), 'nan'), (Decimal('sNaN'), 'nan'),
+                        (Decimal('Infinity'), 'inf'),
+                        (Decimal('-Infinity'), '-inf')):
+            try:
+                json.dumps(d, allow_nan=False)
+            except ValueError:
+                e = sys.exc_info()[1]
+                self.assertEqual(
+                    str(e),
+                    'Out of range float values are not JSON compliant: ' + text)
+            else:
+                self.fail('Unexpected success encoding %r' % (d,))
 
     def test_decimal_nan_as_value(self):
         # Non-finite Decimals nested inside containers must be handled too.

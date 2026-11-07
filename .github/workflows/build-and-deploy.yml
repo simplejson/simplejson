@@ -291,6 +291,8 @@ jobs:
             arch: auto
           - os: windows-latest
             arch: auto
+          - os: windows-11-arm
+            arch: ARM64
           - os: macos-latest
             arch: "x86_64 universal2 arm64"
 
