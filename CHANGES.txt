@@ -1,3 +1,36 @@
+Version 4.3.0 released 2026-11-10
+
+* The C encoder no longer crashes when ``default()`` or ``for_json()``
+  shrinks or grows the list being encoded, and no longer reads a freed
+  key when encoding a dict value removes its entry. Both encoders now
+  raise ``RuntimeError("dictionary changed size during iteration")``
+  when a dict is resized while it is being encoded. ``make_encoder()``
+  raises ``TypeError`` for an invalid ``markers`` argument instead of
+  crashing, and C and pure Python error messages now match
+  https://github.com/simplejson/simplejson/pull/395
+* Circular references are now detected through re-iterable objects
+  encoded with ``iterable_as_array=True``, in both encoders
+  https://github.com/simplejson/simplejson/pull/391
+* A failure while adding a PEP 678 context note no longer replaces the
+  original serialization error
+  https://github.com/simplejson/simplejson/pull/392
+* Explicitly supplied ``parse_float``, ``parse_int`` and
+  ``parse_constant`` callbacks are now used even when they are falsy
+  https://github.com/simplejson/simplejson/pull/394
+* An explicit ``item_sort_key`` is now honored even when it is falsy
+  https://github.com/simplejson/simplejson/pull/396
+* ``python -m simplejson.tool`` now reads input files as UTF-8
+  regardless of the locale
+  https://github.com/simplejson/simplejson/pull/397
+* With ``allow_nan=False`` the C encoder's ``ValueError`` now names the
+  out-of-range value, matching the pure Python encoder
+  https://github.com/simplejson/simplejson/pull/399
+* Build and test native Windows arm64 wheels
+  https://github.com/simplejson/simplejson/pull/401
+* Wheels for CPython 3.15 are now built against the final 3.15 release
+  via cibuildwheel v4.3.5, and CI uses astral-sh/setup-uv v10.3.3
+  https://github.com/simplejson/simplejson/pull/405
+
 Version 4.2.0 released 2026-10-02
 
 * Start building wheels for Python 3.15 and drop Python 3.8 support
