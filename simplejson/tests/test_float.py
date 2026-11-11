@@ -160,3 +160,40 @@ class TestFloatSubclassComparison(TestCase):
             for options in ({'allow_nan': True}, {'ignore_nan': True}):
                 self.assertEqual(json.dumps(NonfiniteFloat(value), **options),
                                  json.dumps(value, **options))
+
+    def test_nonfinite_conversion_result_is_classified(self):
+        # A custom __float__ on a finite value must not bypass allow_nan.
+        for result, text in ((NaN, 'NaN'), (PosInf, 'Infinity'),
+                             (NegInf, '-Infinity')):
+            class ConvertsToNonfinite(float):
+                def __float__(self, result=result):
+                    return result
+
+            for wrap in self.wrappers:
+                value = wrap(ConvertsToNonfinite(1.5))
+                self.assertRaises(ValueError, json.dumps, value,
+                                  allow_nan=False)
+                self.assertEqual(json.dumps(value, allow_nan=True),
+                                 json.dumps(wrap(result), allow_nan=True))
+                self.assertEqual(json.dumps(value, ignore_nan=True),
+                                 json.dumps(wrap(result), ignore_nan=True))
+            self.assertEqual(json.dumps(ConvertsToNonfinite(1.5),
+                                        allow_nan=True), text)
+
+    def test_nonfinite_deny_message_ignores_custom_repr(self):
+        class RaisingReprFloat(float):
+            def __repr__(self):
+                raise RuntimeError('custom repr called')
+
+        for value, text in ((NaN, 'nan'), (PosInf, 'inf'), (NegInf, '-inf')):
+            for wrap in self.wrappers:
+                try:
+                    json.dumps(wrap(RaisingReprFloat(value)), allow_nan=False)
+                except ValueError:
+                    e = sys.exc_info()[1]
+                    self.assertEqual(
+                        str(e),
+                        'Out of range float values are not JSON compliant: ' +
+                        text)
+                else:
+                    self.fail('Unexpected success encoding %r' % (value,))

@@ -2915,11 +2915,26 @@ encoder_encode_float(PyEncoderObject *s, PyObject *obj)
         return PyObject_Repr(obj);
     }
     else {
-        /* See #118, do not trust custom str/repr */
+        /* See #118, do not trust custom str/repr. A custom __float__ is
+           honored for finite values, but its result is classified again
+           so it can not produce invalid JSON. */
         PyObject *res;
         PyObject *tmp = PyObject_CallOneArg((PyObject *)&PyFloat_Type, obj);
         if (tmp == NULL) {
             return NULL;
+        }
+        i = PyFloat_AS_DOUBLE(tmp);
+        if (!Py_IS_FINITE(i)) {
+            Py_DECREF(tmp);
+            return encoder_encode_nonfinite(s, i > 0 ? 1 : (i < 0 ? -1 : 0));
+        }
+        if (!PyFloat_CheckExact(tmp)) {
+            /* Python 2 float() may return a subclass from __float__ */
+            Py_DECREF(tmp);
+            tmp = PyFloat_FromDouble(i);
+            if (tmp == NULL) {
+                return NULL;
+            }
         }
         res = PyObject_Repr(tmp);
         Py_DECREF(tmp);

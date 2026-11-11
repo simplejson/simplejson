@@ -388,20 +388,27 @@ class JSONEncoder(object):
             # and/or platform-specific, so do tests which don't depend on
             # the internals.
 
-            # Match the C encoder's raw float classification without calling
-            # comparison hooks on a subclass. Keep finite float(o) conversion
-            # below, which may intentionally use a custom __float__ method.
-            value = o if type(o) is float else float.__float__(o)
-            if value != value:
+            if type(o) is not float:
+                # Classify by the underlying float value, as the C encoder
+                # does, without calling comparison hooks on the subclass.
+                value = float.__float__(o)
+                if value != value or value == _inf or value == _neginf:
+                    o = value
+                else:
+                    # See #118, do not trust custom str/repr. A custom
+                    # __float__ is honored for finite values, but its result
+                    # is classified again below so it can not produce
+                    # invalid JSON.
+                    o = float(o)
+                    if type(o) is not float:
+                        o = float.__float__(o)
+            if o != o:
                 text = 'NaN'
-            elif value == _inf:
+            elif o == _inf:
                 text = 'Infinity'
-            elif value == _neginf:
+            elif o == _neginf:
                 text = '-Infinity'
             else:
-                if type(o) != float:
-                    # See #118, do not trust custom str/repr
-                    o = float(o)
                 return _repr(o)
 
             if ignore_nan:
