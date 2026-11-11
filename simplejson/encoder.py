@@ -388,11 +388,15 @@ class JSONEncoder(object):
             # and/or platform-specific, so do tests which don't depend on
             # the internals.
 
-            if o != o:
+            # Match the C encoder's raw float classification without calling
+            # comparison hooks on a subclass. Keep finite float(o) conversion
+            # below, which may intentionally use a custom __float__ method.
+            value = o if type(o) is float else float.__float__(o)
+            if value != value:
                 text = 'NaN'
-            elif o == _inf:
+            elif value == _inf:
                 text = 'Infinity'
-            elif o == _neginf:
+            elif value == _neginf:
                 text = '-Infinity'
             else:
                 if type(o) != float:
