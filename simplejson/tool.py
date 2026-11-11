@@ -14,17 +14,17 @@ import sys
 import simplejson as json
 
 def main():
-    if len(sys.argv) == 1:
-        infile = sys.stdin
-        outfile = sys.stdout
-    elif len(sys.argv) == 2:
-        infile = open(sys.argv[1], 'rb')
-        outfile = sys.stdout
-    elif len(sys.argv) == 3:
-        infile = open(sys.argv[1], 'rb')
-        outfile = None
-    else:
+    if len(sys.argv) > 3:
         raise SystemExit(sys.argv[0] + " [infile [outfile]]")
+    infile_name = sys.argv[1] if len(sys.argv) > 1 else None
+    outfile_name = sys.argv[2] if len(sys.argv) > 2 else None
+    try:
+        if infile_name is None:
+            infile = sys.stdin
+        else:
+            infile = open(infile_name, 'rb')
+    except (IOError, OSError):
+        raise SystemExit(sys.exc_info()[1])
     with infile:
         try:
             obj = json.load(infile,
@@ -32,8 +32,15 @@ def main():
                             use_decimal=True)
         except ValueError:
             raise SystemExit(sys.exc_info()[1])
-    if outfile is None:
-        outfile = open(sys.argv[2], 'w')
+    # Open the output only after the input is parsed and closed, so a bad
+    # input (or infile == outfile) never truncates the output.
+    try:
+        if outfile_name is None:
+            outfile = sys.stdout
+        else:
+            outfile = open(outfile_name, 'w')
+    except (IOError, OSError):
+        raise SystemExit(sys.exc_info()[1])
     with outfile:
         json.dump(obj, outfile, sort_keys=True, indent='    ', use_decimal=True)
         outfile.write('\n')

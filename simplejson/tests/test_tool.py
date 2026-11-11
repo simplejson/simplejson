@@ -46,7 +46,7 @@ class TestTool(unittest.TestCase):
     ]
     """)
 
-    def runTool(self, args=None, data=None, env=None):
+    def runToolProcess(self, args=None, data=None, env=None):
         if sys.platform == 'emscripten':
             self.skipTest("subprocess not available on Emscripten")
         argv = [sys.executable, '-m', 'simplejson.tool']
@@ -58,9 +58,23 @@ class TestTool(unittest.TestCase):
                                 stdout=subprocess.PIPE,
                                 env=env)
         out, err = proc.communicate(data)
-        self.assertEqual(strip_python_stderr(err), ''.encode())
-        self.assertEqual(proc.returncode, 0)
+        return proc.returncode, out, strip_python_stderr(err)
+
+    def runTool(self, args=None, data=None, env=None):
+        returncode, out, err = self.runToolProcess(args, data, env)
+        self.assertEqual(err, ''.encode())
+        self.assertEqual(returncode, 0)
         return out.decode('utf8').splitlines()
+
+    def runToolFailure(self, args):
+        """Run the tool expecting a clean failure: a one-line error
+        message on stderr, no traceback, and nothing on stdout."""
+        returncode, out, err = self.runToolProcess(args)
+        self.assertNotEqual(returncode, 0)
+        self.assertEqual(out, b'')
+        self.assertTrue(err)
+        self.assertNotIn(b'Traceback', err)
+        return err
 
     def test_stdin_stdout(self):
         self.assertEqual(
@@ -143,56 +157,57 @@ class TestTool(unittest.TestCase):
                 self.assertEqual(f.read().decode('utf8').splitlines(),
                                  self.expect.splitlines())
         finally:
-            infile.close()
             os.unlink(infile_name)
 
-    def assert_failed_input_preserves_output(self, same_file=False,
-                                            missing_input=False):
-        if sys.platform == 'emscripten':
-            self.skipTest("subprocess not available on Emscripten")
+    def test_invalid_input_preserves_outfile(self):
         infile, infile_name = open_temp_file()
         outfile, outfile_name = open_temp_file()
-        invalid_json = b'{invalid json'
-        old_output = b'previous output\n'
         try:
-            infile.write(invalid_json)
+            infile.write(b'{invalid json')
             infile.close()
-            outfile.write(old_output)
+            outfile.write(b'previous output\n')
             outfile.close()
-            output_name = infile_name if same_file else outfile_name
-            input_name = infile_name
-            if missing_input:
-                # Use a non-existent child of a newly created empty directory.
-                directory = tempfile.mkdtemp()
-                input_name = os.path.join(directory, 'missing.json')
-            try:
-                proc = subprocess.Popen(
-                    [sys.executable, '-m', 'simplejson.tool',
-                     input_name, output_name],
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                out, err = proc.communicate()
-                self.assertNotEqual(proc.returncode, 0)
-                self.assertEqual(out, b'')
-                self.assertTrue(strip_python_stderr(err))
-                if not missing_input:
-                    self.assertIn(b'Expecting property name', err)
-                with open(output_name, 'rb') as f:
-                    self.assertEqual(f.read(),
-                                     invalid_json if same_file else old_output)
-            finally:
-                if missing_input:
-                    os.rmdir(directory)
+            err = self.runToolFailure([infile_name, outfile_name])
+            self.assertIn(b'Expecting property name', err)
+            with open(outfile_name, 'rb') as f:
+                self.assertEqual(f.read(), b'previous output\n')
         finally:
-            infile.close()
-            outfile.close()
             os.unlink(infile_name)
             os.unlink(outfile_name)
 
-    def test_invalid_input_preserves_output(self):
-        self.assert_failed_input_preserves_output()
+    def test_invalid_input_preserves_infile_is_outfile(self):
+        infile, infile_name = open_temp_file()
+        try:
+            infile.write(b'{invalid json')
+            infile.close()
+            err = self.runToolFailure([infile_name, infile_name])
+            self.assertIn(b'Expecting property name', err)
+            with open(infile_name, 'rb') as f:
+                self.assertEqual(f.read(), b'{invalid json')
+        finally:
+            os.unlink(infile_name)
 
-    def test_invalid_input_preserves_same_file(self):
-        self.assert_failed_input_preserves_output(same_file=True)
+    def test_missing_infile_is_clean_error(self):
+        outfile, outfile_name = open_temp_file()
+        try:
+            outfile.write(b'previous output\n')
+            outfile.close()
+            self.runToolFailure([outfile_name + '.missing', outfile_name])
+            with open(outfile_name, 'rb') as f:
+                self.assertEqual(f.read(), b'previous output\n')
+        finally:
+            os.unlink(outfile_name)
 
-    def test_missing_input_preserves_output(self):
-        self.assert_failed_input_preserves_output(missing_input=True)
+    def test_unopenable_outfile_is_clean_error(self):
+        infile, infile_name = open_temp_file()
+        directory = tempfile.mkdtemp()
+        try:
+            infile.write(self.data.encode())
+            infile.close()
+            missing_dir = os.path.join(directory, 'missing')
+            self.runToolFailure(
+                [infile_name, os.path.join(missing_dir, 'out.json')])
+            self.assertFalse(os.path.exists(missing_dir))
+        finally:
+            os.unlink(infile_name)
+            os.rmdir(directory)
