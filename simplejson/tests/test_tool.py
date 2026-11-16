@@ -132,3 +132,67 @@ class TestTool(unittest.TestCase):
                 os.unlink(outfile_name)
         finally:
             os.unlink(infile_name)
+
+    def test_infile_is_outfile(self):
+        infile, infile_name = open_temp_file()
+        try:
+            infile.write(self.data.encode())
+            infile.close()
+            self.assertEqual(self.runTool(args=[infile_name, infile_name]), [])
+            with open(infile_name, 'rb') as f:
+                self.assertEqual(f.read().decode('utf8').splitlines(),
+                                 self.expect.splitlines())
+        finally:
+            infile.close()
+            os.unlink(infile_name)
+
+    def assert_failed_input_preserves_output(self, same_file=False,
+                                            missing_input=False):
+        if sys.platform == 'emscripten':
+            self.skipTest("subprocess not available on Emscripten")
+        infile, infile_name = open_temp_file()
+        outfile, outfile_name = open_temp_file()
+        invalid_json = b'{invalid json'
+        old_output = b'previous output\n'
+        try:
+            infile.write(invalid_json)
+            infile.close()
+            outfile.write(old_output)
+            outfile.close()
+            output_name = infile_name if same_file else outfile_name
+            input_name = infile_name
+            if missing_input:
+                # Use a non-existent child of a newly created empty directory.
+                directory = tempfile.mkdtemp()
+                input_name = os.path.join(directory, 'missing.json')
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, '-m', 'simplejson.tool',
+                     input_name, output_name],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                out, err = proc.communicate()
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertEqual(out, b'')
+                self.assertTrue(strip_python_stderr(err))
+                if not missing_input:
+                    self.assertIn(b'Expecting property name', err)
+                with open(output_name, 'rb') as f:
+                    self.assertEqual(f.read(),
+                                     invalid_json if same_file else old_output)
+            finally:
+                if missing_input:
+                    os.rmdir(directory)
+        finally:
+            infile.close()
+            outfile.close()
+            os.unlink(infile_name)
+            os.unlink(outfile_name)
+
+    def test_invalid_input_preserves_output(self):
+        self.assert_failed_input_preserves_output()
+
+    def test_invalid_input_preserves_same_file(self):
+        self.assert_failed_input_preserves_output(same_file=True)
+
+    def test_missing_input_preserves_output(self):
+        self.assert_failed_input_preserves_output(missing_input=True)
