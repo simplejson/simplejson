@@ -199,12 +199,17 @@ class JSONEncoder(object):
                  use_decimal=True, namedtuple_as_object=True,
                  tuple_as_array=True, bigint_as_string=False,
                  item_sort_key=None, for_json=False, ignore_nan=False,
-                 int_as_string_bitcount=None, iterable_as_array=False):
+                 int_as_string_bitcount=None, iterable_as_array=False,
+                 coerce_keys=True):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
         encoding of keys that are not str, int, long, float or None.  If
         skipkeys is True, such items are simply skipped.
+
+        If coerce_keys is false, keys must be strings. Non-string keys
+        raise TypeError, or are skipped when skipkeys is true. Encoded byte
+        strings still follow the encoding option.
 
         If ensure_ascii is true, the output is guaranteed to be str
         objects with all incoming unicode characters escaped.  If
@@ -284,6 +289,7 @@ class JSONEncoder(object):
         """
 
         self.skipkeys = skipkeys
+        self.coerce_keys = bool(coerce_keys)
         self.ensure_ascii = ensure_ascii
         self.check_circular = check_circular
         self.allow_nan = allow_nan
@@ -420,7 +426,8 @@ class JSONEncoder(object):
                 self.namedtuple_as_object, self.tuple_as_array,
                 int_as_string_bitcount,
                 self.item_sort_key, self.encoding, self.for_json,
-                self.ignore_nan, decimal.Decimal, self.iterable_as_array)
+                self.ignore_nan, decimal.Decimal, self.iterable_as_array,
+                self.coerce_keys)
         else:
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
@@ -429,7 +436,8 @@ class JSONEncoder(object):
                 self.namedtuple_as_object, self.tuple_as_array,
                 int_as_string_bitcount,
                 self.item_sort_key, self.encoding, self.for_json,
-                self.iterable_as_array, Decimal=decimal.Decimal)
+                self.iterable_as_array, _coerce_keys=self.coerce_keys,
+                Decimal=decimal.Decimal)
         try:
             return _iterencode(o, 0)
         finally:
@@ -479,6 +487,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
         _int_as_string_bitcount, _item_sort_key,
         _encoding,_for_json,
         _iterable_as_array,
+        _coerce_keys=True,
         ## HACK: hand-optimized bytecode; turn globals into locals
         _PY3=PY3,
         ValueError=ValueError,
@@ -654,6 +663,11 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
             pass
         elif _PY3 and isinstance(key, bytes) and _encoding is not None:
             key = str(key, _encoding)
+        elif not _coerce_keys:
+            if _skipkeys:
+                return None
+            raise TypeError('keys must be strings when coerce_keys is False, '
+                            'not %s' % key.__class__.__name__)
         elif isinstance(key, float):
             key = _floatstr(key)
         elif key is True:

@@ -292,6 +292,7 @@ typedef struct _PyEncoderObject {
     PyObject *Decimal;
     PyObject *skipkeys_bool;
     int skipkeys;
+    int coerce_keys;
     int fast_encode;
     /* 0, JSON_ALLOW_NAN, JSON_IGNORE_NAN */
     int allow_or_ignore_nan;
@@ -1104,6 +1105,16 @@ encoder_stringify_key(PyEncoderObject *s, PyObject *key)
         return key;
     }
 #endif /* PY_MAJOR_VERSION < 3 */
+    else if (!s->coerce_keys) {
+        if (s->skipkeys) {
+            Py_INCREF(Py_None);
+            return Py_None;
+        }
+        PyErr_Format(PyExc_TypeError,
+                     "keys must be strings when coerce_keys is False, "
+                     "not %.100s", json_type_name(key));
+        return NULL;
+    }
     else if (PyFloat_Check(key)) {
         return encoder_encode_float(s, key);
     }
@@ -2598,6 +2609,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         "ignore_nan",
         "Decimal",
         "iterable_as_array",
+        "coerce_keys",
         NULL};
 
     PyEncoderObject *s;
@@ -2606,6 +2618,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyObject *use_decimal, *namedtuple_as_object, *tuple_as_array, *iterable_as_array;
     PyObject *int_as_string_bitcount, *item_sort_key, *encoding, *for_json;
     PyObject *ignore_nan, *Decimal;
+    PyObject *coerce_keys = Py_True;
     int is_true;
 
     /* Build the format string from per-argument pieces so that each "O"
@@ -2634,6 +2647,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         "O"  /* ignore_nan */
         "O"  /* Decimal */
         "O"  /* iterable_as_array */
+        "|O" /* coerce_keys */
         ":make_encoder";
 
     if (!PyArg_ParseTupleAndKeywords(args, kwds, fmt, kwlist,
@@ -2641,7 +2655,7 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         &sort_keys, &skipkeys, &allow_nan, &key_memo, &use_decimal,
         &namedtuple_as_object, &tuple_as_array,
         &int_as_string_bitcount, &item_sort_key, &encoding, &for_json,
-        &ignore_nan, &Decimal, &iterable_as_array))
+        &ignore_nan, &Decimal, &iterable_as_array, &coerce_keys))
         return NULL;
 
     /* markers goes straight to PyDict_Contains, PyDict_SetItem and
@@ -2700,6 +2714,9 @@ encoder_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     s->skipkeys_bool = skipkeys;
     s->skipkeys = PyObject_IsTrue(skipkeys);
     if (s->skipkeys < 0)
+        goto bail;
+    s->coerce_keys = PyObject_IsTrue(coerce_keys);
+    if (s->coerce_keys < 0)
         goto bail;
     Py_INCREF(key_memo);
     s->key_memo = key_memo;
