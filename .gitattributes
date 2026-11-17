@@ -1,0 +1,2 @@
+simplejson/tests/JSONTestSuite/test_parsing/*.json -text
+simplejson/tests/JSONTestSuite/test_transform/*.json -text

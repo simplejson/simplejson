@@ -5,3 +5,7 @@ include *.toml
 include scripts/*.py
 include MANIFEST.in
 include simplejson/*.h
+include simplejson/tests/JSONTestSuite/LICENSE
+include simplejson/tests/JSONTestSuite/README.md
+recursive-include simplejson/tests/JSONTestSuite/test_parsing *.json
+recursive-include simplejson/tests/JSONTestSuite/test_transform *.json
