@@ -751,11 +751,15 @@ Encoders and decoders
 
    .. method:: iterencode(o)
 
-      Encode the given object, *o*, and yield each string representation as
-      available.  For example::
+      Encode the given object, *o*, and return an iterable of string chunks.
+      For example::
 
             for chunk in JSONEncoder().iterencode(bigobject):
                 mysocket.write(chunk)
+
+      With the C extension enabled, this method buffers the complete encoded
+      output before returning. This also applies when *indent* is set;
+      receiving chunks does not mean the input is processed incrementally.
 
       Note that :meth:`encode` has much better performance than
       :meth:`iterencode`.
