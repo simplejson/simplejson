@@ -359,8 +359,11 @@ class JSONEncoder(object):
             return u''.join(chunks)
 
     def iterencode(self, o):
-        """Encode the given object and yield each string
-        representation as available.
+        """Encode the given object and return an iterable of string chunks.
+
+        With the C extension enabled, this method buffers the complete encoded
+        output before returning. This also applies when indent is set;
+        receiving chunks does not mean the input is processed incrementally.
 
         For example::
 
